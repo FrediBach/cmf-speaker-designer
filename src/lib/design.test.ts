@@ -21,6 +21,7 @@ describe('saved and shared handle designs', () => {
     }
     const restored = validateDesign(oldDesign)
     expect(restored).toMatchObject({ ...oldDesign, style: 'original' })
+    expect(restored.bodyColor).toBe('black')
     expect(restored.handle).toMatchObject({ mode: 'original', height: 27 })
     expect(restored.grille.mode).toBe('original')
     expect(restored.halo).toEqual(DEFAULT_HALO_SETTINGS)
@@ -28,6 +29,36 @@ describe('saved and shared handle designs', () => {
     expect(validateDesign({ model: 'm', handle: null }).handle).toEqual(
       restored.handle,
     )
+  })
+
+  it.each(['black', 'gray'] as const)(
+    'restores a %s body through storage and shared links independently of panel color',
+    (bodyColor) => {
+      const design = validateDesign({
+        ...DEFAULT_DESIGN,
+        model: 'm',
+        bodyColor,
+        panelColor: '#123abc',
+      })
+      expect(design.bodyColor).toBe(bodyColor)
+      expect(design.panelColor).toBe('#123abc')
+      vi.stubGlobal('window', { location: { search: '' } })
+      vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(design) })
+      expect(readDesign()).toEqual(design)
+      vi.stubGlobal('window', {
+        location: {
+          search: `?design=${encodeURIComponent(JSON.stringify(design))}`,
+        },
+      })
+      expect(readDesign()).toEqual(design)
+    },
+  )
+
+  it('defaults missing and unsupported body colors to black', () => {
+    expect(DEFAULT_DESIGN.bodyColor).toBe('black')
+    for (const bodyColor of [undefined, null, 'white', '#808080', 1, {}]) {
+      expect(validateDesign({ bodyColor }).bodyColor).toBe('black')
+    }
   })
 
   it.each(['1', '2', '3'])(

@@ -28,6 +28,7 @@ describe('random designs', () => {
       ]
       for (const design of designs) {
         expect(design.model).toBe(model)
+        expect(['black', 'gray']).toContain(design.bodyColor)
         expect(validateDesign(design)).toEqual(design)
         expect(design.style).toBe('custom')
         expect(
@@ -63,7 +64,12 @@ describe('random designs', () => {
 
   it('varies every setting, including inactive settings and each component mode', () => {
     const designs = sampleDesigns('s')
-    for (const key of ['panelColor', 'knobColor', 'relief'] as const)
+    for (const key of [
+      'bodyColor',
+      'panelColor',
+      'knobColor',
+      'relief',
+    ] as const)
       expect(
         new Set(designs.map((design) => design[key])).size,
       ).toBeGreaterThan(1)
@@ -79,6 +85,10 @@ describe('random designs', () => {
     expect(new Set(designs.map(({ knob }) => knob.style))).toEqual(
       new Set(KNOB_STYLES.map(({ id }) => id)),
     )
+    for (const model of ['s', 'm'] as const)
+      expect(
+        new Set(sampleDesigns(model).map(({ bodyColor }) => bodyColor)),
+      ).toEqual(new Set(['black', 'gray']))
     expect(new Set(designs.map(({ handle }) => handle.cutout))).toEqual(
       new Set(['none', 'circle', 'slot']),
     )

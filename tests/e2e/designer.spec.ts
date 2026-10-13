@@ -223,6 +223,13 @@ for (const viewport of [
     await page.goto('/')
     await expectPanelReady(page)
     await expectWorkspaceInViewport(page)
+    const grayBody = page.getByRole('button', {
+      name: 'Speaker body: Gray',
+      exact: true,
+    })
+    await expect(grayBody).toBeInViewport({ ratio: 1 })
+    await grayBody.click()
+    await expect(grayBody).toHaveAttribute('aria-pressed', 'true')
     await page.screenshot({
       path: testInfo.outputPath(
         `workspace-${viewport.width}x${viewport.height}.png`,
@@ -276,6 +283,26 @@ test('renders WebGL and switches parametric panel modes, colors, and preview mod
     fullPage: true,
   })
 
+  const grayBody = page.getByRole('button', {
+    name: 'Speaker body: Gray',
+    exact: true,
+  })
+  const blackBody = page.getByRole('button', {
+    name: 'Speaker body: Black',
+    exact: true,
+  })
+  await expect(blackBody).toHaveAttribute('aria-pressed', 'true')
+  const blackSpeakerS = await stablePreviewFrame(page)
+  await grayBody.focus()
+  await grayBody.press('Enter')
+  await expect(grayBody).toHaveAttribute('aria-pressed', 'true')
+  expect((await stablePreviewFrame(page)).equals(blackSpeakerS)).toBe(false)
+  await page.getByRole('button', { name: 'Apply Less is more colors' }).click()
+  await stablePreviewFrame(page)
+  await page.screenshot({
+    path: testInfo.outputPath('gray-body-speaker-s.png'),
+  })
+
   const variants = [
     { model: 'S', height: '131' },
     { model: 'M', height: '225' },
@@ -286,6 +313,7 @@ test('renders WebGL and switches parametric panel modes, colors, and preview mod
     })
     await modelButton.click()
     await expect(modelButton).toHaveAttribute('aria-pressed', 'true')
+    await expect(grayBody).toHaveAttribute('aria-pressed', 'true')
     await expect(page.locator('.style-options button')).toHaveText([
       'Original',
       'Custom',
@@ -327,6 +355,15 @@ test('renders WebGL and switches parametric panel modes, colors, and preview mod
     true,
   )
 
+  const graySpeakerM = await stablePreviewFrame(page)
+  await page.screenshot({
+    path: testInfo.outputPath('gray-body-speaker-m.png'),
+  })
+  await blackBody.click()
+  await expect(blackBody).toHaveAttribute('aria-pressed', 'true')
+  expect((await stablePreviewFrame(page)).equals(graySpeakerM)).toBe(false)
+  await grayBody.click()
+
   await page
     .getByRole('button', { name: 'Front panel: Lagoon', exact: true })
     .click()
@@ -355,6 +392,7 @@ test('renders WebGL and switches parametric panel modes, colors, and preview mod
 
   await page.reload()
   await expectPanelReady(page)
+  await expect(grayBody).toHaveAttribute('aria-pressed', 'true')
   await expect(
     page.getByRole('button', { name: /^Speaker M/ }),
   ).toHaveAttribute('aria-pressed', 'true')

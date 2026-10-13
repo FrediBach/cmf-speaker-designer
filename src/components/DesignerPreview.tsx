@@ -99,6 +99,7 @@ export function DesignerPreview({
                 error={error}
                 key={retryKey}
                 model={design.model}
+                bodyColor={design.bodyColor}
                 style="original"
                 panelColor={design.panelColor}
                 knobColor={design.knobColor}

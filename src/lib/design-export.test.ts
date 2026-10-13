@@ -80,6 +80,7 @@ describe('design export', () => {
     const knob = new CylinderGeometry(10, 10, 12, 16)
     const design: Design = {
       ...DEFAULT_DESIGN,
+      bodyColor: 'gray',
       panelColor: '#123456',
       knobColor: '#abcdef',
       knob: {
@@ -119,6 +120,7 @@ describe('design export', () => {
     expect(entries.get(knobName)).toEqual(new Uint8Array(exportKnobStl(knob)))
     const settings = JSON.parse(decoder.decode(entries.get('design.json')))
     expect(settings).toMatchObject(design)
+    expect(settings.bodyColor).toBe('gray')
     expect(settings.knob).not.toHaveProperty('diameter')
     expect(settings.knob).not.toHaveProperty('rotation')
     expect(settings.export.units).toBe('mm')

@@ -29,8 +29,16 @@ export const PALETTE = [
   { name: 'Cobalt', value: '#5573ce' },
 ] as const
 
+export const BODY_COLORS = {
+  black: { label: 'Black', shell: '#272b2e', radiator: '#2b2f31' },
+  gray: { label: 'Gray', shell: '#929697', radiator: '#85898a' },
+} as const
+
+export type BodyColor = keyof typeof BODY_COLORS
+
 export type Design = {
   model: 's' | 'm'
+  bodyColor: BodyColor
   style: PanelStyle
   panelColor: string
   knobColor: string
@@ -42,6 +50,7 @@ export type Design = {
 }
 export const DEFAULT_DESIGN: Design = {
   model: 's',
+  bodyColor: 'black',
   style: 'original',
   panelColor: '#f45427',
   knobColor: '#303538',
@@ -63,6 +72,7 @@ export function validateDesign(value: unknown): Design {
   const halo = normalizeHaloSettings(data.halo ?? {})
   return {
     model,
+    bodyColor: data.bodyColor === 'gray' ? 'gray' : 'black',
     knob: normalizeKnobSettings(data.knob ?? {}),
     grille,
     halo,

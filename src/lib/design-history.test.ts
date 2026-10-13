@@ -15,6 +15,21 @@ const setRelief = (state: DesignHistory, relief: number) =>
   })
 
 describe('design history', () => {
+  it('records body-only changes and restores them with undo and redo', () => {
+    const start = initial()
+    const changed = designHistoryReducer(start, {
+      type: 'set',
+      update: (design) => ({ ...design, bodyColor: 'gray' }),
+    })
+    expect(changed.present).toEqual({ ...DEFAULT_DESIGN, bodyColor: 'gray' })
+    expect(changed.past).toHaveLength(1)
+    const undone = designHistoryReducer(changed, { type: 'undo' })
+    expect(undone.present).toEqual(DEFAULT_DESIGN)
+    expect(designHistoryReducer(undone, { type: 'redo' }).present).toEqual(
+      changed.present,
+    )
+  })
+
   it('undoes and redoes multiple edits in order, including speaker selection', () => {
     const start = initial()
     const first = setRelief(start, 0.5)

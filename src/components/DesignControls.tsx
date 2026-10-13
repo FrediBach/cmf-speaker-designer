@@ -15,7 +15,7 @@ import { HaloEditor } from './HaloEditor'
 import { GrilleEditor } from './GrilleEditor'
 import { HandleEditor } from './HandleEditor'
 import { KnobEditor } from './KnobEditor'
-import type { Design } from '@/lib/design'
+import { BODY_COLORS, type Design } from '@/lib/design'
 import type { useDesignGeometry } from '@/lib/use-design-geometry'
 import type { useDesignInteractions } from '@/lib/use-design-interactions'
 import type { SpeakerPreviewProps } from './SpeakerPreview'
@@ -114,6 +114,36 @@ export function DesignControls({
               </span>
             </button>
           ))}
+        </div>
+        <div className="body-color-control">
+          <span id="body-color-label">Speaker body</span>
+          <div
+            className="body-color-options"
+            role="group"
+            aria-labelledby="body-color-label"
+          >
+            {(['black', 'gray'] as const).map((bodyColor) => (
+              <button
+                key={bodyColor}
+                type="button"
+                aria-label={`Speaker body: ${BODY_COLORS[bodyColor].label}`}
+                aria-pressed={design.bodyColor === bodyColor}
+                title={
+                  bodyColor === 'gray'
+                    ? 'Gray body (white speaker)'
+                    : 'Black body'
+                }
+                onClick={() => update({ bodyColor })}
+              >
+                <span
+                  className="body-color-swatch"
+                  style={{ background: BODY_COLORS[bodyColor].shell }}
+                  aria-hidden="true"
+                />
+                {BODY_COLORS[bodyColor].label}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
       <div className="editor-tabs" role="tablist" aria-label="Design area">

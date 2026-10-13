@@ -140,7 +140,7 @@ export function buildDesignExport({
       units: 'mm',
       files: { panel: panelName, knob: knobName },
       colorNote:
-        'STL files contain geometry only. Match panelColor and knobColor to filament or material colors in your slicer.',
+        'STL files contain geometry only. Match panelColor and knobColor to filament or material colors in your slicer. bodyColor identifies the existing speaker body, which is preview context only.',
     },
   }
   return {

@@ -38,6 +38,7 @@ function settingsEqual<T extends object>(left: T, right: T) {
 function designsEqual(left: Design, right: Design) {
   return (
     left.model === right.model &&
+    left.bodyColor === right.bodyColor &&
     left.style === right.style &&
     left.panelColor === right.panelColor &&
     left.knobColor === right.knobColor &&

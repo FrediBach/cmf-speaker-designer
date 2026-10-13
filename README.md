@@ -61,12 +61,14 @@ Controls use larger text and targets, high-contrast selected states, and visible
 
 ## What the POC does
 
+Choose **Black** or **Gray** under **Speaker body**, next to the model selection. Gray approximates the body and side radiator faces of the white speaker variant; panel and knob colors remain independent. The body choice is saved locally, shared in design links, and recorded as `bodyColor` in the ZIP's `design.json`. Older designs default to black. The body is preview context only and is not exported as an STL.
+
 - Switch between Speaker S and M.
 - Choose the original front panel or build a custom panel with parametric halos and grilles.
 - Generate a halo around each driver with adjustable outward angle, depth, wall thickness, and an angled cut that can turn the ring into a rain-cover shape.
 - Generate round, hexagonal, or slotted grilles with adjustable opening size, material spacing, arrangement, rotation, and thickness.
 - Continue the grille pattern onto the surrounding front face as recesses up to 3 mm deep, with solid material behind them.
-- Preview front panel and volume knob colors in an interactive Three.js scene, including panel-only and exploded views.
+- Preview front panel and volume knob colors with a black or gray speaker body in an interactive Three.js scene, including panel-only and exploded views.
 - Add up to 2 mm of face depth while retaining the original mounting region and overall face dimensions.
 - Generate a custom upper handle: adjust its height, width, and rounded corners, then choose a solid face or one to three circular or slotted openings.
 - Change hole size, spacing, and position, with dependent dimensions constrained to leave at least 3 mm of surrounding material.

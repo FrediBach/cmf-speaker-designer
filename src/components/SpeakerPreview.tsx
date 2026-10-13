@@ -1,6 +1,7 @@
 import { Component, useEffect, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
+import { BODY_COLORS, type BodyColor } from '@/lib/design'
 import {
   ContactShadows,
   Environment,
@@ -30,6 +31,7 @@ export interface SpeakerPreviewProps {
   geometry: BufferGeometry | null
   error?: string | null
   model: 's' | 'm'
+  bodyColor: BodyColor
   style: 'original' | 'custom'
   panelColor: string
   knobColor: string
@@ -161,11 +163,14 @@ function SpeakerBody({
   width,
   height,
   model,
+  bodyColor,
 }: {
   width: number
   height: number
   model: 's' | 'm'
+  bodyColor: BodyColor
 }) {
+  const colors = BODY_COLORS[bodyColor]
   const depth = model === 's' ? 55 : 64
   const faceTop = model === 's' ? 19 : 57
   const roofHeight = faceTop + (model === 's' ? 20 : 25)
@@ -214,7 +219,7 @@ function SpeakerBody({
     <group>
       <mesh geometry={geometry} castShadow receiveShadow>
         <meshStandardMaterial
-          color="#272b2e"
+          color={colors.shell}
           roughness={0.56}
           metalness={0.05}
         />
@@ -233,7 +238,7 @@ function SpeakerBody({
             <meshStandardMaterial color="#141719" roughness={0.85} />
           </mesh>
           <mesh geometry={radiatorFace} position={[0, 0, 0.45]}>
-            <meshStandardMaterial color="#2b2f31" roughness={0.78} />
+            <meshStandardMaterial color={colors.radiator} roughness={0.78} />
           </mesh>
         </group>
       ))}
@@ -471,6 +476,7 @@ function CameraControls({
 function SpeakerScene({
   geometry,
   model,
+  bodyColor,
   panelColor,
   knobColor,
   knobGeometry,
@@ -480,6 +486,7 @@ function SpeakerScene({
 }: {
   geometry: BufferGeometry
   model: 's' | 'm'
+  bodyColor: BodyColor
   panelColor: string
   knobColor: string
   knobGeometry: BufferGeometry | null
@@ -561,7 +568,12 @@ function SpeakerScene({
         />
       </Environment>
       {assembly !== 'panel' && assembly !== 'knob' && (
-        <SpeakerBody width={width} height={height} model={model} />
+        <SpeakerBody
+          width={width}
+          height={height}
+          model={model}
+          bodyColor={bodyColor}
+        />
       )}
       {assembly !== 'knob' && (
         <group position={[0, 0, offset]}>
@@ -620,6 +632,7 @@ export function SpeakerPreview({
   geometry,
   error,
   model,
+  bodyColor,
   style,
   panelColor,
   knobColor,
@@ -651,7 +664,7 @@ export function SpeakerPreview({
       data-preview-controls
       tabIndex={0}
       aria-description="Use arrow keys to rotate, plus to zoom in, and minus to zoom out. Use the Reset camera button to restore the view."
-      aria-label={`Interactive 3D preview of your CMF Speaker ${model.toUpperCase()} ${assembly === 'knob' ? 'volume knob' : assembly === 'panel' ? 'front panel' : 'with custom front panel and volume knob'}. Drag to rotate and scroll to zoom.`}
+      aria-label={`Interactive 3D preview of your CMF Speaker ${model.toUpperCase()} ${assembly === 'knob' ? 'volume knob' : assembly === 'panel' ? 'front panel' : `with ${bodyColor} body, custom front panel and volume knob`}. Drag to rotate and scroll to zoom.`}
       style={{
         position: 'relative',
         width: '100%',
@@ -684,6 +697,7 @@ export function SpeakerPreview({
               <SpeakerScene
                 geometry={geometry}
                 model={model}
+                bodyColor={bodyColor}
                 panelColor={panelColor}
                 knobColor={knobColor}
                 knobGeometry={knobGeometry}
