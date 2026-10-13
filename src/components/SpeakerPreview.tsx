@@ -256,10 +256,12 @@ function SpeakerControls({
 }) {
   const top = model === 's' ? 29.5 : 70
   const depth = model === 's' ? -6 : -8.5
+  // All source panels place the control openings 28.5 mm from the centerline.
+  const controlOffset = 28.5
 
   return (
     <>
-      <group position={[-26.5, top, depth]} rotation={[Math.PI / 4, 0, 0]}>
+      <group position={[-controlOffset, top, depth]} rotation={[Math.PI / 4, 0, 0]}>
         <mesh castShadow>
           <cylinderGeometry args={[9.4, 9.4, 1.1, 48]} />
           <meshStandardMaterial color="#1f2224" roughness={0.45} />
@@ -278,7 +280,7 @@ function SpeakerControls({
         </mesh>
       </group>
       <group
-        position={[26.5, top + 1.3, depth + 1.3]}
+        position={[controlOffset, top + 1.3, depth + 1.3]}
         rotation={[Math.PI / 4, 0, 0]}
       >
         <mesh castShadow>
