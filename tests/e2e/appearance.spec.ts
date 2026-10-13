@@ -160,7 +160,12 @@ test('all appearance combinations remain readable and preserve the speaker desig
       for (const [name, text] of [
         ['Export button', exportButton],
         ['Model dimensions', model.locator('small')],
-        ['Panel description', page.locator('.style-description')],
+        [
+          'Panel description',
+          page
+            .getByRole('tabpanel', { name: 'Front panel', exact: true })
+            .locator('.style-description'),
+        ],
         ['Footer', page.locator('.status-bar p')],
       ] as const) {
         expect(

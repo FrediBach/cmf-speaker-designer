@@ -1,4 +1,9 @@
 import {
+  DEFAULT_KNOB_SETTINGS,
+  normalizeKnobSettings,
+  type KnobSettings,
+} from './knob-settings'
+import {
   getDefaultHandleSettings,
   normalizeHandleSettings,
   type HandleSettings,
@@ -26,6 +31,7 @@ export type Design = {
   relief: number
   handle: HandleSettings
   grille: GrilleSettings
+  knob: KnobSettings
 }
 export const DEFAULT_DESIGN: Design = {
   model: 's',
@@ -35,6 +41,7 @@ export const DEFAULT_DESIGN: Design = {
   relief: 0,
   handle: getDefaultHandleSettings('s'),
   grille: { ...DEFAULT_GRILLE_SETTINGS },
+  knob: { ...DEFAULT_KNOB_SETTINGS },
 }
 export const STORAGE_KEY = 'cmf-speaker-design-v1'
 const isColor = (value: unknown): value is string =>
@@ -46,6 +53,7 @@ export function validateDesign(value: unknown): Design {
   const model = data.model === 'm' ? 'm' : 's'
   return {
     model,
+    knob: normalizeKnobSettings(data.knob ?? {}),
     grille: normalizeGrilleSettings(data.grille ?? {}),
     handle: normalizeHandleSettings(
       model,

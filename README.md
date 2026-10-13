@@ -1,6 +1,6 @@
 # CMF Speaker Designer
 
-A browser-based front panel designer for CMF Speaker S and M, built as a proof of concept for **cmfspeakerdesigner.com**. The interface is a compact design workspace with a persistent 3D preview, an independently scrolling inspector, and a fixed STL export action. Its warm grey surfaces, orange accents, fine rules, and dotted technical typography draw on the supplied product photography.
+A browser-based front panel designer for CMF Speaker S and M, built as a proof of concept for **cmfspeakerdesigner.com**. The interface is a compact design workspace with a persistent 3D preview, an independently scrolling inspector, and a fixed export action for printable panels and volume knobs. Its warm grey surfaces, orange accents, fine rules, and dotted technical typography draw on the supplied product photography.
 
 ## Run locally
 
@@ -56,9 +56,13 @@ Controls use larger text and targets, high-contrast selected states, and visible
 - Generate a custom upper handle: adjust its height, width, and rounded corners, then choose a solid face or one to three circular or slotted openings.
 - Change hole size, spacing, and position, with dependent dimensions constrained to leave at least 3 mm of surrounding material.
 - Keep your current design locally and copy a link to share a configuration.
-- Download the selected panel as a binary STL in millimeters.
+- Select the supplied ring, bar, and cross volume knobs, or generate fluted and faceted grips.
+- Keep the original STL base diameter, collar, and socket fixed; shape the upper grip with height and inward taper.
+- Generate straight, spiral, or chevron flutes with adjustable count and depth, or choose the number of faces on a faceted grip.
+- Inspect the knob at full size in a dedicated preview, or see it mounted on either speaker.
+- Download panel and knob together as a ZIP with separate binary STLs in millimeters and a `design.json` containing settings and colors. Individual STL downloads are also available.
 
-The designer starts from the supplied front panel meshes. The **Original handle** option retains the source upper section. **Custom handle** removes that upper section above the control deck and joins a newly generated extension to the remaining panel; its openings are actual through-holes in the exported solid. Carry loop, Three dots, and Solid presets provide starting points. STL has no color or unit metadata: the exported coordinates are intended as millimeters, and color is a preview setting. Choose the corresponding filament or material in your slicer. This POC does not include freeform drawing, text embossing, slicer integration, or multi-material exports.
+The designer starts from the supplied front panel meshes. The **Original handle** option retains the source upper section. **Custom handle** removes that upper section above the control deck and joins a newly generated extension to the remaining panel; its openings are actual through-holes in the exported solid. Carry loop, Three dots, and Solid presets provide starting points. STL has no color or unit metadata: the exported coordinates are intended as millimeters. The ZIP records panel and knob colors in `design.json`. Choose the corresponding filament or material in your slicer. This POC does not include freeform drawing, text embossing, slicer integration, or multi-material exports.
 
 The **Grille** tab generates a perforated grille over the original driver openings: one on S and both on M. Custom grilles use the original open panel as their base and can be combined with a custom handle and added face depth. Selecting **Original grille** restores the selected supplied panel style. Selecting a supplied front-panel shape also turns off the generated grille while retaining its settings.
 
@@ -70,13 +74,21 @@ Recess depth ranges from 0.2 to 3 mm and is limited to the grille thickness minu
 
 The original assets live in `resources/product-images/` and `resources/stl-files/`. Background and source information is available in the [Nothing Community announcement](https://nothing.community/d/63517-3d-print-your-own-cmf-speaker).
 
-The selectable meshes are the `panel-original`, `panel-1`, `panel-2`, and `panel-3` files for each model. The combined `panel-merge` files and separate knobs/buttons remain available in the repository but are not exported by the designer.
+The selectable meshes are the `panel-original`, `panel-1`, `panel-2`, and `panel-3` files for each model. All selectable knob geometries use `cmf-speaker-sm-3d-printing-knob-original-v1.stl` as their source. Each knob is extracted as its own connected part. The combined `panel-merge` files and separate power buttons remain available in the repository but are not exported by the designer.
 
 The original panels measure approximately 85 × 131 mm for S and 85 × 225 mm for M. Added face depth affects the front surface; the attachment region and folded control plate stay unchanged. A custom handle changes the overall panel bounds, shown in the preview and download summary. It is 4 mm thick, with an extension height of 16–70 mm and width of 60–110 mm. Corner radius, hole sizes, and offsets are limited together to retain the connecting shoulder and minimum wall thickness.
 
 The generated upper section is joined with a Boolean union into one connected solid above the preserved control deck. Boolean operations can retessellate the original lower mesh; the generator uses a 0.00005 mm simplification tolerance to resolve numerical slivers. Downloads orient the front toward the print bed and place the lowest point at Z=0, with coordinates expressed in millimeters. Import at 100% scale and check orientation, supports, and material settings in your slicer before printing.
 
-The automated checks validate mesh topology, attachment geometry, actual openings, solid backing behind decorative recesses, and STL serialization. Physical fit, printer tolerances, carrying strength, and acoustic performance still need validation with test prints on the actual speakers. The 3 mm handle material constraint is a geometry limit, not a load rating. The speaker body shown in the preview is an approximate context model; only the selected front panel and its integrated handle and grille are included in the download.
+The automated checks validate mesh topology, attachment geometry, actual openings, solid backing behind decorative recesses, and STL serialization. Physical fit, printer tolerances, carrying strength, and acoustic performance still need validation with test prints on the actual speakers. The 3 mm handle material constraint is a geometry limit, not a load rating. The speaker body shown in the preview is an approximate context model. Downloads include the selected front panel with its integrated handle and grille, the separate volume knob, or both, according to the export selection. The speaker body and power button are preview context only.
+
+## Volume knobs
+
+The **Knob** tab selects Ring, Bar, Cross, Fluted, or Faceted. Ring, Bar, and Cross come from the supplied original collection. Fluted and Faceted are additional grip shapes derived from the original ring mesh. Color presets and a custom picker work independently of the front panel, and the selected shape, dimensions, and color are retained in saved designs and share links. Existing links without knob settings open with the Bar knob.
+
+Selecting the Knob tab opens the close-up **Knob only** preview. Use **Speaker** or **Exploded** to inspect it alongside the panel. The base diameter, entire lower collar, mounting stem, and internal socket remain at their original STL dimensions. There is no diameter or rigid rotation control; old saved values for these are discarded when a design opens. Only the grip above the collar changes. Adjust its height and inward taper; Fluted grips offer Straight, Spiral, and Chevron paths with flute count and depth, while Faceted grips offer an adjustable face count. Generative details stay within the original outer diameter. Unmodified supplied styles retain their exact source geometry. The Heart from the larger collection has different mounting dimensions and is no longer offered; saved Heart selections open as Bar. Preview and export use the same mesh, with dimensions measured from it; each knob STL contains one part, with its lowest point at Z=0. Check fit, grip clearance, and printing supports with a test print.
+
+The default **Panel + knob** export is a ZIP containing two STLs and `design.json`. The parts remain separate so different filaments can be used. The JSON retains both color hex values and all design parameters; the app does not currently provide a file-import control. Choose **Panel only** or **Knob only** in the export dialog for a direct STL download.
 
 ## Implementation
 
@@ -90,6 +102,9 @@ The automated checks validate mesh topology, attachment geometry, actual opening
 - `src/lib/grille-settings.ts` constrains grille dimensions and defines the shared pattern layout; `grille-geometry.ts` joins perforated inserts and cuts blind decorative recesses.
 - `src/lib/panel-engine.ts` combines handle generation, the shared face-depth transformation, and grille generation in order inside the worker.
 - `src/lib/use-panel-geometry.ts` schedules geometry updates, retains the last preview during generation, and enables export when the current design is ready.
+- `src/lib/knob-settings.ts` validates knob styles and dimensions; `knobs.ts` extracts the source parts, preserves the mounting interface, and builds the preview/export geometry.
+- `src/lib/use-knob-geometry.ts` loads and updates knobs while preventing stale geometry from being exported.
+- `src/lib/design-export.ts` writes individual STLs or a ZIP with both parts and saved colors/settings.
 - `src/lib/design.ts` validates shared and locally stored design settings.
 - `src/components/SpeakerPreview.tsx` renders the selected panel and the contextual speaker body.
 - `src/App.tsx` connects the controls, preview, and download workflow.

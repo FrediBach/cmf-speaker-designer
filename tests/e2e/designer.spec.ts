@@ -128,8 +128,15 @@ test.describe('workspace accessibility', () => {
 
     const panelTab = page.getByRole('tab', { name: 'Front panel', exact: true })
     const handleTab = page.getByRole('tab', { name: 'Handle', exact: true })
+    const knobTab = page.getByRole('tab', { name: 'Knob', exact: true })
     await panelTab.focus()
     await panelTab.press('End')
+    await expect(knobTab).toBeFocused()
+    await expect(knobTab).toHaveAttribute('aria-selected', 'true')
+    await expect(
+      page.getByRole('tabpanel', { name: 'Knob', exact: true }),
+    ).toBeVisible()
+    await knobTab.press('ArrowLeft')
     await expect(handleTab).toBeFocused()
     await expect(handleTab).toHaveAttribute('aria-selected', 'true')
     await expect(
@@ -190,12 +197,12 @@ test.describe('workspace accessibility', () => {
     })
     await exportButton.click()
     const dialog = page.getByRole('dialog', {
-      name: 'Export panel',
+      name: 'Export design',
       exact: true,
     })
     await expect(dialog).toBeVisible()
     await expect(
-      dialog.getByRole('button', { name: /^Download STL/ }),
+      dialog.getByRole('button', { name: /^Download ZIP/ }),
     ).toBeInViewport({ ratio: 1 })
     await page.keyboard.press('Escape')
     await expect(dialog).not.toBeVisible()
@@ -369,6 +376,10 @@ test('keyboard face depth produces a correctly named full-size binary STL downlo
   await expect(dialog).toBeVisible()
   await expect(dialog).toContainText('Speaker M · Twin contours')
   await expect(dialog).toContainText('0.2 mm')
+  await dialog
+    .getByRole('group', { name: 'Export parts' })
+    .getByRole('button', { name: 'Panel only', exact: true })
+    .click()
 
   const downloadStarted = page.waitForEvent('download')
   await dialog.getByRole('button', { name: /^Download STL/ }).click()
@@ -492,6 +503,10 @@ test('generates a connected custom handle with real round and slotted through-ho
     await page.getByRole('button', { name: 'Export STL', exact: true }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toContainText('Custom handle · 48 mm extension')
+    await dialog
+      .getByRole('group', { name: 'Export parts' })
+      .getByRole('button', { name: 'Panel only', exact: true })
+      .click()
     const started = page.waitForEvent('download')
     await dialog.getByRole('button', { name: /^Download STL/ }).click()
     const download = await started
@@ -645,7 +660,7 @@ test.describe('mobile layout', () => {
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
     await expect(
-      dialog.getByRole('button', { name: /^Download STL/ }),
+      dialog.getByRole('button', { name: /^Download ZIP/ }),
     ).toBeVisible()
     const bounds = await dialog.boundingBox()
     expect(bounds).not.toBeNull()
@@ -695,7 +710,7 @@ test.describe('mobile layout', () => {
     })
     await page.getByRole('button', { name: 'Export STL', exact: true }).click()
     await expect(dialog).toContainText('Custom handle · 35 mm extension')
-    const customDownload = dialog.getByRole('button', { name: /^Download STL/ })
+    const customDownload = dialog.getByRole('button', { name: /^Download ZIP/ })
     await customDownload.scrollIntoViewIfNeeded()
     await expect(customDownload).toBeInViewport()
     const handleDialogBounds = await dialog.boundingBox()

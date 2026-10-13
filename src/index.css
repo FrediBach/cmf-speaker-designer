@@ -606,7 +606,7 @@ main {
 .editor-tabs {
   flex-shrink: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   padding: 0 12px;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
@@ -2156,5 +2156,203 @@ main {
   .summary-swatch,
   .appearance-accent-swatch {
     forced-color-adjust: none;
+  }
+}
+
+/* Volume knob shapes and grip controls */
+.knob-intro {
+  color: var(--muted-foreground);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.knob-intro {
+  margin: -2px 0 16px;
+}
+.knob-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.knob-options button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 102px;
+  padding: 6px 6px 9px;
+  border: 1px solid var(--control-border);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted-foreground);
+}
+.knob-options button > svg:not(.knob-check) {
+  width: 58px;
+  max-width: 100%;
+  height: 52px;
+}
+.knob-options button > span {
+  color: var(--foreground);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.knob-options button > small {
+  margin-top: 3px;
+  color: var(--muted-foreground);
+  font: 9px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+.knob-options button:hover {
+  background: var(--surface-hover);
+}
+.knob-options button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+  box-shadow: inset 0 -2px var(--accent-ink);
+}
+.knob-check {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+}
+.knob-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: -8px;
+}
+.knob-section-heading h3 {
+  margin: 0;
+}
+.knob-section-heading .text-button {
+  font-size: 12px;
+  gap: 5px;
+}
+.knob-section-heading .text-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.knob-parameter {
+  margin-top: 16px;
+}
+.knob-parameter .control-label {
+  margin-bottom: 2px;
+}
+.knob-fit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 0 4px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.knob-fit > span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--foreground);
+}
+.knob-parameter-note {
+  margin: 2px 0 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.knob-pattern-heading {
+  margin: 20px 0 10px;
+  font-size: 15px;
+}
+.knob-pattern-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.knob-pattern-options button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 8px 4px;
+  border: 1px solid var(--control-border);
+  border-radius: 3px;
+  background: transparent;
+  font-size: 13px;
+}
+.knob-pattern-options button > svg {
+  width: 32px;
+  height: 30px;
+}
+.knob-pattern-options button:hover {
+  background: var(--surface-hover);
+}
+.knob-pattern-options button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+  box-shadow: inset 0 -2px var(--accent-ink);
+}
+.export-targets {
+  margin: 20px 0 16px;
+}
+.export-targets button {
+  min-width: 0;
+  font-size: 13px;
+}
+.download-summary + .download-summary {
+  margin-top: -12px;
+}
+.download-summary > svg {
+  flex-shrink: 0;
+}
+.knob-download-summary > svg {
+  height: 48px;
+}
+@media (max-width: 1150px) {
+  .assembly-switch {
+    width: 100%;
+  }
+  .assembly-switch button {
+    flex: 1;
+    min-width: 0;
+    gap: 4px;
+    padding: 6px 4px;
+    font-size: 12px;
+  }
+}
+@media (max-width: 800px) {
+  .assembly-switch {
+    gap: 3px;
+  }
+  .assembly-switch button {
+    gap: 4px;
+    padding-right: 3px;
+    padding-left: 3px;
+    font-size: 12px;
+  }
+}
+@media (max-width: 380px) {
+  .editor-tabs button {
+    font-size: 13px;
+    padding-right: 3px;
+    padding-left: 3px;
+  }
+  .knob-section-heading .text-button {
+    font-size: 11px;
+  }
+  .assembly-switch button {
+    font-size: 11px;
+  }
+  .export-targets button {
+    padding-right: 4px;
+    padding-left: 4px;
+    font-size: 12px;
   }
 }

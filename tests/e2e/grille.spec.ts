@@ -128,6 +128,10 @@ test('generates a custom speaker grille with through-holes, blind face recesses,
   await page.getByRole('button', { name: 'Export STL', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toContainText('Custom handle · 35 mm extension')
+  await dialog
+    .getByRole('group', { name: 'Export parts' })
+    .getByRole('button', { name: 'Panel only', exact: true })
+    .click()
   const started = page.waitForEvent('download')
   await dialog.getByRole('button', { name: /^Download STL/ }).click()
   const download = await started
@@ -287,7 +291,7 @@ test.describe('mobile grille controls', () => {
     })
     await page.getByRole('button', { name: 'Export STL', exact: true }).click()
     const dialog = page.getByRole('dialog')
-    const exportButton = dialog.getByRole('button', { name: /^Download STL/ })
+    const exportButton = dialog.getByRole('button', { name: /^Download ZIP/ })
     await exportButton.scrollIntoViewIfNeeded()
     await expect(exportButton).toBeInViewport()
     const bounds = await dialog.boundingBox()

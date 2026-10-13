@@ -5,6 +5,7 @@ import {
   STORAGE_KEY,
   validateDesign,
 } from './design'
+import { DEFAULT_KNOB_SETTINGS } from './knob-settings'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -21,6 +22,7 @@ describe('saved and shared handle designs', () => {
     expect(restored).toMatchObject(oldDesign)
     expect(restored.handle).toMatchObject({ mode: 'original', height: 27 })
     expect(restored.grille.mode).toBe('original')
+    expect(restored.knob).toEqual(DEFAULT_KNOB_SETTINGS)
     expect(validateDesign({ model: 'm', handle: null }).handle).toEqual(
       restored.handle,
     )
@@ -68,6 +70,66 @@ describe('saved and shared handle designs', () => {
       },
     })
     expect(readDesign()).toEqual(DEFAULT_DESIGN)
+  })
+
+  it('restores knob shape, dimensions, and custom colors from saved and shared designs', () => {
+    const design = validateDesign({
+      knob: {
+        style: 'fluted',
+        height: 18,
+        taper: 0.6,
+        flutePath: 'spiral',
+        facets: 8,
+        fluteCount: 12,
+        fluteDepth: 1,
+      },
+      knobColor: '#123abc',
+    })
+    expect(design.knob).toMatchObject({
+      style: 'fluted',
+      height: 18,
+      taper: 0.6,
+      flutePath: 'spiral',
+      facets: 8,
+      fluteCount: 12,
+      fluteDepth: 1,
+    })
+    vi.stubGlobal('window', { location: { search: '' } })
+    vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(design) })
+    expect(readDesign()).toEqual(design)
+    vi.stubGlobal('window', {
+      location: {
+        search: `?design=${encodeURIComponent(JSON.stringify(design))}`,
+      },
+    })
+    expect(readDesign()).toEqual(design)
+    expect(validateDesign({ knob: null }).knob).toEqual(DEFAULT_KNOB_SETTINGS)
+    expect(validateDesign({ knob: 'invalid' }).knob).toEqual(
+      DEFAULT_KNOB_SETTINGS,
+    )
+  })
+
+  it('discards legacy knob diameter and rigid rotation from saved and shared designs', () => {
+    const legacy = {
+      ...DEFAULT_DESIGN,
+      knob: { ...DEFAULT_KNOB_SETTINGS, diameter: 24, rotation: 90 },
+    }
+    expect(validateDesign(legacy).knob).toEqual(DEFAULT_KNOB_SETTINGS)
+    vi.stubGlobal('window', { location: { search: '' } })
+    vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(legacy) })
+    expect(readDesign().knob).toEqual(DEFAULT_KNOB_SETTINGS)
+    vi.stubGlobal('window', {
+      location: {
+        search: `?design=${encodeURIComponent(JSON.stringify(legacy))}`,
+      },
+    })
+    expect(readDesign().knob).toEqual(DEFAULT_KNOB_SETTINGS)
+    expect(readDesign().knob).not.toHaveProperty('diameter')
+    expect(readDesign().knob).not.toHaveProperty('rotation')
+    expect(
+      validateDesign({ knob: { style: 'heart', diameter: 24, rotation: 90 } })
+        .knob,
+    ).toEqual(DEFAULT_KNOB_SETTINGS)
   })
 
   it('restores a shared grille alongside a custom handle and the saved factory style', () => {

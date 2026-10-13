@@ -14,6 +14,7 @@ import {
   DataTexture,
   ExtrudeGeometry,
   LinearFilter,
+  Matrix4,
   LinearMipmapLinearFilter,
   PerspectiveCamera,
   RepeatWrapping,
@@ -32,9 +33,11 @@ export interface SpeakerPreviewProps {
   style: 'original' | '1' | '2' | '3'
   panelColor: string
   knobColor: string
+  knobGeometry: BufferGeometry | null
+  knobStyle?: string
   relief?: number
   view?: 'perspective' | 'front'
-  assembly?: 'assembled' | 'panel' | 'exploded'
+  assembly?: 'assembled' | 'panel' | 'exploded' | 'knob'
   resetKey?: number
   className?: string
   onReady?: () => void
@@ -252,10 +255,12 @@ function SpeakerBody({
 function SpeakerControls({
   panelColor,
   knobColor,
+  knobGeometry,
   model,
 }: {
   panelColor: string
   knobColor: string
+  knobGeometry: BufferGeometry | null
   model: 's' | 'm'
 }) {
   const top = model === 's' ? 29.5 : 70
@@ -286,32 +291,25 @@ function SpeakerControls({
           />
         </mesh>
       </group>
-      <group
-        position={[controlOffset, top + 1.3, depth + 1.3]}
-        rotation={[Math.PI / 4, 0, 0]}
-      >
-        <mesh castShadow>
-          <cylinderGeometry args={[8.1, 8.5, 4.3, 48]} />
-          <meshStandardMaterial
-            color={knobColor}
-            roughness={0.4}
-            metalness={0.06}
-          />
-        </mesh>
-        <RoundedBox
-          args={[3.4, 10.5, 13.4]}
-          radius={1.1}
-          smoothness={4}
-          position={[0, 5.5, 0]}
-          castShadow
+      {knobGeometry && (
+        <group
+          position={[controlOffset, top, depth]}
+          rotation={[-Math.PI / 4, 0, 0]}
         >
-          <meshStandardMaterial
-            color={knobColor}
-            roughness={0.42}
-            metalness={0.04}
-          />
-        </RoundedBox>
-      </group>
+          <mesh
+            position={[0, 0, -(knobGeometry.userData.knob?.mountHeight ?? 5)]}
+            castShadow
+            receiveShadow
+          >
+            <primitive object={knobGeometry} attach="geometry" dispose={null} />
+            <meshStandardMaterial
+              color={knobColor}
+              roughness={0.42}
+              metalness={0.04}
+            />
+          </mesh>
+        </group>
+      )}
     </>
   )
 }
@@ -325,13 +323,14 @@ function CameraControls({
   bounds: Box3
   view: 'perspective' | 'front'
   resetKey: number
-  assembly: 'assembled' | 'panel' | 'exploded'
+  assembly: 'assembled' | 'panel' | 'exploded' | 'knob'
 }) {
   const { camera, size, invalidate, gl } = useThree()
   const orbit = useRef<{ target: Vector3; update: () => void } | null>(null)
   const previousFraming = useRef<{
     view: typeof view
     resetKey: number
+    assembly: typeof assembly
   } | null>(null)
   const extent = Math.max(
     bounds.max.x - bounds.min.x,
@@ -347,11 +346,12 @@ function CameraControls({
     const resetView =
       !previousFraming.current ||
       previousFraming.current.view !== view ||
-      previousFraming.current.resetKey !== resetKey
+      previousFraming.current.resetKey !== resetKey ||
+      (previousFraming.current.assembly === 'knob') !== (assembly === 'knob')
     const direction = resetView
       ? view === 'front'
         ? new Vector3(0, 0, 1)
-        : new Vector3(0.63, 0.27, 1).normalize()
+        : new Vector3(0.63, assembly === 'knob' ? 0.85 : 0.27, 1).normalize()
       : camera.position
           .clone()
           .sub(orbit.current?.target ?? target)
@@ -384,7 +384,7 @@ function CameraControls({
       orbit.current.target.copy(target)
       orbit.current.update()
     }
-    previousFraming.current = { view, resetKey }
+    previousFraming.current = { view, resetKey, assembly }
     invalidate()
   }, [
     camera,
@@ -473,6 +473,7 @@ function SpeakerScene({
   model,
   panelColor,
   knobColor,
+  knobGeometry,
   view,
   assembly,
   resetKey,
@@ -481,14 +482,21 @@ function SpeakerScene({
   model: 's' | 'm'
   panelColor: string
   knobColor: string
+  knobGeometry: BufferGeometry | null
   view: 'perspective' | 'front'
-  assembly: 'assembled' | 'panel' | 'exploded'
+  assembly: 'assembled' | 'panel' | 'exploded' | 'knob'
   resetKey: number
 }) {
   const height = model === 's' ? 130.97 : 224.97
   const width = 84.97
   const offset = assembly === 'exploded' ? 32 : 0
   const bounds = useMemo(() => {
+    if (assembly === 'knob' && knobGeometry) {
+      knobGeometry.computeBoundingBox()
+      return knobGeometry
+        .boundingBox!.clone()
+        .applyMatrix4(new Matrix4().makeRotationX(-Math.PI / 2))
+    }
     const result = geometry.boundingBox?.clone() ?? new Box3()
     if (result.isEmpty()) {
       const positions = geometry.getAttribute('position')
@@ -509,7 +517,7 @@ function SpeakerScene({
       )
     }
     return result
-  }, [geometry, model, assembly, offset, height])
+  }, [geometry, knobGeometry, model, assembly, offset, height])
 
   return (
     <>
@@ -552,34 +560,48 @@ function SpeakerScene({
           target={[0, 0, 0]}
         />
       </Environment>
-      {assembly !== 'panel' && (
+      {assembly !== 'panel' && assembly !== 'knob' && (
         <SpeakerBody width={width} height={height} model={model} />
       )}
-      <group position={[0, 0, offset]}>
-        <mesh castShadow receiveShadow>
-          <primitive object={geometry} attach="geometry" dispose={null} />
+      {assembly !== 'knob' && (
+        <group position={[0, 0, offset]}>
+          <mesh castShadow receiveShadow>
+            <primitive object={geometry} attach="geometry" dispose={null} />
+            <meshStandardMaterial
+              color={panelColor}
+              roughness={0.43}
+              metalness={0.025}
+              envMapIntensity={0.5}
+            />
+          </mesh>
+          {assembly !== 'panel' && (
+            <SpeakerControls
+              panelColor={panelColor}
+              knobColor={knobColor}
+              knobGeometry={knobGeometry}
+              model={model}
+            />
+          )}
+        </group>
+      )}
+      {assembly === 'knob' && knobGeometry && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
+          <primitive object={knobGeometry} attach="geometry" dispose={null} />
           <meshStandardMaterial
-            color={panelColor}
-            roughness={0.43}
-            metalness={0.025}
+            color={knobColor}
+            roughness={0.42}
+            metalness={0.04}
             envMapIntensity={0.5}
           />
         </mesh>
-        {assembly !== 'panel' && (
-          <SpeakerControls
-            panelColor={panelColor}
-            knobColor={knobColor}
-            model={model}
-          />
-        )}
-      </group>
+      )}
       <ContactShadows
-        key={`${geometry.uuid}:${assembly}`}
-        position={[0, -height / 2 - 2.1, -12]}
+        key={`${geometry.uuid}:${knobGeometry?.uuid}:${assembly}`}
+        position={[0, bounds.min.y - 0.45, assembly === 'knob' ? 0 : -12]}
         opacity={0.32}
-        scale={height * 2.5}
+        scale={assembly === 'knob' ? 70 : height * 2.5}
         blur={2.7}
-        far={bounds.max.y + height / 2 + 12}
+        far={bounds.max.y - bounds.min.y + 12}
         resolution={512}
         color="#35332e"
         frames={1}
@@ -601,6 +623,8 @@ export function SpeakerPreview({
   style,
   panelColor,
   knobColor,
+  knobGeometry,
+  knobStyle,
   view = 'perspective',
   assembly = 'assembled',
   resetKey = 0,
@@ -621,11 +645,13 @@ export function SpeakerPreview({
     <div
       className={className}
       data-panel-style={style}
+      data-knob-style={knobStyle}
+      data-knob-ready={!!knobGeometry}
       role="img"
       data-preview-controls
       tabIndex={0}
       aria-description="Use arrow keys to rotate, plus to zoom in, and minus to zoom out. Use the Reset camera button to restore the view."
-      aria-label={`Interactive 3D preview of your CMF Speaker ${model.toUpperCase()} ${assembly === 'panel' ? 'front panel' : 'with custom front panel'}. Drag to rotate and scroll to zoom.`}
+      aria-label={`Interactive 3D preview of your CMF Speaker ${model.toUpperCase()} ${assembly === 'knob' ? 'volume knob' : assembly === 'panel' ? 'front panel' : 'with custom front panel and volume knob'}. Drag to rotate and scroll to zoom.`}
       style={{
         position: 'relative',
         width: '100%',
@@ -660,6 +686,7 @@ export function SpeakerPreview({
                 model={model}
                 panelColor={panelColor}
                 knobColor={knobColor}
+                knobGeometry={knobGeometry}
                 view={view}
                 assembly={assembly}
                 resetKey={resetKey}

@@ -6,7 +6,6 @@ import {
   Box,
   Check,
   CircleHelp,
-  CirclePlus,
   Copy,
   ExternalLink,
   Layers3,
@@ -30,19 +29,23 @@ import { PanelIcon } from '@/components/PanelIcon'
 import { AppearanceSettings } from '@/components/AppearanceSettings'
 import { HandleEditor } from '@/components/HandleEditor'
 import { GrilleEditor } from '@/components/GrilleEditor'
+import { ColorPicker } from '@/components/ColorPicker'
+import { KnobEditor } from '@/components/KnobEditor'
+import { KnobIcon } from '@/components/KnobIcon'
+import { normalizeKnobSettings, KNOB_STYLES } from '@/lib/knob-settings'
+import { useKnobGeometry } from '@/lib/use-knob-geometry'
+import type { DesignExportTarget } from '@/lib/design-export'
 import { normalizeHandleSettings } from '@/lib/handle-settings'
 import { normalizeGrilleSettings } from '@/lib/grille-settings'
 import { usePanelGeometry } from '@/lib/use-panel-geometry'
 import {
   DEFAULT_DESIGN,
-  PALETTE,
   STORAGE_KEY,
   colorName,
   readDesign,
   type Design,
 } from '@/lib/design'
 import {
-  downloadPanelStl,
   getPanelStyles,
   getPanelDimensions,
   loadPanelGeometry,
@@ -65,83 +68,30 @@ const EDITOR_TABS = [
   { id: 'panel', label: 'Front panel' },
   { id: 'grille', label: 'Grille' },
   { id: 'handle', label: 'Handle' },
+  { id: 'knob', label: 'Knob' },
 ] as const
-
-function ColorPicker({
-  label,
-  value,
-  onChange,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-}) {
-  return (
-    <div className="color-picker">
-      <div className="control-label">
-        <span className="color-label">{label}</span>
-        <span>{colorName(value)}</span>
-      </div>
-      <div className="swatches" role="group" aria-label={`${label} color`}>
-        {PALETTE.map((color) => (
-          <button
-            key={color.value}
-            className={`swatch ${value.toLowerCase() === color.value ? 'selected' : ''}`}
-            style={{ '--swatch': color.value } as React.CSSProperties}
-            onClick={() => onChange(color.value)}
-            aria-label={`${label}: ${color.name}`}
-            aria-pressed={value.toLowerCase() === color.value}
-            title={color.name}
-          >
-            {value.toLowerCase() === color.value && (
-              <Check
-                size={15}
-                strokeWidth={2}
-                color={
-                  !['#303538', '#5573ce'].includes(color.value)
-                    ? '#303538'
-                    : '#fff'
-                }
-              />
-            )}
-          </button>
-        ))}
-        <label
-          className="custom-swatch"
-          title={`Choose a custom ${label.toLowerCase()} color`}
-        >
-          <CirclePlus size={19} strokeWidth={1.4} />
-          <input
-            type="color"
-            aria-label={`Custom ${label.toLowerCase()} color`}
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-          />
-        </label>
-      </div>
-    </div>
-  )
-}
 
 function App() {
   const guideTriggerRef = useRef<HTMLButtonElement>(null)
   const exportTriggerRef = useRef<HTMLButtonElement>(null)
   const [design, setDesign] = useState<Design>(readDesign)
-  const [editorTab, setEditorTab] = useState<'panel' | 'grille' | 'handle'>(
-    () =>
-      design.grille.mode === 'custom'
-        ? 'grille'
-        : design.handle.mode === 'custom'
-          ? 'handle'
-          : 'panel',
+  const [editorTab, setEditorTab] = useState<
+    'panel' | 'grille' | 'handle' | 'knob'
+  >(() =>
+    design.grille.mode === 'custom'
+      ? 'grille'
+      : design.handle.mode === 'custom'
+        ? 'handle'
+        : 'panel',
   )
   const [view, setView] = useState<'perspective' | 'front'>('perspective')
-  const [assembly, setAssembly] = useState<'assembled' | 'panel' | 'exploded'>(
-    'assembled',
-  )
+  const [assembly, setAssembly] = useState<
+    'assembled' | 'panel' | 'exploded' | 'knob'
+  >('assembled')
   const [resetKey, setResetKey] = useState(0)
   const [guideOpen, setGuideOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+  const [exportTarget, setExportTarget] = useState<DesignExportTarget>('both')
   const [source, setSource] = useState<{
     geometry: BufferGeometry
     model: Design['model']
@@ -158,6 +108,7 @@ function App() {
         ...next,
         handle: normalizeHandleSettings(next.model, next.handle),
         grille: normalizeGrilleSettings(next.grille),
+        knob: normalizeKnobSettings(next.knob),
       }
     })
   const styles = getPanelStyles(design.model)
@@ -174,6 +125,19 @@ function App() {
     error: generationError,
     generating,
   } = usePanelGeometry(source, design, retryKey)
+  const {
+    geometry: knobGeometry,
+    previewGeometry: previewKnobGeometry,
+    error: knobError,
+    generating: knobGenerating,
+  } = useKnobGeometry(design.knob, retryKey)
+  const knobLabel = KNOB_STYLES.find(
+    (item) => item.id === design.knob.style,
+  )!.label
+  const knobBounds = previewKnobGeometry?.boundingBox
+  const knobDimensions = knobBounds
+    ? `Ø${Number(Math.max(knobBounds.max.x - knobBounds.min.x, knobBounds.max.y - knobBounds.min.y).toFixed(2))} × ${Number((knobBounds.max.z - knobBounds.min.z).toFixed(2))}`
+    : null
   const dimensions = previewGeometry
     ? getPanelDimensions(previewGeometry)
     : null
@@ -248,16 +212,26 @@ function App() {
     }
   }
 
-  async function exportPanel() {
-    if (!geometry || busy) return
+  async function exportDesign() {
+    if (!geometry || !knobGeometry || busy) return
     setBusy(true)
     try {
       await new Promise<void>((resolve) =>
         requestAnimationFrame(() => resolve()),
       )
-      downloadPanelStl(geometry, design.model, sourceStyle, design.relief)
+      const { downloadDesignExport } = await import('@/lib/design-export')
+      downloadDesignExport({
+        panel: geometry,
+        knob: knobGeometry,
+        design,
+        target: exportTarget,
+      })
       setExportOpen(false)
-      setToast('STL downloaded.')
+      setToast(
+        exportTarget === 'both'
+          ? 'Panel, knob, and design settings downloaded.'
+          : 'STL downloaded.',
+      )
     } catch {
       setToast('The download could not start. Please try again.')
     } finally {
@@ -365,6 +339,8 @@ function App() {
                     style={sourceStyle}
                     panelColor={design.panelColor}
                     knobColor={design.knobColor}
+                    knobGeometry={previewKnobGeometry}
+                    knobStyle={design.knob.style}
                     relief={design.relief}
                     view={view}
                     assembly={assembly}
@@ -372,7 +348,7 @@ function App() {
                   />
                 </Suspense>
               </div>
-              {generating && previewGeometry && (
+              {(generating || knobGenerating) && previewGeometry && (
                 <div className="geometry-updating" role="status">
                   <LoaderCircle className="spin" size={12} /> Updating geometry…
                 </div>
@@ -382,11 +358,20 @@ function App() {
                   <span className="preview-model">
                     CMF Speaker {design.model.toUpperCase()}
                     <span> / </span>
-                    {panelLabel}
+                    {assembly === 'knob' ? `${knobLabel} knob` : panelLabel}
                   </span>
                   <span className="preview-dimensions">
-                    {panelWidth} × {panelHeight} MM <span>·</span>{' '}
-                    {colorName(design.panelColor).toUpperCase()}
+                    {assembly === 'knob'
+                      ? knobDimensions
+                        ? `${knobDimensions} MM`
+                        : 'ORIGINAL FIT'
+                      : `${panelWidth} × ${panelHeight} MM`}{' '}
+                    <span>·</span>{' '}
+                    {colorName(
+                      assembly === 'knob'
+                        ? design.knobColor
+                        : design.panelColor,
+                    ).toUpperCase()}
                   </span>
                 </div>
                 <div className="preview-actions">
@@ -417,6 +402,11 @@ function App() {
                       { id: 'assembled', label: 'Speaker', icon: Box },
                       { id: 'panel', label: 'Panel only', icon: Layers3 },
                       { id: 'exploded', label: 'Exploded', icon: MoveUpRight },
+                      {
+                        id: 'knob',
+                        label: 'Knob only',
+                        icon: SlidersHorizontal,
+                      },
                     ] as const
                   ).map((item) => (
                     <button
@@ -511,10 +501,16 @@ function App() {
                               EDITOR_TABS.length
                       const next = EDITOR_TABS[nextIndex].id
                       setEditorTab(next)
+                      if (next === 'knob') setAssembly('knob')
+                      else if (assembly === 'knob') setAssembly('assembled')
                       document.getElementById(`${next}-tab`)?.focus()
                     }
                   }}
-                  onClick={() => setEditorTab(tab)}
+                  onClick={() => {
+                    setEditorTab(tab)
+                    if (tab === 'knob') setAssembly('knob')
+                    else if (assembly === 'knob') setAssembly('assembled')
+                  }}
                 >
                   {label}
                 </button>
@@ -685,6 +681,19 @@ function App() {
                   onChange={(handle) => update({ handle })}
                 />
               </div>
+              <div
+                id="knob-editor"
+                role="tabpanel"
+                aria-labelledby="knob-tab"
+                hidden={editorTab !== 'knob'}
+              >
+                <KnobEditor
+                  value={design.knob}
+                  onChange={(knob) => update({ knob })}
+                  color={design.knobColor}
+                  onColorChange={(knobColor) => update({ knobColor })}
+                />
+              </div>
             </div>
             <div className="export-section">
               <div className="export-spec">
@@ -693,9 +702,9 @@ function App() {
                 </span>
                 <span>1:1 SCALE · MM</span>
               </div>
-              {error ? (
+              {error || knobError ? (
                 <div className="load-error" role="alert">
-                  {error}
+                  {error || knobError}
                   <button onClick={() => setRetryKey((key) => key + 1)}>
                     Retry
                   </button>
@@ -703,13 +712,13 @@ function App() {
               ) : null}
               <Button
                 className="download-button"
-                disabled={!geometry || !!error}
+                disabled={!geometry || !knobGeometry || !!error || !!knobError}
                 onClick={(event) => {
                   exportTriggerRef.current = event.currentTarget
                   setExportOpen(true)
                 }}
               >
-                {!geometry && !error ? (
+                {(!geometry || !knobGeometry) && !error && !knobError ? (
                   <LoaderCircle size={17} className="spin" />
                 ) : (
                   <ArrowDownToLine size={18} />
@@ -748,8 +757,8 @@ function App() {
           <span className="eyebrow">REFERENCE / 01</span>
           <DialogTitle>Print guide</DialogTitle>
           <DialogDescription>
-            Export your panel, prepare it in a slicer, and check the first
-            print.
+            Export your panel and knob, prepare them in a slicer, and check the
+            first print.
           </DialogDescription>
           <ol className="print-steps">
             <li>
@@ -760,7 +769,9 @@ function App() {
                   Choose Speaker S or M and a panel shape. Added face depth
                   thickens the front while retaining the original mounting
                   features and folded controls. In the Handle tab, generate a
-                  new upper extension with your own outline and openings.
+                  new upper extension with your own outline and openings. In the
+                  Knob tab, shape the upper grip while retaining the original
+                  base and socket dimensions.
                 </p>
               </div>
             </li>
@@ -780,9 +791,10 @@ function App() {
               <div>
                 <h4>Slice at 100% scale</h4>
                 <p>
-                  Import your STL in millimeters. The export is laid
-                  horizontally and placed on the build plate. Review overhangs
-                  and supports in your slicer before printing.
+                  Unzip a full design download to find separate panel and knob
+                  STLs and your saved colors and settings. Import the STLs in
+                  millimeters; each part is placed on the build plate. Review
+                  overhangs and supports in your slicer before printing.
                 </p>
               </div>
             </li>
@@ -826,84 +838,124 @@ function App() {
             <ArrowDownToLine size={23} />
           </div>
           <span className="eyebrow">EXPORT / STL</span>
-          <DialogTitle>Export panel</DialogTitle>
+          <DialogTitle>Export design</DialogTitle>
           <DialogDescription>
-            Full-size geometry in millimeters. Open the STL in your slicer at
-            100% scale.
+            Full-size parts in millimeters. Open each STL in your slicer at 100%
+            scale.
           </DialogDescription>
-          <div className="download-summary">
-            <PanelIcon model={design.model} style={sourceStyle} />
-            <div>
-              <strong>
-                Speaker {design.model.toUpperCase()} · {panelLabel}
-              </strong>
-              <span>
-                {design.relief > 0
-                  ? `${design.relief.toFixed(1)} mm added face depth`
-                  : 'Standard face depth'}{' '}
-                · Binary STL
-              </span>
-              {design.handle.mode === 'custom' && (
-                <span>
-                  Custom handle · {design.handle.height} mm extension ·{' '}
-                  {design.handle.cutout === 'none'
-                    ? 'Solid'
-                    : `${design.handle.holeCount} ${design.handle.cutout === 'circle' ? 'round' : 'slot'} ${design.handle.holeCount === 1 ? 'hole' : 'holes'}`}
-                </span>
-              )}
-              {design.grille.mode === 'custom' && (
-                <span>
-                  Custom grille · {design.grille.size} mm openings ·{' '}
-                  {design.grille.spacing} mm spacing · {design.grille.thickness}{' '}
-                  mm thick
-                  {design.grille.extendPattern
-                    ? ` · ${design.grille.recessDepth} mm recessed face pattern`
-                    : ''}
-                </span>
-              )}
-              <span>
-                {panelWidth} × {panelHeight} mm · Millimeter units
-              </span>
-            </div>
-            <span
-              className="summary-swatch"
-              style={{ background: design.panelColor }}
-            />
+          <div
+            className="handle-mode export-targets"
+            role="group"
+            aria-label="Export parts"
+          >
+            {(
+              [
+                { id: 'both', label: 'Panel + knob' },
+                { id: 'panel', label: 'Panel only' },
+                { id: 'knob', label: 'Knob only' },
+              ] as const
+            ).map((target) => (
+              <button
+                key={target.id}
+                aria-pressed={exportTarget === target.id}
+                className={exportTarget === target.id ? 'active' : ''}
+                onClick={() => setExportTarget(target.id)}
+              >
+                {target.label}
+              </button>
+            ))}
           </div>
+          {exportTarget !== 'knob' && (
+            <div className="download-summary">
+              <PanelIcon model={design.model} style={sourceStyle} />
+              <div>
+                <strong>
+                  Speaker {design.model.toUpperCase()} · {panelLabel}
+                </strong>
+                <span>
+                  {design.relief > 0
+                    ? `${design.relief.toFixed(1)} mm added face depth`
+                    : 'Standard face depth'}{' '}
+                  · Binary STL
+                </span>
+                {design.handle.mode === 'custom' && (
+                  <span>
+                    Custom handle · {design.handle.height} mm extension ·{' '}
+                    {design.handle.cutout === 'none'
+                      ? 'Solid'
+                      : `${design.handle.holeCount} ${design.handle.cutout === 'circle' ? 'round' : 'slot'} ${design.handle.holeCount === 1 ? 'hole' : 'holes'}`}
+                  </span>
+                )}
+                {design.grille.mode === 'custom' && (
+                  <span>
+                    Custom grille · {design.grille.size} mm openings ·{' '}
+                    {design.grille.spacing} mm spacing ·{' '}
+                    {design.grille.thickness} mm thick
+                    {design.grille.extendPattern
+                      ? ` · ${design.grille.recessDepth} mm recessed face pattern`
+                      : ''}
+                  </span>
+                )}
+                <span>
+                  {panelWidth} × {panelHeight} mm · Millimeter units
+                </span>
+              </div>
+              <span
+                className="summary-swatch"
+                style={{ background: design.panelColor }}
+              />
+            </div>
+          )}
+          {exportTarget !== 'panel' && (
+            <div className="download-summary knob-download-summary">
+              <KnobIcon style={design.knob.style} />
+              <div>
+                <strong>{knobLabel} volume knob</strong>
+                <span>
+                  {knobDimensions ? `${knobDimensions} mm · ` : ''}Binary STL
+                </span>
+                <span>{colorName(design.knobColor)} · Fits Speaker S & M</span>
+              </div>
+              <span
+                className="summary-swatch"
+                style={{ background: design.knobColor }}
+              />
+            </div>
+          )}
           <div className="download-notes">
             <p>
-              <Check size={15} /> Full-size panel with original mounting
-              features
+              <Check size={15} /> Original mounting features retained
             </p>
             <p>
-              <Check size={15} /> Horizontal layout, positioned on the build
-              plate
+              <Check size={15} /> Separate parts, positioned on the build plate
             </p>
-            <p>
-              <CircleHelp size={15} /> Panel only. Knob and speaker body are
-              preview objects.
-            </p>
+            {exportTarget === 'both' && (
+              <p>
+                <Check size={15} /> ZIP includes both STLs and design.json with
+                your colors and settings
+              </p>
+            )}
           </div>
           <p className="export-caveat">
-            STL files don’t store colors. Use{' '}
-            {colorName(design.panelColor).toLowerCase()} filament for this look.
-            Review supports in your slicer and test-fit your first print
-            {design.relief > 0
-              ? ' — custom face depth has not been physically tested'
-              : ''}
-            .
+            STL files don’t store colors. Match your selected colors with
+            filament. Review supports in your slicer and test-fit your first
+            print.
           </p>
           <Button
             className="confirm-download"
-            onClick={exportPanel}
-            disabled={busy || !geometry}
+            onClick={exportDesign}
+            disabled={busy || !geometry || !knobGeometry}
           >
             {busy ? (
               <LoaderCircle size={17} className="spin" />
             ) : (
               <ArrowDownToLine size={17} />
             )}{' '}
-            {busy ? 'Preparing STL…' : 'Download STL'}
+            {busy
+              ? 'Preparing files…'
+              : exportTarget === 'both'
+                ? 'Download ZIP'
+                : 'Download STL'}
             <span>Speaker {design.model.toUpperCase()}</span>
           </Button>
         </DialogContent>
