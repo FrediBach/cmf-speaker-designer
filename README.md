@@ -23,10 +23,10 @@ npm run test:production # Build and run the full browser regression suite
 ```
 
 React Doctor is installed as a development dependency. Run `npm run doctor -- --verbose`
-for a full scan; add `--no-score` to skip the remote score and telemetry. The initial
-cleanup leaves warnings about `App` size/complexity and the geometry hooks' serialized
-dependency keys. Review those keys before changing dependencies: settings objects are
-recreated during color edits, which should not trigger geometry regeneration. Version
+for a full scan; add `--no-score` to skip the remote score and telemetry. The remaining
+warnings concern the geometry hooks' serialized dependency keys. Review those keys
+before changing dependencies: settings objects are recreated during color edits,
+which should not trigger geometry regeneration. Version
 0.9.18 also reports two cleanup errors in `SpeakerPreview` because it mistakes Three.js
 `Vector3.sub()` subtraction for a subscription. The camera keyboard listener already
 has matching cleanup. These findings remain visible and currently make the scan exit
@@ -144,6 +144,9 @@ The default **Panel + knob** export is a ZIP containing two STLs and `design.jso
 - `src/lib/design-export.ts` writes individual STLs or a ZIP with both parts and saved colors/settings.
 - `src/lib/design.ts` validates shared and locally stored design settings.
 - `src/components/SpeakerPreview.tsx` renders the selected panel and the contextual speaker body.
+- `src/components/DesignerPreview.tsx`, `DesignControls.tsx`, and `PanelEditor.tsx` compose the preview and editing workspace; `ExportDialog.tsx` and `PrintGuide.tsx` own the dialogs.
+- `src/lib/use-design-geometry.ts` owns source loading, disposal, and the panel/knob geometry state used by previews and exports.
+- `src/lib/use-design-interactions.ts` handles undo/redo shortcuts and groups slider and numeric input gestures into history transactions.
 - `src/App.tsx` connects the controls, preview, and download workflow.
 
 Models and the geometry generator are loaded on demand. Large STL resources and the WebAssembly module are part of the deployable assets, so a first load can take a moment. No backend, account, or API key is required; geometry processing and export run in the browser. Existing saved designs and shared links that select a numbered alternate panel now open as **Original**, or **Custom** when they include an active custom halo or grille. Other saved parameters are retained.
