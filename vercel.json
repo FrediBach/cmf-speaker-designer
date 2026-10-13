@@ -4,17 +4,9 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "redirects": [
-    {
-      "source": "/:path*",
-      "has": [{ "type": "host", "value": "www.cmfspeakerdesigner.com" }],
-      "destination": "https://cmfspeakerdesigner.com/:path*",
-      "permanent": true
-    }
-  ],
   "headers": [
     {
-      "source": "/:path*",
+      "source": "/(.*)",
       "headers": [
         {
           "key": "Content-Security-Policy",
@@ -55,8 +47,11 @@
       ]
     },
     {
-      "source": "/:path*",
-      "missing": [{ "type": "host", "value": "cmfspeakerdesigner.com" }],
+      "source": "/(.*)",
+      "missing": [
+        { "type": "host", "value": "cmfspeakerdesigner.com" },
+        { "type": "host", "value": "www.cmfspeakerdesigner.com" }
+      ],
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
     }
   ]

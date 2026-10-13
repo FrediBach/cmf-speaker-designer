@@ -18,7 +18,7 @@ const deployment = JSON.parse(
 }
 const securityHeaders = Object.fromEntries(
   deployment.headers
-    .filter((rule) => rule.source === '/:path*' && !rule.has && !rule.missing)
+    .filter((rule) => rule.source === '/(.*)' && !rule.has && !rule.missing)
     .flatMap((rule) => rule.headers.map(({ key, value }) => [key, value])),
 )
 

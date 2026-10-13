@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-const canonical = 'https://cmfspeakerdesigner.com/'
+const canonical = 'https://www.cmfspeakerdesigner.com/'
 
 function pngSize(bytes: Buffer) {
   expect(bytes.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a')

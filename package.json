@@ -9,6 +9,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "check": "tsc -b",
+    "check:deployment": "node scripts/check-deployment.mjs",
     "test:e2e": "playwright test",
     "test:production": "npm run build && PLAYWRIGHT_PREVIEW=1 playwright test",
     "assets:generate": "node scripts/generate-brand-assets.mjs",
