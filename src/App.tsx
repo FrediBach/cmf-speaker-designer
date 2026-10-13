@@ -265,7 +265,7 @@ function App() {
           </h1>
         </a>
         <span className="workspace-id" aria-hidden="true">
-          CMF—SD / 001
+          CMF-SD / 001
         </span>
         <nav aria-label="Main navigation">
           <AppearanceSettings />
@@ -321,7 +321,7 @@ function App() {
                 </div>
               </div>
               <div className="preview-watermark" aria-hidden="true">
-                {design.model.toUpperCase()}—01
+                {design.model.toUpperCase()}-01
               </div>
               <div className="preview-stage">
                 <PreviewLoadBoundary>
