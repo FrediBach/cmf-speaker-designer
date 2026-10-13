@@ -51,7 +51,7 @@ const fallbackStyle = {
   gap: 12,
   padding: 32,
   textAlign: 'center' as const,
-  color: '#656663',
+  color: 'var(--stage-muted)',
   fontSize: 14,
   lineHeight: 1.6,
 }
@@ -59,10 +59,13 @@ const fallbackStyle = {
 function PreviewFallback({ message }: { message?: string }) {
   return (
     <div role="status" style={fallbackStyle}>
-      <span style={{ fontSize: 28, color: '#fe5b35' }} aria-hidden="true">
+      <span
+        style={{ fontSize: 28, color: 'var(--accent-ink)' }}
+        aria-hidden="true"
+      >
         ◌
       </span>
-      <strong style={{ color: '#292a27', fontWeight: 500 }}>
+      <strong style={{ color: 'var(--foreground)', fontWeight: 500 }}>
         3D preview unavailable
       </strong>
       <span style={{ maxWidth: 290 }}>

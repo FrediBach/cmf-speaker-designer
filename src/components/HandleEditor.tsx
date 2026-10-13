@@ -114,7 +114,7 @@ function HandleDiagram({
             height="5"
             patternUnits="userSpaceOnUse"
           >
-            <circle r=".35" fill="#d3d6cc" />
+            <circle r=".35" fill="var(--border)" />
           </pattern>
         </defs>
         <rect
@@ -126,14 +126,14 @@ function HandleDiagram({
         />
         <path
           d={`M-42.5 ${h / 2}v5h85v-5`}
-          stroke="#a2a797"
-          fill="#e5e7df"
+          stroke="var(--control-border)"
+          fill="var(--muted)"
           strokeWidth=".6"
         />
         <polygon
           points={outline}
-          fill="#f7d9cb"
-          stroke="#e4744c"
+          fill="var(--accent-soft)"
+          stroke="var(--accent-ink)"
           strokeWidth=".6"
         />
         {holes.map((hole, i) => (
@@ -144,21 +144,21 @@ function HandleDiagram({
             width={hole.width}
             height={hole.height}
             rx={Math.min(hole.width, hole.height) / 2}
-            fill="#f7f8f3"
-            stroke="#e4744c"
+            fill="var(--card)"
+            stroke="var(--accent-ink)"
             strokeWidth=".6"
           />
         ))}
         <path
           d={`M${-w / 2} ${-h / 2 - 7}h${w}M${-w / 2} ${-h / 2 - 9}v4M${w / 2} ${-h / 2 - 9}v4`}
-          stroke="#9ca491"
+          stroke="var(--control-border)"
           strokeWidth=".5"
         />
         <text
           x="0"
           y={-h / 2 - 10}
           textAnchor="middle"
-          fill="#717b62"
+          fill="var(--muted-foreground)"
           fontSize="4"
           fontFamily="monospace"
         >

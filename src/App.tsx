@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { PanelIcon } from '@/components/PanelIcon'
+import { AppearanceSettings } from '@/components/AppearanceSettings'
 import { HandleEditor } from '@/components/HandleEditor'
 import { GrilleEditor } from '@/components/GrilleEditor'
 import { normalizeHandleSettings } from '@/lib/handle-settings'
@@ -97,7 +98,7 @@ function ColorPicker({
                 size={15}
                 strokeWidth={2}
                 color={
-                  !['#303538', '#5375cf'].includes(color.value)
+                  !['#303538', '#5573ce'].includes(color.value)
                     ? '#303538'
                     : '#fff'
                 }
@@ -292,13 +293,18 @@ function App() {
           CMF—SD / 001
         </span>
         <nav aria-label="Main navigation">
+          <AppearanceSettings />
           <button
+            className="guide-trigger"
+            aria-label="Print guide"
+            title="Print guide"
             onClick={(event) => {
               guideTriggerRef.current = event.currentTarget
               setGuideOpen(true)
             }}
           >
-            <CircleHelp size={18} /> Print guide
+            <CircleHelp size={18} aria-hidden="true" />
+            <span className="guide-trigger-label">Print guide</span>
           </button>
           <a href={COMMUNITY_URL} target="_blank" rel="noreferrer">
             Source files <ArrowUpRight size={16} />
@@ -718,7 +724,12 @@ function App() {
         <span>
           <span className="orange-dot" /> LOCAL WORKSPACE
         </span>
-        <p>Independent project · Not affiliated with Nothing or CMF</p>
+        <p>
+          Independent project · Not affiliated with Nothing or CMF · (c) 2026{' '}
+          <a href="https://fredibach.com" target="_blank" rel="noreferrer">
+            Fredi Bach
+          </a>
+        </p>
         <a href={COMMUNITY_URL} target="_blank" rel="noreferrer">
           Files & credits <ExternalLink size={14} />
         </a>

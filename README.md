@@ -41,6 +41,8 @@ Development tests use port 5174; production-preview tests use port 4179. Develop
 
 The preview stays visible while the parameters scroll, including on phones. Model selection, editor tabs, and export stay within reach. Color presets are in the Front panel inspector; printing guidance and source files are available from the header. On exceptionally short screens, the layout allows page scrolling so controls remain reachable.
 
+Use **Appearance** in the header to choose a light or dark theme and an orange or turquoise interface accent. Preferences are saved locally, independently of the speaker design and its shared URL. Accent colors use the existing app palette (`#f45427` orange, `#13b7b1` turquoise); the official product pages name these colorways but do not publish exact hex specifications.
+
 Controls use larger text and targets, high-contrast selected states, and visible keyboard focus. Use the skip link to reach design controls, arrow keys or Home/End within the editor tabs, and arrow keys on sliders. Focus the 3D preview to rotate with arrow keys or zoom with +/−. Closing a dialog returns focus to its opener. Reduced-motion and forced-color preferences are supported.
 
 ## What the POC does

@@ -157,21 +157,29 @@ function GrilleDiagram({
           </clipPath>
         </defs>
         <g clipPath={`url(#${clipId})`}>
-          <rect x={left} y={top} width="84" height="84" fill="#f5e3d8" />
+          <rect x={left} y={top} width="84" height="84" fill="var(--surface)" />
           <circle
             cx={opening.x}
             cy={-opening.y}
             r={opening.radius}
-            fill="#f7d9cb"
-            stroke="#daab90"
+            fill="var(--accent-soft)"
+            stroke="var(--accent-ink)"
             strokeWidth=".35"
           />
           {visibleHoles.map((hole, index) => (
             <polygon
               key={index}
               points={hole.points.map(([x, y]) => `${x},${-y}`).join(' ')}
-              fill={hole.kind === 'through' ? '#f6f7f2' : '#eac0a9'}
-              stroke={hole.kind === 'through' ? '#d58a61' : '#dcb091'}
+              fill={
+                hole.kind === 'through'
+                  ? 'var(--card)'
+                  : 'var(--diagram-recess)'
+              }
+              stroke={
+                hole.kind === 'through'
+                  ? 'var(--accent-ink)'
+                  : 'var(--accent-ink)'
+              }
               strokeWidth=".3"
             />
           ))}
