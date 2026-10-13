@@ -1,6 +1,6 @@
 # CMF Speaker Designer
 
-A browser-based front panel designer for CMF Speaker S and M, built as a proof of concept for **cmfspeakerdesigner.com**. The interface takes its warm white, orange, dark grey, and technical typography from the supplied product photography.
+A browser-based front panel designer for CMF Speaker S and M, built as a proof of concept for **cmfspeakerdesigner.com**. The interface is a compact design workspace with a persistent 3D preview, an independently scrolling inspector, and a fixed STL export action. Its warm grey surfaces, orange accents, fine rules, and dotted technical typography draw on the supplied product photography.
 
 ## Run locally
 
@@ -36,6 +36,12 @@ PLAYWRIGHT_PREVIEW=1 npm run test:e2e -- --grep "generates a"
 ```
 
 Development tests use port 5174; production-preview tests use port 4179. Development tests reuse an existing server; production tests start an isolated preview and fail if that port is occupied.
+
+## Workspace and accessibility
+
+The preview stays visible while the parameters scroll, including on phones. Model selection, editor tabs, and export stay within reach. Color presets are in the Front panel inspector; printing guidance and source files are available from the header. On exceptionally short screens, the layout allows page scrolling so controls remain reachable.
+
+Controls use larger text and targets, high-contrast selected states, and visible keyboard focus. Use the skip link to reach design controls, arrow keys or Home/End within the editor tabs, and arrow keys on sliders. Focus the 3D preview to rotate with arrow keys or zoom with +/−. Closing a dialog returns focus to its opener. Reduced-motion and forced-color preferences are supported.
 
 ## What the POC does
 

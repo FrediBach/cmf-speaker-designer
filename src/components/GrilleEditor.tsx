@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react'
-import { ArrowRight, Check, Sparkles } from 'lucide-react'
+import { ArrowRight, Check, Grid2X2 } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import {
   getGrilleLimits,
@@ -83,6 +83,7 @@ function GrilleParameter({
       <Slider
         aria-label={label}
         aria-describedby={description ? descriptionId : undefined}
+        aria-valuetext={`${Number(value.toFixed(2))} ${unit === 'mm' ? 'millimeters' : 'degrees'}`}
         value={[value]}
         min={min}
         max={Math.max(min + step, max)}
@@ -204,6 +205,8 @@ function GrilleDiagram({
 }
 
 export function GrilleEditor({ model, value, onChange }: Props) {
+  const extensionLabelId = useId()
+  const extensionDescriptionId = useId()
   const limits = getGrilleLimits(value)
   const set = (patch: Partial<GrilleSettings>) =>
     onChange(normalizeGrilleSettings({ ...value, ...patch }))
@@ -233,11 +236,10 @@ export function GrilleEditor({ model, value, onChange }: Props) {
       <section className="control-section grille-intro">
         <div className="grille-heading">
           <h3>
-            <Sparkles size={14} /> Find your rhythm
+            <Grid2X2 size={16} aria-hidden="true" /> Grille
           </h3>
-          <span className="new-tag">GENERATIVE</span>
         </div>
-        <p>Choose the openings. Make the pattern your own.</p>
+        <p>Set the opening shape, size, and spacing.</p>
         <div
           className="grille-mode"
           role="group"
@@ -255,7 +257,7 @@ export function GrilleEditor({ model, value, onChange }: Props) {
             aria-pressed={value.mode === 'custom'}
             onClick={() => set({ mode: 'custom' })}
           >
-            Custom grille <Sparkles size={12} />
+            Custom grille
           </button>
         </div>
       </section>
@@ -264,13 +266,10 @@ export function GrilleEditor({ model, value, onChange }: Props) {
           <div className="grille-original-icon">
             <PatternMark pattern="round" staggered />
           </div>
-          <h4>A familiar sound. A new look.</h4>
-          <p>
-            Generate your own grille with round holes, hexagons, or slots. Set
-            the size, spacing, and direction.
-          </p>
+          <h4>Original grille selected</h4>
+          <p>Use custom mode to adjust the pattern and grille thickness.</p>
           <button type="button" onClick={() => set({ mode: 'custom' })}>
-            Design your grille <ArrowRight size={14} />
+            Design your grille <ArrowRight size={16} aria-hidden="true" />
           </button>
         </div>
       ) : (
@@ -278,7 +277,7 @@ export function GrilleEditor({ model, value, onChange }: Props) {
           <GrilleDiagram model={model} value={value} />
           <section className="control-section">
             <h3>
-              <span>01</span> Choose the opening
+              <span aria-hidden="true">01</span> Opening shape
             </h3>
             <div
               className="grille-pattern-options"
@@ -327,7 +326,7 @@ export function GrilleEditor({ model, value, onChange }: Props) {
           </section>
           <section className="control-section">
             <h3>
-              <span>02</span> Size and spacing
+              <span aria-hidden="true">02</span> Size and spacing
             </h3>
             {parameter(
               'size',
@@ -361,11 +360,13 @@ export function GrilleEditor({ model, value, onChange }: Props) {
           </section>
           <section className="control-section grille-extension">
             <h3>
-              <span>03</span> Beyond the openings
+              <span aria-hidden="true">03</span> Surface pattern
             </h3>
             <label className="grille-extension-toggle">
               <input
                 type="checkbox"
+                aria-labelledby={extensionLabelId}
+                aria-describedby={extensionDescriptionId}
                 checked={value.extendPattern}
                 onChange={(event) =>
                   set({ extendPattern: event.target.checked })
@@ -375,8 +376,10 @@ export function GrilleEditor({ model, value, onChange }: Props) {
                 {value.extendPattern && <Check size={11} strokeWidth={2.5} />}
               </span>
               <span>
-                <strong>Continue across the face</strong>
-                <small>Shallow recesses outside the speaker openings.</small>
+                <strong id={extensionLabelId}>Continue across the face</strong>
+                <small id={extensionDescriptionId}>
+                  Shallow recesses outside the speaker openings.
+                </small>
               </span>
             </label>
             {value.extendPattern &&

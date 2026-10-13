@@ -21,7 +21,7 @@ const test = base.extend<{ appErrors: string[] }>({
 
 async function expectGeneratedPanelReady(page: Page) {
   await expect(
-    page.getByRole('button', { name: 'Download your panel', exact: true }),
+    page.getByRole('button', { name: 'Export STL', exact: true }),
   ).toBeEnabled({ timeout: 60_000 })
   await expect(page.locator('.preview-stage canvas')).toBeVisible()
   await expect(
@@ -122,9 +122,7 @@ test('generates a custom speaker grille with through-holes, blind face recesses,
     .locator('.preview-card')
     .screenshot({ path: testInfo.outputPath('custom-grille-closeup.png') })
 
-  await page
-    .getByRole('button', { name: 'Download your panel', exact: true })
-    .click()
+  await page.getByRole('button', { name: 'Export STL', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toContainText('Custom handle · 35 mm extension')
   const started = page.waitForEvent('download')
@@ -253,9 +251,7 @@ test.describe('mobile grille controls', () => {
       path: testInfo.outputPath('mobile-custom-grille.png'),
       fullPage: true,
     })
-    await page
-      .getByRole('button', { name: 'Download your panel', exact: true })
-      .click()
+    await page.getByRole('button', { name: 'Export STL', exact: true }).click()
     const dialog = page.getByRole('dialog')
     const exportButton = dialog.getByRole('button', { name: /^Download STL/ })
     await exportButton.scrollIntoViewIfNeeded()

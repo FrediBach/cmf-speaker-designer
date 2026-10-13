@@ -6,6 +6,8 @@ function Slider({
   className,
   'aria-label': ariaLabel,
   'aria-labelledby': ariaLabelledBy,
+  'aria-describedby': ariaDescribedBy,
+  'aria-valuetext': ariaValueText,
   ...props
 }: React.ComponentProps<typeof SliderPrimitive.Root>) {
   return (
@@ -21,6 +23,8 @@ function Slider({
         className="slider-thumb"
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
+        aria-describedby={ariaDescribedBy}
+        aria-valuetext={ariaValueText}
       />
     </SliderPrimitive.Root>
   )

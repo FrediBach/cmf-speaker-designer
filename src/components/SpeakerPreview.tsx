@@ -19,6 +19,7 @@ import {
   RepeatWrapping,
   RGBAFormat,
   Shape,
+  Spherical,
   SRGBColorSpace,
   Vector3,
 } from 'three'
@@ -51,7 +52,7 @@ const fallbackStyle = {
   padding: 32,
   textAlign: 'center' as const,
   color: '#656663',
-  fontSize: 13,
+  fontSize: 14,
   lineHeight: 1.6,
 }
 
@@ -261,7 +262,10 @@ function SpeakerControls({
 
   return (
     <>
-      <group position={[-controlOffset, top, depth]} rotation={[Math.PI / 4, 0, 0]}>
+      <group
+        position={[-controlOffset, top, depth]}
+        rotation={[Math.PI / 4, 0, 0]}
+      >
         <mesh castShadow>
           <cylinderGeometry args={[9.4, 9.4, 1.1, 48]} />
           <meshStandardMaterial color="#1f2224" roughness={0.45} />
@@ -320,7 +324,7 @@ function CameraControls({
   resetKey: number
   assembly: 'assembled' | 'panel' | 'exploded'
 }) {
-  const { camera, size, invalidate } = useThree()
+  const { camera, size, invalidate, gl } = useThree()
   const orbit = useRef<{ target: Vector3; update: () => void } | null>(null)
   const previousFraming = useRef<{
     view: typeof view
@@ -389,6 +393,58 @@ function CameraControls({
     assembly,
     invalidate,
   ])
+
+  useEffect(() => {
+    const surface = gl.domElement.closest<HTMLElement>(
+      '[data-preview-controls]',
+    )
+    if (!surface) return
+    const handleKey = (event: KeyboardEvent) => {
+      if (
+        event.target !== surface ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey
+      )
+        return
+      if (
+        ![
+          'ArrowLeft',
+          'ArrowRight',
+          'ArrowUp',
+          'ArrowDown',
+          '+',
+          '=',
+          '-',
+        ].includes(event.key)
+      )
+        return
+      event.preventDefault()
+      const target = orbit.current?.target ?? new Vector3()
+      const spherical = new Spherical().setFromVector3(
+        camera.position.clone().sub(target),
+      )
+      if (event.key === 'ArrowLeft') spherical.theta -= 0.12
+      if (event.key === 'ArrowRight') spherical.theta += 0.12
+      if (event.key === 'ArrowUp') spherical.phi -= 0.12
+      if (event.key === 'ArrowDown') spherical.phi += 0.12
+      if (event.key === '+' || event.key === '=') spherical.radius *= 0.9
+      if (event.key === '-') spherical.radius /= 0.9
+      spherical.phi = Math.max(0.18, Math.min(Math.PI * 0.78, spherical.phi))
+      spherical.radius = Math.max(
+        extent * 0.7,
+        Math.min(extent * 6, spherical.radius),
+      )
+      camera.position
+        .copy(target)
+        .add(new Vector3().setFromSpherical(spherical))
+      camera.lookAt(target)
+      orbit.current?.update()
+      invalidate()
+    }
+    surface.addEventListener('keydown', handleKey)
+    return () => surface.removeEventListener('keydown', handleKey)
+  }, [camera, extent, gl, invalidate])
 
   return (
     <OrbitControls
@@ -563,12 +619,15 @@ export function SpeakerPreview({
       className={className}
       data-panel-style={style}
       role="img"
+      data-preview-controls
+      tabIndex={0}
+      aria-description="Use arrow keys to rotate, plus to zoom in, and minus to zoom out. Use the Reset camera button to restore the view."
       aria-label={`Interactive 3D preview of your CMF Speaker ${model.toUpperCase()} ${assembly === 'panel' ? 'front panel' : 'with custom front panel'}. Drag to rotate and scroll to zoom.`}
       style={{
         position: 'relative',
         width: '100%',
         height: '100%',
-        minHeight: 260,
+        minHeight: 0,
         touchAction: 'none',
       }}
     >
@@ -606,6 +665,9 @@ export function SpeakerPreview({
           </Canvas>
         )}
       </PreviewBoundary>
+      <span className="camera-keyboard-hint" aria-hidden="true">
+        Arrow keys: rotate · + / −: zoom
+      </span>
       {loading && !error && (
         <div
           role="status"
@@ -613,7 +675,7 @@ export function SpeakerPreview({
             ...fallbackStyle,
             pointerEvents: 'none',
             fontFamily: 'monospace',
-            fontSize: 10,
+            fontSize: 14,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
           }}

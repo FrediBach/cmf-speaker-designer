@@ -21,7 +21,7 @@ const test = base.extend<{ appErrors: string[] }>({
 
 async function expectPanelReady(page: Page) {
   await expect(
-    page.getByRole('button', { name: 'Download your panel', exact: true }),
+    page.getByRole('button', { name: 'Export STL', exact: true }),
   ).toBeEnabled()
   await expect(page.locator('.preview-stage canvas')).toBeVisible()
   await expect(
@@ -32,12 +32,213 @@ async function expectPanelReady(page: Page) {
   ).not.toBeVisible()
 }
 
+async function expectWorkspaceInViewport(page: Page) {
+  const dimensions = await page.evaluate(() => ({
+    width: document.documentElement.clientWidth,
+    contentWidth: document.documentElement.scrollWidth,
+    height: window.innerHeight,
+    contentHeight: document.documentElement.scrollHeight,
+    scrollY: window.scrollY,
+  }))
+  expect(dimensions.contentWidth).toBeLessThanOrEqual(dimensions.width + 1)
+  expect(dimensions.contentHeight).toBeLessThanOrEqual(dimensions.height + 1)
+  expect(dimensions.scrollY).toBe(0)
+  await expect(page.locator('.preview-card')).toBeInViewport({ ratio: 1 })
+  await expect(
+    page.getByRole('button', { name: 'Export STL', exact: true }),
+  ).toBeInViewport({ ratio: 1 })
+}
+
+async function revealDeepHandleControl(page: Page) {
+  await page.getByRole('tab', { name: 'Handle', exact: true }).click()
+  await page.getByRole('button', { name: 'Custom handle', exact: true }).click()
+  await page.getByRole('button', { name: 'Carry loop', exact: true }).click()
+  await page.getByText('Position & spacing', { exact: false }).click()
+  const offset = page.getByRole('spinbutton', {
+    name: 'Vertical offset in millimeters',
+    exact: true,
+  })
+  await offset.scrollIntoViewIfNeeded()
+  await offset.focus()
+  await expect(offset).toBeInViewport({ ratio: 1 })
+  await expect(offset).toBeFocused()
+  expect(
+    await page
+      .locator('.controls-scroll')
+      .evaluate((element) => element.scrollTop),
+  ).toBeGreaterThan(0)
+}
+
+async function stablePreviewFrame(page: Page) {
+  const canvas = page.locator('.preview-stage canvas')
+  let previous: Buffer | undefined
+  await expect
+    .poll(
+      async () => {
+        const frame = await canvas.screenshot()
+        const stable = previous?.equals(frame) ?? false
+        previous = frame
+        return stable
+      },
+      {
+        message:
+          'The rendered preview should settle before comparing camera views',
+      },
+    )
+    .toBe(true)
+  return previous!
+}
+
+test.describe('workspace accessibility', () => {
+  test.use({ viewport: { width: 1440, height: 900 } })
+
+  test('keeps the preview and export visible while keyboard users edit deep controls', async ({
+    page,
+  }, testInfo) => {
+    await page.goto('/')
+    await expectPanelReady(page)
+    await expectWorkspaceInViewport(page)
+    await page.screenshot({
+      path: testInfo.outputPath('workspace-1440x900.png'),
+    })
+
+    const preview = page.locator('[role="img"][data-preview-controls]')
+    await expect(preview).toHaveAttribute(
+      'aria-description',
+      /arrow keys.*plus.*minus/,
+    )
+    await preview.focus()
+    await expect(preview).toBeFocused()
+    let before = await stablePreviewFrame(page)
+    for (const key of ['ArrowRight', 'ArrowUp', 'Shift+Equal', 'Minus']) {
+      await preview.press(key)
+      await expect
+        .poll(
+          async () =>
+            !(await page.locator('.preview-stage canvas').screenshot()).equals(
+              before,
+            ),
+          { message: `${key} should visibly change the 3D camera` },
+        )
+        .toBe(true)
+      before = await stablePreviewFrame(page)
+      await expect(preview).toBeFocused()
+      await expectWorkspaceInViewport(page)
+    }
+
+    const panelTab = page.getByRole('tab', { name: 'Front panel', exact: true })
+    const handleTab = page.getByRole('tab', { name: 'Handle', exact: true })
+    await panelTab.focus()
+    await panelTab.press('End')
+    await expect(handleTab).toBeFocused()
+    await expect(handleTab).toHaveAttribute('aria-selected', 'true')
+    await expect(
+      page.getByRole('tabpanel', { name: 'Handle', exact: true }),
+    ).toBeVisible()
+    await handleTab.press('ArrowLeft')
+    const grilleTab = page.getByRole('tab', { name: 'Grille', exact: true })
+    await expect(grilleTab).toBeFocused()
+    await expect(grilleTab).toHaveAttribute('aria-selected', 'true')
+    await grilleTab.press('Home')
+    await expect(panelTab).toBeFocused()
+    await expect(panelTab).toHaveAttribute('aria-selected', 'true')
+
+    const customColor = page.getByLabel('Custom front panel color', {
+      exact: true,
+    })
+    await customColor.focus()
+    await expect(customColor).toBeFocused()
+    const focusIndicator = await customColor.evaluate((input) => {
+      const style = getComputedStyle(input.closest('label')!)
+      return {
+        style: style.outlineStyle,
+        width: parseFloat(style.outlineWidth),
+      }
+    })
+    expect(focusIndicator.style).not.toBe('none')
+    expect(focusIndicator.width).toBeGreaterThanOrEqual(2)
+
+    const printGuide = page.getByRole('button', {
+      name: 'Print guide',
+      exact: true,
+    })
+    await printGuide.click()
+    const guide = page.getByRole('dialog', { name: 'Print guide', exact: true })
+    await expect(guide).toBeVisible()
+    await guide
+      .getByRole('button', { name: 'Close dialog', exact: true })
+      .click()
+    await expect(guide).not.toBeVisible()
+    await expect(printGuide).toBeFocused()
+
+    const depthHelp = page.getByRole('button', {
+      name: 'About added face depth',
+      exact: true,
+    })
+    await depthHelp.click()
+    await expect(guide).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(guide).not.toBeVisible()
+    await expect(depthHelp).toBeFocused()
+
+    await revealDeepHandleControl(page)
+    await expectWorkspaceInViewport(page)
+    await expectPanelReady(page)
+    const exportButton = page.getByRole('button', {
+      name: 'Export STL',
+      exact: true,
+    })
+    await exportButton.click()
+    const dialog = page.getByRole('dialog', {
+      name: 'Export panel',
+      exact: true,
+    })
+    await expect(dialog).toBeVisible()
+    await expect(
+      dialog.getByRole('button', { name: /^Download STL/ }),
+    ).toBeInViewport({ ratio: 1 })
+    await page.keyboard.press('Escape')
+    await expect(dialog).not.toBeVisible()
+    await expect(exportButton).toBeFocused()
+    await expectWorkspaceInViewport(page)
+  })
+})
+
+for (const viewport of [
+  { width: 320, height: 568 },
+  { width: 768, height: 1024 },
+  { width: 1024, height: 768 },
+]) {
+  test(`keeps the workspace usable at ${viewport.width} × ${viewport.height}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(viewport)
+    await page.goto('/')
+    await expectPanelReady(page)
+    await expectWorkspaceInViewport(page)
+    await page.screenshot({
+      path: testInfo.outputPath(
+        `workspace-${viewport.width}x${viewport.height}.png`,
+      ),
+    })
+
+    await revealDeepHandleControl(page)
+    await expectPanelReady(page)
+    await expectWorkspaceInViewport(page)
+    await page.screenshot({
+      path: testInfo.outputPath(
+        `workspace-deep-controls-${viewport.width}x${viewport.height}.png`,
+      ),
+    })
+  })
+}
+
 test('renders WebGL and switches real panel designs, colors, and preview modes', async ({
   page,
 }, testInfo) => {
   await page.goto('/')
   await expect(
-    page.getByRole('heading', { name: 'Make it yours.' }),
+    page.getByRole('heading', { name: 'Speaker designer' }),
   ).toBeVisible()
   await expectPanelReady(page)
 
@@ -163,9 +364,7 @@ test('keyboard face depth produces a correctly named full-size binary STL downlo
   await depth.press('ArrowRight')
   await expect(depth).toHaveAttribute('aria-valuenow', '0.2')
   await expectPanelReady(page)
-  await page
-    .getByRole('button', { name: 'Download your panel', exact: true })
-    .click()
+  await page.getByRole('button', { name: 'Export STL', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
   await expect(dialog).toContainText('Speaker M · Twin contours')
@@ -207,7 +406,7 @@ test('keyboard face depth produces a correctly named full-size binary STL downlo
   expect(maximum[2] - minimum[2]).toBeCloseTo(52.775, 3)
   expect(minimum[2]).toBeCloseTo(0, 5)
   await expect(dialog).not.toBeVisible()
-  await expect(page.getByRole('status')).toContainText('Your STL is downloaded')
+  await expect(page.getByRole('status')).toContainText('STL downloaded.')
 })
 
 test('generates a connected custom handle with real round and slotted through-holes', async ({
@@ -290,9 +489,7 @@ test('generates a connected custom handle with real round and slotted through-ho
 
   async function downloadHandle(label: string) {
     await expectPanelReady(page)
-    await page
-      .getByRole('button', { name: 'Download your panel', exact: true })
-      .click()
+    await page.getByRole('button', { name: 'Export STL', exact: true }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toContainText('Custom handle · 48 mm extension')
     const started = page.waitForEvent('download')
@@ -431,6 +628,7 @@ test.describe('mobile layout', () => {
   }, testInfo) => {
     await page.goto('/')
     await expectPanelReady(page)
+    await expectWorkspaceInViewport(page)
     const viewport = await page.evaluate(() => ({
       content: document.documentElement.scrollWidth,
       viewport: document.documentElement.clientWidth,
@@ -443,9 +641,7 @@ test.describe('mobile layout', () => {
     await expect(
       page.getByRole('button', { name: 'Front panel: Chalk', exact: true }),
     ).toHaveAttribute('aria-pressed', 'true')
-    await page
-      .getByRole('button', { name: 'Download your panel', exact: true })
-      .click()
+    await page.getByRole('button', { name: 'Export STL', exact: true }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
     await expect(
@@ -473,6 +669,19 @@ test.describe('mobile layout', () => {
       .click()
     await page.getByRole('button', { name: 'Carry loop', exact: true }).click()
     await expectPanelReady(page)
+    await page.getByText('Position & spacing', { exact: false }).click()
+    const offset = page.getByRole('spinbutton', {
+      name: 'Vertical offset in millimeters',
+      exact: true,
+    })
+    await offset.scrollIntoViewIfNeeded()
+    await expect(offset).toBeInViewport({ ratio: 1 })
+    expect(
+      await page
+        .locator('.controls-scroll')
+        .evaluate((element) => element.scrollTop),
+    ).toBeGreaterThan(0)
+    await expectWorkspaceInViewport(page)
     const handleViewport = await page.evaluate(() => ({
       content: document.documentElement.scrollWidth,
       viewport: document.documentElement.clientWidth,
@@ -484,9 +693,7 @@ test.describe('mobile layout', () => {
       path: testInfo.outputPath('mobile-custom-handle.png'),
       fullPage: true,
     })
-    await page
-      .getByRole('button', { name: 'Download your panel', exact: true })
-      .click()
+    await page.getByRole('button', { name: 'Export STL', exact: true }).click()
     await expect(dialog).toContainText('Custom handle · 35 mm extension')
     const customDownload = dialog.getByRole('button', { name: /^Download STL/ })
     await customDownload.scrollIntoViewIfNeeded()

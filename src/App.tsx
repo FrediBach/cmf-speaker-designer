@@ -1,11 +1,10 @@
-import { useEffect, useState, Suspense, lazy } from 'react'
+import { useEffect, useRef, useState, Suspense, lazy } from 'react'
 import {
   ArrowDownToLine,
   ArrowRight,
   ArrowUpRight,
   Box,
   Check,
-  ChevronRight,
   CircleHelp,
   CirclePlus,
   Copy,
@@ -16,7 +15,6 @@ import {
   MoveUpRight,
   RotateCcw,
   SlidersHorizontal,
-  Sparkles,
   X,
 } from 'lucide-react'
 import type { BufferGeometry } from 'three'
@@ -80,7 +78,7 @@ function ColorPicker({
   return (
     <div className="color-picker">
       <div className="control-label">
-        <label>{label}</label>
+        <span className="color-label">{label}</span>
         <span>{colorName(value)}</span>
       </div>
       <div className="swatches" role="group" aria-label={`${label} color`}>
@@ -99,7 +97,7 @@ function ColorPicker({
                 size={15}
                 strokeWidth={2}
                 color={
-                  color.value === '#eeeae1' || color.value === '#e4b8b4'
+                  !['#303538', '#5375cf'].includes(color.value)
                     ? '#303538'
                     : '#fff'
                 }
@@ -125,6 +123,8 @@ function ColorPicker({
 }
 
 function App() {
+  const guideTriggerRef = useRef<HTMLButtonElement>(null)
+  const exportTriggerRef = useRef<HTMLButtonElement>(null)
   const [design, setDesign] = useState<Design>(readDesign)
   const [editorTab, setEditorTab] = useState<'panel' | 'grille' | 'handle'>(
     () =>
@@ -240,7 +240,7 @@ function App() {
     url.searchParams.set('design', JSON.stringify(design))
     try {
       await navigator.clipboard.writeText(url.toString())
-      setToast('Design link copied. Make someone’s day.')
+      setToast('Design link copied.')
     } catch {
       setToast('Link ready in your address bar. Copy it to share your design.')
       window.history.replaceState(null, '', url)
@@ -256,7 +256,7 @@ function App() {
       )
       downloadPanelStl(geometry, design.model, sourceStyle, design.relief)
       setExportOpen(false)
-      setToast('Your STL is downloaded. Time to make it real.')
+      setToast('STL downloaded.')
     } catch {
       setToast('The download could not start. Please try again.')
     } finally {
@@ -270,61 +270,43 @@ function App() {
     setView('perspective')
     setAssembly('assembled')
     setResetKey((value) => value + 1)
-    setToast('Back to the original. A fresh start.')
+    setToast('Design reset.')
   }
 
   return (
-    <>
+    <div className="app-shell">
+      <a className="skip-link" href="#design-controls">
+        Skip to design controls
+      </a>
       <header className="site-header">
         <a className="brand" href="#" aria-label="CMF Speaker Designer home">
           <span className="brand-word">
             cmf<span className="brand-dot">●</span>
           </span>
           <span className="brand-divider" />
-          <span className="brand-title">
-            SPEAKER
-            <br />
-            DESIGNER
-          </span>
+          <h1 className="brand-title" id="page-title">
+            Speaker designer
+          </h1>
         </a>
+        <span className="workspace-id" aria-hidden="true">
+          CMF—SD / 001
+        </span>
         <nav aria-label="Main navigation">
-          <a href="#designer" className="nav-active">
-            The designer
-          </a>
-          <button onClick={() => setGuideOpen(true)}>
-            Print guide <ArrowUpRight size={14} />
+          <button
+            onClick={(event) => {
+              guideTriggerRef.current = event.currentTarget
+              setGuideOpen(true)
+            }}
+          >
+            <CircleHelp size={18} /> Print guide
           </button>
+          <a href={COMMUNITY_URL} target="_blank" rel="noreferrer">
+            Source files <ArrowUpRight size={16} />
+          </a>
         </nav>
-        <a
-          className="community-link"
-          href={COMMUNITY_URL}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Built for the community <ArrowUpRight size={15} />
-        </a>
       </header>
 
-      <main>
-        <section className="intro" aria-labelledby="page-title">
-          <div>
-            <div className="eyebrow">
-              <span className="orange-dot" /> A LITTLE DIFFERENT. A LOT MORE
-              YOU.
-            </div>
-            <h1 id="page-title">
-              Make it yours<span>.</span>
-            </h1>
-          </div>
-          <div className="intro-note">
-            <p>Your speaker. Your colors. Your kind of loud.</p>
-            <p>Design a front panel, preview it in 3D, and print it.</p>
-            <span className="beta-tag">
-              THE COMMUNITY DESIGN LAB <span>V.01</span>
-            </span>
-          </div>
-        </section>
-
+      <main aria-labelledby="page-title">
         <section
           id="designer"
           className="designer"
@@ -334,9 +316,13 @@ function App() {
             <div className="preview-card">
               <div className="preview-topbar">
                 <span className="eyebrow">
-                  <span className="live-dot" /> LIVE PREVIEW
+                  <span className="live-dot" /> PREVIEW
                 </span>
-                <div className="view-switch" aria-label="Camera view">
+                <div
+                  className="view-switch"
+                  role="group"
+                  aria-label="Camera view"
+                >
                   <button
                     className={view === 'perspective' ? 'active' : ''}
                     aria-pressed={view === 'perspective'}
@@ -354,14 +340,14 @@ function App() {
                 </div>
               </div>
               <div className="preview-watermark" aria-hidden="true">
-                SPEAKER {design.model.toUpperCase()}
+                {design.model.toUpperCase()}—01
               </div>
               <div className="preview-stage">
                 <Suspense
                   fallback={
                     <div className="preview-loading">
                       <LoaderCircle className="spin" size={22} />
-                      <span>Getting your speaker ready</span>
+                      <span>Loading preview…</span>
                     </div>
                   }
                 >
@@ -385,7 +371,6 @@ function App() {
                   <LoaderCircle className="spin" size={12} /> Updating geometry…
                 </div>
               )}
-              <div className="preview-side-label">DESIGNED TO BE DIFFERENT</div>
               <div className="preview-bottom">
                 <div>
                   <span className="preview-model">
@@ -416,7 +401,11 @@ function App() {
                 </div>
               </div>
               <div className="preview-toolbar">
-                <div className="assembly-switch" aria-label="Preview mode">
+                <div
+                  className="assembly-switch"
+                  role="group"
+                  aria-label="Preview mode"
+                >
                   {(
                     [
                       { id: 'assembled', label: 'Speaker', icon: Box },
@@ -436,74 +425,31 @@ function App() {
                   ))}
                 </div>
                 <span className="orbit-hint">
-                  <MousePointer2 size={13} /> Drag to rotate · Scroll to zoom
+                  <MousePointer2 size={13} /> Drag to rotate · Pinch or scroll
+                  to zoom
                 </span>
               </div>
             </div>
-            <div className="looks-bar">
-              <div className="looks-title">
-                <Sparkles size={15} />
-                <span>A little inspiration</span>
-              </div>
-              <div className="looks">
-                {looks.map((look) => (
-                  <button
-                    key={look.name}
-                    className={
-                      design.panelColor === look.panelColor &&
-                      design.knobColor === look.knobColor
-                        ? 'look selected'
-                        : 'look'
-                    }
-                    onClick={() =>
-                      update({
-                        panelColor: look.panelColor,
-                        knobColor: look.knobColor,
-                      })
-                    }
-                    title={look.name}
-                    aria-label={`Apply ${look.name} colors`}
-                    aria-pressed={
-                      design.panelColor === look.panelColor &&
-                      design.knobColor === look.knobColor
-                    }
-                  >
-                    <span
-                      className="look-colors"
-                      style={{ background: look.panelColor }}
-                    >
-                      <i style={{ background: look.knobColor }} />
-                    </span>
-                    <span>{look.name}</span>
-                    <ArrowUpRight size={13} />
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="workspace-note">
-              <span>
-                <span className="tiny-cross">+</span> Real CMF geometry. Endless
-                personality.
-              </span>
-              <button onClick={() => setGuideOpen(true)}>
-                New to 3D printing? <ArrowRight size={14} />
-              </button>
-            </div>
           </div>
 
-          <aside className="controls" aria-label="Design controls">
+          <aside
+            className="controls"
+            id="design-controls"
+            aria-label="Design controls"
+            tabIndex={-1}
+          >
             <div className="controls-heading">
               <div>
                 <SlidersHorizontal size={17} />
-                <h2>Your design</h2>
+                <h2>Design controls</h2>
               </div>
               <button className="text-button" onClick={resetDesign}>
                 <RotateCcw size={12} /> Reset
               </button>
             </div>
-            <section className="control-section">
+            <section className="control-section model-section">
               <h3>
-                <span>01</span> Choose your speaker
+                <span>01</span> Speaker model
               </h3>
               <div className="model-options">
                 {(['s', 'm'] as const).map((model) => (
@@ -517,9 +463,7 @@ function App() {
                     <span>
                       Speaker {model.toUpperCase()}
                       <small>
-                        {model === 's'
-                          ? 'Small. Full of character.'
-                          : 'More room to play.'}
+                        {model === 's' ? '85 × 131 mm' : '85 × 225 mm'}
                       </small>
                     </span>
                     <span className="radio-indicator">
@@ -571,118 +515,170 @@ function App() {
               ))}
             </div>
             <div
-              id="panel-editor"
-              role="tabpanel"
-              aria-labelledby="panel-tab"
-              hidden={editorTab !== 'panel'}
+              className="controls-scroll"
+              key={editorTab}
+              role="region"
+              aria-label={`${EDITOR_TABS.find((tab) => tab.id === editorTab)?.label} parameters`}
+              tabIndex={0}
             >
-              <section className="control-section">
-                <h3>
-                  <span>02</span> Find your shape
-                </h3>
-                <div className="style-options">
-                  {styles.map((style) => (
+              <div
+                id="panel-editor"
+                role="tabpanel"
+                aria-labelledby="panel-tab"
+                hidden={editorTab !== 'panel'}
+              >
+                <section className="control-section">
+                  <h3>
+                    <span>01</span> Panel shape
+                  </h3>
+                  <div className="style-options">
+                    {styles.map((style) => (
+                      <button
+                        key={style.id}
+                        className={`style-option ${design.grille.mode === 'original' && design.style === style.id ? 'selected' : ''}`}
+                        onClick={() =>
+                          update({
+                            style: style.id,
+                            grille: { ...design.grille, mode: 'original' },
+                          })
+                        }
+                        aria-pressed={
+                          design.grille.mode === 'original' &&
+                          design.style === style.id
+                        }
+                      >
+                        <PanelIcon model={design.model} style={style.id} />
+                        <span>{style.label}</span>
+                        {design.grille.mode === 'original' &&
+                          design.style === style.id && (
+                            <Check className="style-check" size={12} />
+                          )}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="style-description">
+                    {design.grille.mode === 'custom'
+                      ? 'Custom grille active. Choose a shape to return to a supplied panel.'
+                      : currentStyle.description}
+                  </p>
+                </section>
+                <section className="control-section">
+                  <h3>
+                    <span>02</span> Colors
+                  </h3>
+                  <ColorPicker
+                    label="Front panel"
+                    value={design.panelColor}
+                    onChange={(panelColor) => update({ panelColor })}
+                  />
+                  <ColorPicker
+                    label="Volume knob"
+                    value={design.knobColor}
+                    onChange={(knobColor) => update({ knobColor })}
+                  />
+                  <p className="subtle-note">
+                    Preview colors only. Match with your filament.
+                  </p>
+                </section>
+                <section className="control-section relief-section">
+                  <h3>
+                    <span>03</span> Face depth{' '}
                     <button
-                      key={style.id}
-                      className={`style-option ${design.grille.mode === 'original' && design.style === style.id ? 'selected' : ''}`}
-                      onClick={() =>
-                        update({
-                          style: style.id,
-                          grille: { ...design.grille, mode: 'original' },
-                        })
-                      }
-                      aria-pressed={
-                        design.grille.mode === 'original' &&
-                        design.style === style.id
-                      }
+                      className="help-button"
+                      aria-label="About added face depth"
+                      onClick={(event) => {
+                        guideTriggerRef.current = event.currentTarget
+                        setGuideOpen(true)
+                      }}
                     >
-                      <PanelIcon model={design.model} style={style.id} />
-                      <span>{style.label}</span>
-                      {design.grille.mode === 'original' &&
-                        design.style === style.id && (
-                          <Check className="style-check" size={12} />
-                        )}
+                      <CircleHelp size={14} />
                     </button>
-                  ))}
+                  </h3>
+                  <div className="control-label">
+                    <label id="relief-label">Added face depth</label>
+                    <span className="value-chip">
+                      {design.relief.toFixed(1)} mm
+                    </span>
+                  </div>
+                  <Slider
+                    aria-labelledby="relief-label"
+                    aria-valuetext={`${design.relief.toFixed(1)} millimeters`}
+                    value={[design.relief]}
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    onValueChange={([relief]) => update({ relief })}
+                  />
+                  <div className="slider-labels">
+                    <span>Original</span>
+                    <span>+2 mm</span>
+                  </div>
+                </section>
+                <div className="looks-bar">
+                  <div className="looks-title">
+                    <span className="section-index">04</span>
+                    <span>Color presets</span>
+                  </div>
+                  <div className="looks">
+                    {looks.map((look) => (
+                      <button
+                        key={look.name}
+                        className={
+                          design.panelColor === look.panelColor &&
+                          design.knobColor === look.knobColor
+                            ? 'look selected'
+                            : 'look'
+                        }
+                        onClick={() =>
+                          update({
+                            panelColor: look.panelColor,
+                            knobColor: look.knobColor,
+                          })
+                        }
+                        title={look.name}
+                        aria-label={`Apply ${look.name} colors`}
+                        aria-pressed={
+                          design.panelColor === look.panelColor &&
+                          design.knobColor === look.knobColor
+                        }
+                      >
+                        <span
+                          className="look-colors"
+                          style={{ background: look.panelColor }}
+                        >
+                          <i style={{ background: look.knobColor }} />
+                        </span>
+                        <span>{look.name}</span>
+                        <ArrowUpRight size={13} />
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <p className="style-description">
-                  {design.grille.mode === 'custom'
-                    ? 'Custom grille active. Choose a shape to return to a supplied panel.'
-                    : currentStyle.description}
-                </p>
-              </section>
-              <section className="control-section">
-                <h3>
-                  <span>03</span> Add your color
-                </h3>
-                <ColorPicker
-                  label="Front panel"
-                  value={design.panelColor}
-                  onChange={(panelColor) => update({ panelColor })}
+              </div>
+              <div
+                id="grille-editor"
+                role="tabpanel"
+                aria-labelledby="grille-tab"
+                hidden={editorTab !== 'grille'}
+              >
+                <GrilleEditor
+                  model={design.model}
+                  value={design.grille}
+                  onChange={(grille) => update({ grille })}
                 />
-                <ColorPicker
-                  label="Volume knob"
-                  value={design.knobColor}
-                  onChange={(knobColor) => update({ knobColor })}
+              </div>
+              <div
+                id="handle-editor"
+                role="tabpanel"
+                aria-labelledby="handle-tab"
+                hidden={editorTab !== 'handle'}
+              >
+                <HandleEditor
+                  model={design.model}
+                  value={design.handle}
+                  onChange={(handle) => update({ handle })}
                 />
-                <p className="subtle-note">
-                  Color is a preview. Make it real with your filament.
-                </p>
-              </section>
-              <section className="control-section relief-section">
-                <h3>
-                  <span>04</span> Fine-tune the face{' '}
-                  <button
-                    className="help-button"
-                    aria-label="About added face depth"
-                    onClick={() => setGuideOpen(true)}
-                  >
-                    <CircleHelp size={14} />
-                  </button>
-                </h3>
-                <div className="control-label">
-                  <label id="relief-label">Added face depth</label>
-                  <span className="value-chip">
-                    {design.relief.toFixed(1)} mm
-                  </span>
-                </div>
-                <Slider
-                  aria-labelledby="relief-label"
-                  value={[design.relief]}
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  onValueChange={([relief]) => update({ relief })}
-                />
-                <div className="slider-labels">
-                  <span>Original</span>
-                  <span>+2 mm</span>
-                </div>
-              </section>
-            </div>
-            <div
-              id="grille-editor"
-              role="tabpanel"
-              aria-labelledby="grille-tab"
-              hidden={editorTab !== 'grille'}
-            >
-              <GrilleEditor
-                model={design.model}
-                value={design.grille}
-                onChange={(grille) => update({ grille })}
-              />
-            </div>
-            <div
-              id="handle-editor"
-              role="tabpanel"
-              aria-labelledby="handle-tab"
-              hidden={editorTab !== 'handle'}
-            >
-              <HandleEditor
-                model={design.model}
-                value={design.handle}
-                onChange={(handle) => update({ handle })}
-              />
+              </div>
             </div>
             <div className="export-section">
               <div className="export-spec">
@@ -702,88 +698,53 @@ function App() {
               <Button
                 className="download-button"
                 disabled={!geometry || !!error}
-                onClick={() => setExportOpen(true)}
+                onClick={(event) => {
+                  exportTriggerRef.current = event.currentTarget
+                  setExportOpen(true)
+                }}
               >
                 {!geometry && !error ? (
                   <LoaderCircle size={17} className="spin" />
                 ) : (
                   <ArrowDownToLine size={18} />
                 )}{' '}
-                Download your panel <ArrowRight size={17} />
+                Export STL <ArrowRight size={17} />
               </Button>
-              <p>Made by you. Ready for your slicer.</p>
             </div>
           </aside>
         </section>
-
-        <section className="make-section" aria-labelledby="make-title">
-          <div className="make-copy">
-            <span className="eyebrow">LESS OFF-THE-SHELF. MORE OFF-BEAT.</span>
-            <h2 id="make-title">
-              Good design leaves
-              <br />
-              room for you.
-            </h2>
-            <p>
-              A speaker you can take apart. A front panel you can make your own.
-              Start with CMF’s original files and put a little of yourself into
-              the everyday.
-            </p>
-            <a href={COMMUNITY_URL} target="_blank" rel="noreferrer">
-              Meet the open design project <ArrowUpRight size={16} />
-            </a>
-            <div className="make-steps">
-              <span>
-                <b>01</b> Design it
-              </span>
-              <ChevronRight size={14} />
-              <span>
-                <b>02</b> Print it
-              </span>
-              <ChevronRight size={14} />
-              <span>
-                <b>03</b> Play it
-              </span>
-            </div>
-          </div>
-          <div className="make-image">
-            <img
-              src="/speakers-lineup.png"
-              alt="Orange, white, graphite, and teal CMF speakers with interchangeable front panels and contrasting volume knobs"
-              loading="lazy"
-            />
-            <span>ONE SPEAKER. YOUR EXPRESSION.</span>
-          </div>
-        </section>
       </main>
-      <footer>
-        <a className="footer-brand" href="#">
-          cmf<span>●</span> <span>speaker designer</span>
-        </a>
-        <p>
-          An independent community project. Not affiliated with Nothing or CMF.
-        </p>
+      <footer className="status-bar">
+        <span>
+          <span className="orange-dot" /> LOCAL WORKSPACE
+        </span>
+        <p>Independent project · Not affiliated with Nothing or CMF</p>
         <a href={COMMUNITY_URL} target="_blank" rel="noreferrer">
-          Original files & credits <ExternalLink size={12} />
+          Files & credits <ExternalLink size={14} />
         </a>
       </footer>
 
       <Dialog open={guideOpen} onOpenChange={setGuideOpen}>
-        <DialogContent>
+        <DialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault()
+            guideTriggerRef.current?.focus()
+          }}
+        >
           <div className="dialog-icon">
             <Layers3 size={23} />
           </div>
-          <span className="eyebrow">FROM PIXELS TO PLASTIC</span>
-          <DialogTitle>Your first print starts here.</DialogTitle>
+          <span className="eyebrow">REFERENCE / 01</span>
+          <DialogTitle>Print guide</DialogTitle>
           <DialogDescription>
-            A few practical pointers for turning your design into a real CMF
-            front panel.
+            Export your panel, prepare it in a slicer, and check the first
+            print.
           </DialogDescription>
           <ol className="print-steps">
             <li>
               <span>01</span>
               <div>
-                <h4>Make it your own</h4>
+                <h4>Configure the panel</h4>
                 <p>
                   Choose Speaker S or M and a panel shape. Added face depth
                   thickens the front while retaining the original mounting
@@ -817,7 +778,7 @@ function App() {
             <li>
               <span>04</span>
               <div>
-                <h4>Print one. Check the fit.</h4>
+                <h4>Test the first print</h4>
                 <p>
                   Printer tolerances vary. Test the fit before making a full
                   set. Generated handles and custom face depth have not been
@@ -844,15 +805,20 @@ function App() {
           if (!busy) setExportOpen(open)
         }}
       >
-        <DialogContent>
+        <DialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault()
+            exportTriggerRef.current?.focus()
+          }}
+        >
           <div className="dialog-icon">
             <ArrowDownToLine size={23} />
           </div>
-          <span className="eyebrow">MAKE SOMETHING THAT’S YOURS</span>
-          <DialogTitle>Meet your next print.</DialogTitle>
+          <span className="eyebrow">EXPORT / STL</span>
+          <DialogTitle>Export panel</DialogTitle>
           <DialogDescription>
-            Your front panel, in full size and ready to open in your favorite
-            slicer.
+            Full-size geometry in millimeters. Open the STL in your slicer at
+            100% scale.
           </DialogDescription>
           <div className="download-summary">
             <PanelIcon model={design.model} style={sourceStyle} />
@@ -943,7 +909,7 @@ function App() {
           </button>
         </div>
       )}
-    </>
+    </div>
   )
 }
 

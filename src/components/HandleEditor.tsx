@@ -4,7 +4,6 @@ import {
   Minus,
   MoveHorizontal,
   RectangleHorizontal,
-  Sparkles,
 } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import {
@@ -56,6 +55,7 @@ function Parameter({
           <input
             aria-label={`${label} in millimeters`}
             type="number"
+            inputMode="decimal"
             min={min}
             max={max}
             step={step}
@@ -74,11 +74,12 @@ function Parameter({
               }
             }}
           />
-          <span>mm</span>
+          <span aria-hidden="true">mm</span>
         </label>
       </div>
       <Slider
         aria-label={label}
+        aria-valuetext={`${Number(value.toFixed(2))} millimeters`}
         value={[value]}
         min={min}
         max={Math.max(min + step, max)}
@@ -165,7 +166,7 @@ function HandleDiagram({
         </text>
       </svg>
       <span>
-        PROCEDURAL GEOMETRY <span>4 MM THICK</span>
+        HANDLE DETAIL <span>4 MM THICK</span>
       </span>
     </div>
   )
@@ -202,17 +203,17 @@ export function HandleEditor({ model, value, onChange }: Props) {
       <section className="control-section handle-intro">
         <div className="handle-heading">
           <h3>
-            <Sparkles size={14} /> Make room for your ideas
+            <MoveHorizontal size={16} aria-hidden="true" /> Handle
           </h3>
-          <span className="new-tag">GENERATIVE</span>
         </div>
-        <p>A new extension. Every opening, your own.</p>
+        <p>Set the handle dimensions and cutouts.</p>
         <div
           className="handle-mode"
           role="group"
           aria-label="Handle generation mode"
         >
           <button
+            type="button"
             aria-pressed={value.mode === 'original'}
             className={value.mode === 'original' ? 'active' : ''}
             onClick={() => set({ mode: 'original' })}
@@ -220,35 +221,40 @@ export function HandleEditor({ model, value, onChange }: Props) {
             Original handle
           </button>
           <button
+            type="button"
             aria-pressed={value.mode === 'custom'}
             className={value.mode === 'custom' ? 'active' : ''}
             onClick={() => set({ mode: 'custom' })}
           >
-            Custom handle <Sparkles size={12} />
+            Custom handle
           </button>
         </div>
       </section>
       {value.mode === 'original' ? (
         <div className="handle-original">
-          <div className="original-handle-icon">
+          <div className="original-handle-icon" aria-hidden="true">
             <RectangleHorizontal size={60} strokeWidth={1} />
             <Minus size={27} strokeWidth={3} />
           </div>
-          <h4>A familiar starting point.</h4>
+          <h4>Original handle selected</h4>
           <p>
-            Switch to a custom handle to generate a new extension, shape its
-            edges, and place your own cutouts.
+            Use custom mode to adjust the size, rounded corners, and openings.
           </p>
-          <button onClick={() => set({ mode: 'custom' })}>
-            Design your handle <MoveHorizontal size={14} />
+          <button type="button" onClick={() => set({ mode: 'custom' })}>
+            Design your handle <MoveHorizontal size={16} aria-hidden="true" />
           </button>
         </div>
       ) : (
         <>
           <HandleDiagram model={model} value={value} />
-          <div className="handle-presets" aria-label="Handle starting points">
-            <span>START WITH</span>
+          <div
+            className="handle-presets"
+            role="group"
+            aria-label="Handle starting points"
+          >
+            <span>PRESETS</span>
             <button
+              type="button"
               onClick={() =>
                 set({
                   height: 35,
@@ -267,6 +273,7 @@ export function HandleEditor({ model, value, onChange }: Props) {
               Carry loop
             </button>
             <button
+              type="button"
               onClick={() =>
                 set({
                   height: 30,
@@ -285,6 +292,7 @@ export function HandleEditor({ model, value, onChange }: Props) {
               Three dots
             </button>
             <button
+              type="button"
               onClick={() =>
                 set({
                   height: 22,
@@ -301,7 +309,7 @@ export function HandleEditor({ model, value, onChange }: Props) {
           </div>
           <section className="control-section handle-shape">
             <h3>
-              <span>01</span> Shape the extension
+              <span aria-hidden="true">01</span> Dimensions
             </h3>
             {parameter('height', 'Extension height')}
             {parameter('width', 'Handle width')}
@@ -309,7 +317,7 @@ export function HandleEditor({ model, value, onChange }: Props) {
           </section>
           <section className="control-section handle-cutouts">
             <h3>
-              <span>02</span> Make an opening
+              <span aria-hidden="true">02</span> Cutouts
             </h3>
             <div
               className="cutout-options"
@@ -324,12 +332,13 @@ export function HandleEditor({ model, value, onChange }: Props) {
                 ] as const
               ).map(({ id, label, Icon }) => (
                 <button
+                  type="button"
                   key={id}
                   aria-pressed={value.cutout === id}
                   className={value.cutout === id ? 'selected' : ''}
                   onClick={() => set({ cutout: id })}
                 >
-                  <Icon size={17} strokeWidth={1.4} />
+                  <Icon size={17} strokeWidth={1.4} aria-hidden="true" />
                   {label}
                 </button>
               ))}
@@ -341,6 +350,7 @@ export function HandleEditor({ model, value, onChange }: Props) {
                   <div role="group" aria-label="Number of holes">
                     {[1, 2, 3].map((count) => (
                       <button
+                        type="button"
                         key={count}
                         aria-label={`${count} ${count === 1 ? 'hole' : 'holes'}`}
                         aria-pressed={value.holeCount === count}
@@ -360,7 +370,7 @@ export function HandleEditor({ model, value, onChange }: Props) {
                   parameter('holeHeight', 'Hole height')}
                 <details className="handle-placement">
                   <summary>
-                    Position & spacing <span>+</span>
+                    Position & spacing <span aria-hidden="true">+</span>
                   </summary>
                   <div>
                     {value.holeCount > 1 &&
