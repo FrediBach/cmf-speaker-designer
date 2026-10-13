@@ -1,5 +1,9 @@
 import { defineConfig } from '@playwright/test'
 
+const productionPreview = process.env.PLAYWRIGHT_PREVIEW === '1'
+const port = productionPreview ? 4179 : 5174
+const baseURL = `http://127.0.0.1:${port}`
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
@@ -9,7 +13,7 @@ export default defineConfig({
   reporter: 'list',
   outputDir: 'test-results',
   use: {
-    baseURL: 'http://127.0.0.1:5174',
+    baseURL,
     browserName: 'chromium',
     channel: 'chrome',
     headless: true,
@@ -19,9 +23,9 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   webServer: {
-    command: 'npm run dev -- --port 5174 --strictPort',
-    url: 'http://127.0.0.1:5174',
-    reuseExistingServer: true,
+    command: `npm run ${productionPreview ? 'preview' : 'dev'} -- --port ${port} --strictPort`,
+    url: baseURL,
+    reuseExistingServer: !productionPreview,
     timeout: 60_000,
   },
 })

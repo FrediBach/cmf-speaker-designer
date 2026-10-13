@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, Suspense, lazy } from 'react'
+import { useEffect, useState, Suspense, lazy } from 'react'
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -29,6 +29,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { PanelIcon } from '@/components/PanelIcon'
+import { HandleEditor } from '@/components/HandleEditor'
+import { normalizeHandleSettings } from '@/lib/handle-settings'
+import { usePanelGeometry } from '@/lib/use-panel-geometry'
 import {
   DEFAULT_DESIGN,
   PALETTE,
@@ -38,9 +41,9 @@ import {
   type Design,
 } from '@/lib/design'
 import {
-  buildPanelGeometry,
   downloadPanelStl,
   getPanelStyles,
+  getPanelDimensions,
   loadPanelGeometry,
 } from '@/lib/panels'
 
@@ -116,6 +119,9 @@ function ColorPicker({
 
 function App() {
   const [design, setDesign] = useState<Design>(readDesign)
+  const [editorTab, setEditorTab] = useState<'panel' | 'handle'>(() =>
+    design.handle.mode === 'custom' ? 'handle' : 'panel',
+  )
   const [view, setView] = useState<'perspective' | 'front'>('perspective')
   const [assembly, setAssembly] = useState<'assembled' | 'panel' | 'exploded'>(
     'assembled',
@@ -133,21 +139,30 @@ function App() {
   const [toast, setToast] = useState('')
   const [retryKey, setRetryKey] = useState(0)
   const update = (patch: Partial<Design>) =>
-    setDesign((current) => ({ ...current, ...patch }))
+    setDesign((current) => {
+      const next = { ...current, ...patch }
+      return patch.model
+        ? { ...next, handle: normalizeHandleSettings(next.model, next.handle) }
+        : next
+    })
   const styles = getPanelStyles(design.model)
   const currentStyle = styles.find((item) => item.id === design.style)!
-  const geometry = useMemo(
-    () =>
-      source && source.model === design.model && source.style === design.style
-        ? buildPanelGeometry(
-            source.geometry,
-            source.model,
-            source.style,
-            design.relief,
-          )
-        : null,
-    [source, design.model, design.style, design.relief],
-  )
+  const {
+    geometry,
+    previewGeometry,
+    error: generationError,
+    generating,
+  } = usePanelGeometry(source, design, retryKey)
+  const dimensions = previewGeometry
+    ? getPanelDimensions(previewGeometry)
+    : null
+  const panelWidth = dimensions ? Math.round(dimensions.width) : 85
+  const panelHeight = dimensions
+    ? Math.round(dimensions.height)
+    : design.model === 's'
+      ? 131
+      : 225
+  const error = loadError || generationError
 
   useEffect(() => {
     try {
@@ -192,12 +207,6 @@ function App() {
       source?.geometry.dispose()
     },
     [source],
-  )
-  useEffect(
-    () => () => {
-      geometry?.dispose()
-    },
-    [geometry],
   )
   useEffect(() => {
     if (!toast) return
@@ -336,8 +345,8 @@ function App() {
                   }
                 >
                   <SpeakerPreview
-                    geometry={geometry}
-                    error={loadError}
+                    geometry={previewGeometry}
+                    error={error}
                     key={retryKey}
                     model={design.model}
                     style={design.style}
@@ -350,6 +359,11 @@ function App() {
                   />
                 </Suspense>
               </div>
+              {generating && previewGeometry && (
+                <div className="geometry-updating" role="status">
+                  <LoaderCircle className="spin" size={12} /> Updating geometry…
+                </div>
+              )}
               <div className="preview-side-label">DESIGNED TO BE DIFFERENT</div>
               <div className="preview-bottom">
                 <div>
@@ -359,8 +373,8 @@ function App() {
                     {currentStyle.label}
                   </span>
                   <span className="preview-dimensions">
-                    85 × {design.model === 's' ? '131' : '225'} MM{' '}
-                    <span>·</span> {colorName(design.panelColor).toUpperCase()}
+                    {panelWidth} × {panelHeight} MM <span>·</span>{' '}
+                    {colorName(design.panelColor).toUpperCase()}
                   </span>
                 </div>
                 <div className="preview-actions">
@@ -494,76 +508,126 @@ function App() {
                 ))}
               </div>
             </section>
-            <section className="control-section">
-              <h3>
-                <span>02</span> Find your shape
-              </h3>
-              <div className="style-options">
-                {styles.map((style) => (
-                  <button
-                    key={style.id}
-                    className={`style-option ${design.style === style.id ? 'selected' : ''}`}
-                    onClick={() => update({ style: style.id })}
-                    aria-pressed={design.style === style.id}
-                  >
-                    <PanelIcon model={design.model} style={style.id} />
-                    <span>{style.label}</span>
-                    {design.style === style.id && (
-                      <Check className="style-check" size={12} />
-                    )}
-                  </button>
-                ))}
-              </div>
-              <p className="style-description">{currentStyle.description}</p>
-            </section>
-            <section className="control-section">
-              <h3>
-                <span>03</span> Add your color
-              </h3>
-              <ColorPicker
-                label="Front panel"
-                value={design.panelColor}
-                onChange={(panelColor) => update({ panelColor })}
-              />
-              <ColorPicker
-                label="Volume knob"
-                value={design.knobColor}
-                onChange={(knobColor) => update({ knobColor })}
-              />
-              <p className="subtle-note">
-                Color is a preview. Make it real with your filament.
-              </p>
-            </section>
-            <section className="control-section relief-section">
-              <h3>
-                <span>04</span> Fine-tune the face{' '}
+            <div
+              className="editor-tabs"
+              role="tablist"
+              aria-label="Design area"
+            >
+              {(['panel', 'handle'] as const).map((tab) => (
                 <button
-                  className="help-button"
-                  aria-label="About added face depth"
-                  onClick={() => setGuideOpen(true)}
+                  key={tab}
+                  role="tab"
+                  aria-label={tab === 'panel' ? 'Front panel' : 'Handle'}
+                  id={`${tab}-tab`}
+                  aria-controls={`${tab}-editor`}
+                  aria-selected={editorTab === tab}
+                  tabIndex={editorTab === tab ? 0 : -1}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === 'ArrowLeft' ||
+                      event.key === 'ArrowRight'
+                    ) {
+                      const next = tab === 'panel' ? 'handle' : 'panel'
+                      setEditorTab(next)
+                      document.getElementById(`${next}-tab`)?.focus()
+                    }
+                  }}
+                  onClick={() => setEditorTab(tab)}
                 >
-                  <CircleHelp size={14} />
+                  {tab === 'panel' ? 'Front panel' : 'Handle'}
+                  {tab === 'handle' && <span>NEW</span>}
                 </button>
-              </h3>
-              <div className="control-label">
-                <label id="relief-label">Added face depth</label>
-                <span className="value-chip">
-                  {design.relief.toFixed(1)} mm
-                </span>
-              </div>
-              <Slider
-                aria-labelledby="relief-label"
-                value={[design.relief]}
-                min={0}
-                max={2}
-                step={0.1}
-                onValueChange={([relief]) => update({ relief })}
+              ))}
+            </div>
+            <div
+              id="panel-editor"
+              role="tabpanel"
+              aria-labelledby="panel-tab"
+              hidden={editorTab !== 'panel'}
+            >
+              <section className="control-section">
+                <h3>
+                  <span>02</span> Find your shape
+                </h3>
+                <div className="style-options">
+                  {styles.map((style) => (
+                    <button
+                      key={style.id}
+                      className={`style-option ${design.style === style.id ? 'selected' : ''}`}
+                      onClick={() => update({ style: style.id })}
+                      aria-pressed={design.style === style.id}
+                    >
+                      <PanelIcon model={design.model} style={style.id} />
+                      <span>{style.label}</span>
+                      {design.style === style.id && (
+                        <Check className="style-check" size={12} />
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <p className="style-description">{currentStyle.description}</p>
+              </section>
+              <section className="control-section">
+                <h3>
+                  <span>03</span> Add your color
+                </h3>
+                <ColorPicker
+                  label="Front panel"
+                  value={design.panelColor}
+                  onChange={(panelColor) => update({ panelColor })}
+                />
+                <ColorPicker
+                  label="Volume knob"
+                  value={design.knobColor}
+                  onChange={(knobColor) => update({ knobColor })}
+                />
+                <p className="subtle-note">
+                  Color is a preview. Make it real with your filament.
+                </p>
+              </section>
+              <section className="control-section relief-section">
+                <h3>
+                  <span>04</span> Fine-tune the face{' '}
+                  <button
+                    className="help-button"
+                    aria-label="About added face depth"
+                    onClick={() => setGuideOpen(true)}
+                  >
+                    <CircleHelp size={14} />
+                  </button>
+                </h3>
+                <div className="control-label">
+                  <label id="relief-label">Added face depth</label>
+                  <span className="value-chip">
+                    {design.relief.toFixed(1)} mm
+                  </span>
+                </div>
+                <Slider
+                  aria-labelledby="relief-label"
+                  value={[design.relief]}
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  onValueChange={([relief]) => update({ relief })}
+                />
+                <div className="slider-labels">
+                  <span>Original</span>
+                  <span>+2 mm</span>
+                </div>
+              </section>
+            </div>
+            <div
+              id="handle-editor"
+              role="tabpanel"
+              aria-labelledby="handle-tab"
+              hidden={editorTab !== 'handle'}
+            >
+              <HandleEditor
+                model={design.model}
+                value={design.handle}
+                onChange={(handle) => update({ handle })}
               />
-              <div className="slider-labels">
-                <span>Original</span>
-                <span>+2 mm</span>
-              </div>
-            </section>
+            </div>
             <div className="export-section">
               <div className="export-spec">
                 <span>
@@ -571,9 +635,9 @@ function App() {
                 </span>
                 <span>1:1 SCALE · MM</span>
               </div>
-              {loadError ? (
+              {error ? (
                 <div className="load-error" role="alert">
-                  {loadError}
+                  {error}
                   <button onClick={() => setRetryKey((key) => key + 1)}>
                     Retry
                   </button>
@@ -581,10 +645,10 @@ function App() {
               ) : null}
               <Button
                 className="download-button"
-                disabled={!geometry || !!loadError}
+                disabled={!geometry || !!error}
                 onClick={() => setExportOpen(true)}
               >
-                {!geometry && !loadError ? (
+                {!geometry && !error ? (
                   <LoaderCircle size={17} className="spin" />
                 ) : (
                   <ArrowDownToLine size={18} />
@@ -667,7 +731,8 @@ function App() {
                 <p>
                   Choose Speaker S or M and a panel shape. Added face depth
                   thickens the front while retaining the original mounting
-                  features and folded controls.
+                  features and folded controls. In the Handle tab, generate a
+                  new upper extension with your own outline and openings.
                 </p>
               </div>
             </li>
@@ -699,8 +764,9 @@ function App() {
                 <h4>Print one. Check the fit.</h4>
                 <p>
                   Printer tolerances vary. Test the fit before making a full
-                  set. Custom face depth is experimental and has not been
-                  physically fit-tested.
+                  set. Generated handles and custom face depth have not been
+                  physically tested. Test strength before using a printed handle
+                  to carry a speaker.
                 </p>
               </div>
             </li>
@@ -744,9 +810,16 @@ function App() {
                   : 'Original surface'}{' '}
                 · Binary STL
               </span>
+              {design.handle.mode === 'custom' && (
+                <span>
+                  Custom handle · {design.handle.height} mm extension ·{' '}
+                  {design.handle.cutout === 'none'
+                    ? 'Solid'
+                    : `${design.handle.holeCount} ${design.handle.cutout === 'circle' ? 'round' : 'slot'} ${design.handle.holeCount === 1 ? 'hole' : 'holes'}`}
+                </span>
+              )}
               <span>
-                85 × {design.model === 's' ? '131' : '225'} mm · Millimeter
-                units
+                {panelWidth} × {panelHeight} mm · Millimeter units
               </span>
             </div>
             <span

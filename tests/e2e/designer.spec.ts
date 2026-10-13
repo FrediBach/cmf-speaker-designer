@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { test as base, expect, type Page } from '@playwright/test'
+import { inspectBinaryStl } from './stl'
 
 const test = base.extend<{ appErrors: string[] }>({
   appErrors: [
@@ -209,6 +210,214 @@ test('keyboard face depth produces a correctly named full-size binary STL downlo
   await expect(page.getByRole('status')).toContainText('Your STL is downloaded')
 })
 
+test('generates a connected custom handle with real round and slotted through-holes', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(180_000)
+  await page.goto('/')
+  await expectPanelReady(page)
+  await page.getByRole('tab', { name: 'Handle', exact: true }).click()
+  await page.getByRole('button', { name: 'Custom handle', exact: true }).click()
+  await page.getByRole('button', { name: 'Three dots', exact: true }).click()
+  await page
+    .getByRole('spinbutton', {
+      name: 'Extension height in millimeters',
+      exact: true,
+    })
+    .fill('48')
+  await page
+    .getByRole('spinbutton', {
+      name: 'Handle width in millimeters',
+      exact: true,
+    })
+    .fill('96')
+  await page
+    .getByRole('spinbutton', {
+      name: 'Corner radius in millimeters',
+      exact: true,
+    })
+    .fill('8')
+  await page
+    .getByRole('spinbutton', {
+      name: 'Hole diameter in millimeters',
+      exact: true,
+    })
+    .fill('12')
+  await page.getByText('Position & spacing', { exact: false }).click()
+  await page
+    .getByRole('spinbutton', {
+      name: 'Hole spacing in millimeters',
+      exact: true,
+    })
+    .fill('8')
+  await page
+    .getByRole('spinbutton', {
+      name: 'Horizontal offset in millimeters',
+      exact: true,
+    })
+    .fill('6')
+  await page
+    .getByRole('spinbutton', {
+      name: 'Vertical offset in millimeters',
+      exact: true,
+    })
+    .fill('3')
+  await expectPanelReady(page)
+  await expect(page.locator('.preview-dimensions')).toContainText('96 × 155 MM')
+
+  // A reload must recover the generated configuration, including model-specific normalization.
+  await page.reload()
+  await expectPanelReady(page)
+  await expect(
+    page.getByRole('tab', { name: 'Handle', exact: true }),
+  ).toHaveAttribute('aria-selected', 'true')
+  await expect(
+    page.getByRole('button', { name: 'Round', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await expect(
+    page.getByRole('button', { name: '3 holes', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await expect(
+    page.getByRole('spinbutton', {
+      name: 'Extension height in millimeters',
+      exact: true,
+    }),
+  ).toHaveValue('48')
+  await page.screenshot({
+    path: testInfo.outputPath('custom-handle.png'),
+    fullPage: true,
+  })
+
+  async function downloadHandle(label: string) {
+    await expectPanelReady(page)
+    await page
+      .getByRole('button', { name: 'Download your panel', exact: true })
+      .click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toContainText('Custom handle · 48 mm extension')
+    const started = page.waitForEvent('download')
+    await dialog.getByRole('button', { name: /^Download STL/ }).click()
+    const download = await started
+    expect(download.suggestedFilename()).toBe(
+      'cmf-speaker-s-original-handle-48.0mm.stl',
+    )
+    const path = testInfo.outputPath(`${label}.stl`)
+    await download.saveAs(path)
+    const report = inspectBinaryStl(await readFile(path))
+    expect(
+      report.components,
+      'The handle and original panel must be one solid',
+    ).toBe(1)
+    expect(
+      report.invalidEdges,
+      'Every edge must have two oppositely wound faces',
+    ).toBe(0)
+    expect(report.degenerateEdges).toBe(0)
+    expect(report.signedVolume).toBeGreaterThan(0)
+    expect(report.maximum[0] - report.minimum[0]).toBeCloseTo(96, 3)
+    expect(report.maximum[1] - report.minimum[1]).toBeCloseTo(154.9691, 3)
+    expect(report.maximum[2] - report.minimum[2]).toBeCloseTo(24, 3)
+    expect(report.minimum[2]).toBeCloseTo(0, 5)
+    return report
+  }
+
+  const round = await downloadHandle('three-round-holes')
+  // Source S has four through-holes. Replacing its carry hole with three gives genus six.
+  expect(round.genus).toBe(6)
+  const seamY = 65.48455 - 24
+  const roundY = seamY + 48 / 2 + 2 + 3
+  for (const x of [14, -6, -26]) {
+    expect(
+      round.rayZ(x, roundY),
+      'A hole center must be empty through the entire thickness',
+    ).toEqual([])
+    expect(round.rayZ(x + 4, roundY)).toEqual([])
+  }
+  for (const x of [4, -16]) {
+    const wall = round.rayZ(x, roundY)
+    expect(wall).toHaveLength(2)
+    expect(wall[0]).toBeCloseTo(20, 3)
+    expect(wall[1]).toBeCloseTo(24, 3)
+  }
+  await page.screenshot({
+    path: testInfo.outputPath('generated-round-handle.png'),
+    fullPage: true,
+  })
+
+  await page.getByRole('button', { name: 'Slot', exact: true }).click()
+  await page.getByRole('button', { name: '2 holes', exact: true }).click()
+  await page
+    .getByRole('spinbutton', { name: 'Hole width in millimeters', exact: true })
+    .fill('28')
+  await page
+    .getByRole('spinbutton', {
+      name: 'Hole height in millimeters',
+      exact: true,
+    })
+    .fill('10')
+  await page.getByText('Position & spacing', { exact: false }).click()
+  await page
+    .getByRole('spinbutton', {
+      name: 'Horizontal offset in millimeters',
+      exact: true,
+    })
+    .fill('0')
+  await page
+    .getByRole('spinbutton', {
+      name: 'Vertical offset in millimeters',
+      exact: true,
+    })
+    .fill('0')
+  const slots = await downloadHandle('two-slot-holes')
+  expect(slots.genus).toBe(5)
+  const slotY = seamY + 48 / 2 + 2
+  for (const x of [-18, 18]) {
+    expect(slots.rayZ(x, slotY)).toEqual([])
+    expect(
+      slots.rayZ(x + 12, slotY),
+      'The elongated end of a slot must also be open',
+    ).toEqual([])
+    expect(
+      slots.rayZ(x, slotY + 6),
+      'Material must remain outside each cutout',
+    ).toHaveLength(2)
+  }
+  expect(
+    slots.rayZ(0, slotY),
+    'The bridge between slots must remain solid',
+  ).toHaveLength(2)
+  await page.screenshot({
+    path: testInfo.outputPath('generated-slot-handle.png'),
+    fullPage: true,
+  })
+
+  await page.getByRole('button', { name: 'None', exact: true }).click()
+  await expectPanelReady(page)
+  await expect(
+    page.getByRole('button', { name: 'None', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Carry loop', exact: true }).click()
+  await expect(
+    page.getByRole('button', { name: 'Slot', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await expect(
+    page.getByRole('spinbutton', {
+      name: 'Extension height in millimeters',
+      exact: true,
+    }),
+  ).toHaveValue('35')
+  await page.getByRole('button', { name: 'Solid', exact: true }).click()
+  await expectPanelReady(page)
+  await expect(
+    page.getByRole('button', { name: 'None', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await page
+    .getByRole('button', { name: 'Original handle', exact: true })
+    .click()
+  await expectPanelReady(page)
+  await expect(page.locator('.preview-dimensions')).toContainText('85 × 131 MM')
+})
+
 test.describe('mobile layout', () => {
   test.use({
     viewport: { width: 390, height: 844 },
@@ -255,6 +464,41 @@ test.describe('mobile layout', () => {
       .click()
     await page.screenshot({
       path: testInfo.outputPath('mobile-designer.png'),
+      fullPage: true,
+    })
+
+    await page.getByRole('tab', { name: 'Handle', exact: true }).click()
+    await page
+      .getByRole('button', { name: 'Custom handle', exact: true })
+      .click()
+    await page.getByRole('button', { name: 'Carry loop', exact: true }).click()
+    await expectPanelReady(page)
+    const handleViewport = await page.evaluate(() => ({
+      content: document.documentElement.scrollWidth,
+      viewport: document.documentElement.clientWidth,
+    }))
+    expect(handleViewport.content).toBeLessThanOrEqual(
+      handleViewport.viewport + 1,
+    )
+    await page.screenshot({
+      path: testInfo.outputPath('mobile-custom-handle.png'),
+      fullPage: true,
+    })
+    await page
+      .getByRole('button', { name: 'Download your panel', exact: true })
+      .click()
+    await expect(dialog).toContainText('Custom handle · 35 mm extension')
+    const customDownload = dialog.getByRole('button', { name: /^Download STL/ })
+    await customDownload.scrollIntoViewIfNeeded()
+    await expect(customDownload).toBeInViewport()
+    const handleDialogBounds = await dialog.boundingBox()
+    expect(handleDialogBounds).not.toBeNull()
+    expect(handleDialogBounds!.x).toBeGreaterThanOrEqual(0)
+    expect(
+      handleDialogBounds!.x + handleDialogBounds!.width,
+    ).toBeLessThanOrEqual(391)
+    await page.screenshot({
+      path: testInfo.outputPath('mobile-custom-download.png'),
       fullPage: true,
     })
   })

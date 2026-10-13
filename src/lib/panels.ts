@@ -221,7 +221,13 @@ export function downloadPanelStl(
   )
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = panelFilename(model, style, addedDepth)
+  const customHandle = geometry.userData.handle?.settings?.mode === 'custom'
+  anchor.download = panelFilename(model, style, addedDepth).replace(
+    '.stl',
+    customHandle
+      ? `-handle-${Number(geometry.userData.handle.settings.height).toFixed(1)}mm.stl`
+      : '.stl',
+  )
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()

@@ -1,3 +1,9 @@
+import {
+  getDefaultHandleSettings,
+  normalizeHandleSettings,
+  type HandleSettings,
+} from './handle-settings'
+
 export const PALETTE = [
   { name: 'CMF orange', value: '#f45427' },
   { name: 'Graphite', value: '#303538' },
@@ -13,6 +19,7 @@ export type Design = {
   panelColor: string
   knobColor: string
   relief: number
+  handle: HandleSettings
 }
 export const DEFAULT_DESIGN: Design = {
   model: 's',
@@ -20,6 +27,7 @@ export const DEFAULT_DESIGN: Design = {
   panelColor: '#f45427',
   knobColor: '#303538',
   relief: 0,
+  handle: getDefaultHandleSettings('s'),
 }
 export const STORAGE_KEY = 'cmf-speaker-design-v1'
 const isColor = (value: unknown): value is string =>
@@ -28,8 +36,13 @@ const isColor = (value: unknown): value is string =>
 export function validateDesign(value: unknown): Design {
   const data =
     value && typeof value === 'object' ? (value as Partial<Design>) : {}
+  const model = data.model === 'm' ? 'm' : 's'
   return {
-    model: data.model === 'm' ? 'm' : 's',
+    model,
+    handle: normalizeHandleSettings(
+      model,
+      data.handle ?? getDefaultHandleSettings(model),
+    ),
     style: ['original', '1', '2', '3'].includes(data.style ?? '')
       ? data.style!
       : 'original',

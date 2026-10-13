@@ -1653,3 +1653,402 @@ footer > a:last-child {
     transition-duration: 0.01ms !important;
   }
 }
+
+.editor-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  background: #f1f2eb;
+  border-radius: 6px;
+  margin: 16px 23px 2px;
+}
+.editor-tabs button {
+  border: 0;
+  background: transparent;
+  border-radius: 4px;
+  padding: 9px 6px;
+  font-size: 11px;
+  color: #7d8275;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.editor-tabs button[aria-selected='true'] {
+  background: #fff;
+  color: #33382e;
+  box-shadow: 0 1px 3px #00000008;
+}
+.editor-tabs button > span {
+  font-family: 'Space Mono', monospace;
+  font-size: 6px;
+  letter-spacing: 0.4px;
+  color: #df714b;
+}
+[role='tabpanel'][hidden] {
+  display: none;
+}
+.handle-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.handle-heading h3 {
+  font-size: 11px;
+  margin: 0;
+}
+.handle-heading h3 svg {
+  color: #d47e58;
+  flex-shrink: 0;
+}
+.new-tag {
+  color: #9c8975;
+  font-size: 6px;
+  font-family: 'Space Mono', monospace;
+  letter-spacing: 0.5px;
+  border: 1px solid #e7e0d2;
+  border-radius: 3px;
+  padding: 3px 4px;
+}
+.handle-intro > p {
+  font-size: 10px;
+  color: #868b7d;
+  margin: 9px 0 15px;
+}
+.handle-mode {
+  display: flex;
+  border: 1px solid #e1e4d9;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.handle-mode button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  font-size: 10px;
+  padding: 9px 5px;
+  border: 0;
+  background: #fff;
+  color: #8b917f;
+}
+.handle-mode button + button {
+  border-left: 1px solid #e1e4d9;
+}
+.handle-mode button.active {
+  color: #b75a34;
+  background: #fff3ed;
+}
+.handle-original {
+  text-align: center;
+  padding: 25px 30px 37px;
+}
+.original-handle-icon {
+  display: grid;
+  place-items: center;
+  height: 110px;
+  position: relative;
+  color: #c3c8b8;
+}
+.original-handle-icon svg + svg {
+  position: absolute;
+  color: #ec956d;
+}
+.handle-original h4 {
+  font-size: 15px;
+  font-weight: 500;
+  margin: 5px 0 8px;
+}
+.handle-original p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #929b85;
+  margin: 0;
+}
+.handle-original > button {
+  border: 0;
+  background: none;
+  color: #b67452;
+  font-size: 11px;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 20px;
+}
+.handle-diagram {
+  padding: 0 23px;
+  margin-top: 15px;
+}
+.handle-diagram > svg {
+  width: 100%;
+  height: 138px;
+  background: #f6f7f2;
+  border: 1px solid #e5e8de;
+  border-radius: 6px;
+}
+.handle-diagram > span {
+  font-family: 'Space Mono', monospace;
+  font-size: 6px;
+  letter-spacing: 0.6px;
+  color: #909a82;
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 1px;
+}
+.handle-presets {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 7px 23px 0;
+}
+.handle-presets > span {
+  font-family: 'Space Mono', monospace;
+  font-size: 6px;
+  color: #989f8b;
+  margin-right: 2px;
+  white-space: nowrap;
+}
+.handle-presets button {
+  background: #fff;
+  border: 1px solid #e0e5d6;
+  border-radius: 4px;
+  font-size: 8px;
+  padding: 6px;
+  color: #7e8a6e;
+  white-space: nowrap;
+}
+.handle-presets button:hover {
+  border-color: #d29b7e;
+  color: #ba6c42;
+}
+.handle-parameter {
+  margin-top: 15px;
+}
+.handle-parameter .control-label {
+  margin-bottom: 5px;
+}
+.handle-parameter .parameter-name {
+  font-size: 10px;
+  color: #676f5d;
+}
+.dimension-input {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid #e9ece2;
+  background: #f7f8f3;
+  border-radius: 4px;
+  padding: 3px 5px;
+  color: #8b957c;
+  font-family: 'Space Mono', monospace;
+  font-size: 8px;
+}
+.dimension-input input {
+  width: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 9px;
+  text-align: right;
+  color: #768465;
+  -moz-appearance: textfield;
+}
+.dimension-input input::-webkit-inner-spin-button,
+.dimension-input input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.cutout-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+.cutout-options button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid #e1e5d8;
+  border-radius: 5px;
+  font-size: 10px;
+  color: #949d87;
+}
+.cutout-options button.selected {
+  background: #fff5ef;
+  border-color: #eb9875;
+  color: #c4754a;
+}
+.hole-count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  margin-top: 15px;
+  color: #67725a;
+}
+.hole-count > div {
+  display: flex;
+  gap: 5px;
+}
+.hole-count button {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  width: 27px;
+  height: 25px;
+  border: 1px solid #e3e8da;
+  background: #fff;
+  border-radius: 4px;
+  color: #919e80;
+}
+.hole-count button.selected {
+  background: #f9e8dc;
+  color: #b66c41;
+  border-color: #efc4a7;
+}
+.handle-placement {
+  border-top: 1px solid #e9ede1;
+  margin-top: 18px;
+  padding-top: 13px;
+}
+.handle-placement summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  color: #858f77;
+  font-size: 10px;
+  list-style: none;
+}
+.handle-placement summary::-webkit-details-marker {
+  display: none;
+}
+.handle-placement summary > span {
+  font-size: 15px;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+.handle-placement[open] summary > span {
+  transform: rotate(45deg);
+}
+.handle-placement > div {
+  padding-top: 3px;
+}
+.handle-footnote {
+  font-size: 9px;
+  color: #9da58f;
+  line-height: 1.75;
+  margin: 14px 23px 18px;
+}
+.geometry-updating {
+  position: absolute;
+  left: 50%;
+  bottom: 132px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 20px;
+  padding: 7px 11px;
+  background: #fffffff0;
+  border: 1px solid #e1e5d8;
+  z-index: 3;
+  color: #808b71;
+  font-size: 9px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px #00000005;
+}
+@media (min-width: 681px) {
+  .preview-column {
+    position: sticky;
+    top: 20px;
+  }
+}
+@media (max-width: 1150px) {
+  .editor-tabs {
+    margin-left: 19px;
+    margin-right: 19px;
+  }
+  .handle-diagram {
+    padding: 0 19px;
+  }
+  .handle-presets {
+    margin-left: 19px;
+    margin-right: 19px;
+    gap: 4px;
+  }
+  .handle-presets button {
+    font-size: 7px;
+  }
+}
+@media (max-width: 680px) {
+  .editor-tabs {
+    margin: 16px 20px 0;
+  }
+  .editor-tabs button {
+    font-size: 12px;
+    padding: 11px;
+  }
+  .handle-heading h3 {
+    font-size: 12px;
+  }
+  .handle-mode button {
+    padding: 12px 6px;
+    font-size: 11px;
+  }
+  .handle-intro > p {
+    font-size: 11px;
+  }
+  .handle-diagram {
+    padding: 0 20px;
+  }
+  .handle-diagram > svg {
+    height: 153px;
+  }
+  .handle-presets {
+    margin-left: 20px;
+    margin-right: 20px;
+    gap: 6px;
+  }
+  .handle-presets button {
+    font-size: 9px;
+    padding: 7px 9px;
+  }
+  .handle-parameter {
+    margin-top: 18px;
+  }
+  .handle-parameter .parameter-name {
+    font-size: 12px;
+  }
+  .dimension-input {
+    padding: 5px;
+    font-size: 9px;
+  }
+  .dimension-input input {
+    font-size: 10px;
+  }
+  .cutout-options button {
+    padding: 12px 8px;
+    font-size: 11px;
+  }
+  .hole-count {
+    font-size: 12px;
+  }
+  .hole-count button {
+    width: 30px;
+    height: 30px;
+    font-size: 10px;
+  }
+  .handle-placement summary {
+    font-size: 11px;
+  }
+  .handle-footnote {
+    margin-left: 20px;
+    margin-right: 20px;
+    font-size: 10px;
+  }
+}

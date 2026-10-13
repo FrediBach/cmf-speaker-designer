@@ -9,6 +9,7 @@ import {
   RoundedBox,
 } from '@react-three/drei'
 import {
+  Box3,
   BufferGeometry,
   DataTexture,
   ExtrudeGeometry,
@@ -307,36 +308,64 @@ function SpeakerControls({
 }
 
 function CameraControls({
-  height,
-  width,
+  bounds,
   view,
   resetKey,
   assembly,
 }: {
-  height: number
-  width: number
+  bounds: Box3
   view: 'perspective' | 'front'
   resetKey: number
   assembly: 'assembled' | 'panel' | 'exploded'
 }) {
   const { camera, size, invalidate } = useThree()
   const orbit = useRef<{ target: Vector3; update: () => void } | null>(null)
+  const previousFraming = useRef<{
+    view: typeof view
+    resetKey: number
+  } | null>(null)
+  const extent = Math.max(
+    bounds.max.x - bounds.min.x,
+    bounds.max.y - bounds.min.y,
+    bounds.max.z - bounds.min.z,
+  )
 
   useEffect(() => {
     if (!(camera instanceof PerspectiveCamera)) return
-    const aspect = size.width / Math.max(size.height, 1)
-    const verticalFit = height / (2 * Math.tan((camera.fov * Math.PI) / 360))
-    const horizontalFit =
-      (width + (view === 'perspective' ? 45 : 0)) /
-      (2 * Math.tan((camera.fov * Math.PI) / 360) * aspect)
-    const distance =
-      Math.max(verticalFit, horizontalFit) *
-      (assembly === 'exploded' ? 1.55 : 1.35)
-    const target = new Vector3(0, -1, assembly === 'panel' ? 0 : -13)
-    const direction =
-      view === 'front'
+    const aspect = Math.max(size.width, 1) / Math.max(size.height, 1)
+    const tangent = Math.tan((camera.fov * Math.PI) / 360)
+    const target = bounds.getCenter(new Vector3())
+    const resetView =
+      !previousFraming.current ||
+      previousFraming.current.view !== view ||
+      previousFraming.current.resetKey !== resetKey
+    const direction = resetView
+      ? view === 'front'
         ? new Vector3(0, 0, 1)
         : new Vector3(0.63, 0.27, 1).normalize()
+      : camera.position
+          .clone()
+          .sub(orbit.current?.target ?? target)
+          .normalize()
+    const right = new Vector3().crossVectors(camera.up, direction).normalize()
+    const up = new Vector3().crossVectors(direction, right).normalize()
+    let distance = 1
+    const corner = new Vector3()
+    // Fit all eight corners in camera space, including a taller or wider handle
+    // and the assembled body's depth. Geometry edits preserve the orbit angle.
+    for (const x of [bounds.min.x, bounds.max.x]) {
+      for (const y of [bounds.min.y, bounds.max.y]) {
+        for (const z of [bounds.min.z, bounds.max.z]) {
+          corner.set(x, y, z).sub(target)
+          const depth = corner.dot(direction)
+          distance = Math.max(
+            distance,
+            depth + (Math.abs(corner.dot(up)) * 1.25) / tangent,
+            depth + (Math.abs(corner.dot(right)) * 1.25) / (tangent * aspect),
+          )
+        }
+      }
+    }
     camera.position.copy(target).addScaledVector(direction, distance)
     camera.near = 1
     camera.far = 2400
@@ -346,13 +375,13 @@ function CameraControls({
       orbit.current.target.copy(target)
       orbit.current.update()
     }
+    previousFraming.current = { view, resetKey }
     invalidate()
   }, [
     camera,
     size.width,
     size.height,
-    height,
-    width,
+    bounds,
     view,
     resetKey,
     assembly,
@@ -370,8 +399,8 @@ function CameraControls({
       dampingFactor={0.1}
       rotateSpeed={0.65}
       zoomSpeed={0.65}
-      minDistance={height * 0.7}
-      maxDistance={height * 6}
+      minDistance={extent * 0.7}
+      maxDistance={extent * 6}
       minPolarAngle={0.18}
       maxPolarAngle={Math.PI * 0.78}
     />
@@ -398,6 +427,28 @@ function SpeakerScene({
   const height = model === 's' ? 130.97 : 224.97
   const width = 84.97
   const offset = assembly === 'exploded' ? 32 : 0
+  const bounds = useMemo(() => {
+    const result = geometry.boundingBox?.clone() ?? new Box3()
+    if (result.isEmpty()) {
+      const positions = geometry.getAttribute('position')
+      const point = new Vector3()
+      for (let index = 0; index < positions.count; index++) {
+        result.expandByPoint(point.fromBufferAttribute(positions, index))
+      }
+    }
+    result.translate(new Vector3(0, 0, offset))
+    if (assembly !== 'panel') {
+      const bodyDepth = model === 's' ? 55 : 64
+      const controlsTop = model === 's' ? 45.5 : 86
+      result.union(
+        new Box3(
+          new Vector3(-width / 2, -height / 2 - 1.65, -bodyDepth - 1.55),
+          new Vector3(width / 2, controlsTop, 10 + offset),
+        ),
+      )
+    }
+    return result
+  }, [geometry, model, assembly, offset, height])
 
   return (
     <>
@@ -467,14 +518,13 @@ function SpeakerScene({
         opacity={0.32}
         scale={height * 2.5}
         blur={2.7}
-        far={height * 0.7}
+        far={bounds.max.y + height / 2 + 12}
         resolution={512}
         color="#35332e"
         frames={1}
       />
       <CameraControls
-        height={height}
-        width={width}
+        bounds={bounds}
         view={view}
         assembly={assembly}
         resetKey={resetKey}
