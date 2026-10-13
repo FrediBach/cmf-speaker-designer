@@ -1,0 +1,230 @@
+import { BufferGeometry, MathUtils, Mesh, Vector3 } from 'three'
+import { STLExporter } from 'three/addons/exporters/STLExporter.js'
+import { STLLoader } from 'three/addons/loaders/STLLoader.js'
+
+import sOriginal from '../../resources/stl-files/cmf-speaker-s-3d-printing-panel-original-v1.stl?url'
+import sOne from '../../resources/stl-files/cmf-speaker-s-3d-printing-panel-1-v1.stl?url'
+import sTwo from '../../resources/stl-files/cmf-speaker-s-3d-printing-panel-2-v1.stl?url'
+import sThree from '../../resources/stl-files/cmf-speaker-s-3d-printing-panel-3-v1.stl?url'
+import mOriginal from '../../resources/stl-files/cmf-speaker-m-3d-printing-panel-original-v1.stl?url'
+import mOne from '../../resources/stl-files/cmf-speaker-m-3d-printing-panel-1-v1.stl?url'
+import mTwo from '../../resources/stl-files/cmf-speaker-m-3d-printing-panel-2-v1.stl?url'
+import mThree from '../../resources/stl-files/cmf-speaker-m-3d-printing-panel-3-v1.stl?url'
+
+export type SpeakerModel = 's' | 'm'
+export type PanelStyle = 'original' | '1' | '2' | '3'
+
+export interface PanelStyleOption {
+  id: PanelStyle
+  label: string
+  description: string
+}
+
+export const SPEAKER_MODELS = [
+  {
+    id: 's',
+    label: 'Speaker S',
+    width: 84.9715,
+    height: 130.9691,
+    baseDepth: 24,
+  },
+  {
+    id: 'm',
+    label: 'Speaker M',
+    width: 84.9715,
+    height: 224.9691,
+    baseDepth: 29,
+  },
+] as const
+
+export const PANEL_STYLES: readonly PanelStyleOption[] = [
+  {
+    id: 'original',
+    label: 'Original',
+    description: 'The original open speaker face.',
+  },
+  {
+    id: '1',
+    label: 'Halo',
+    description: 'A sculptural ring around the driver.',
+  },
+  {
+    id: '2',
+    label: 'Perforated',
+    description: 'A precise grid of circular openings.',
+  },
+  {
+    id: '3',
+    label: 'Slotted',
+    description: 'Horizontal lines with an open rhythm.',
+  },
+]
+
+const MEDIUM_STYLES: readonly PanelStyleOption[] = [
+  PANEL_STYLES[0],
+  {
+    id: '1',
+    label: 'Halo',
+    description: 'A sculptural ring around the upper driver.',
+  },
+  {
+    id: '2',
+    label: 'Twin contours',
+    description: 'Raised contours around both drivers.',
+  },
+  {
+    id: '3',
+    label: 'Perforated',
+    description: 'Circular openings over the upper driver.',
+  },
+]
+
+export const PANEL_ASSETS: Record<SpeakerModel, Record<PanelStyle, string>> = {
+  s: { original: sOriginal, '1': sOne, '2': sTwo, '3': sThree },
+  m: { original: mOriginal, '1': mOne, '2': mTwo, '3': mThree },
+}
+
+export const MAX_FACE_DEPTH = 2
+
+/** Style numbers in the supplied S and M collections describe different designs. */
+export function getPanelStyles(
+  model: SpeakerModel,
+): readonly PanelStyleOption[] {
+  return model === 's' ? PANEL_STYLES : MEDIUM_STYLES
+}
+
+/**
+ * A rigid transform only: millimeters stay millimeters. Display X is width, Y is
+ * upright, and +Z points out of the speaker. The main face's rear rim is Z=0;
+ * the folded control plate extends behind it. No source features are scaled.
+ */
+export function parsePanelGeometry(
+  data: ArrayBuffer,
+  model: SpeakerModel,
+): BufferGeometry {
+  const geometry = new STLLoader().parse(data)
+  geometry.computeBoundingBox()
+  const box = geometry.boundingBox!
+  const center = box.getCenter(new Vector3())
+  const front = box.min.x + (model === 's' ? 24 : 29)
+  const mountingPlane = front - 4
+
+  // Rotation about Y is right handed, retaining the original triangle winding.
+  geometry.translate(-mountingPlane, -center.y, -center.z)
+  geometry.rotateY(-Math.PI / 2)
+  geometry.computeBoundingBox()
+  geometry.computeBoundingSphere()
+  return geometry
+}
+
+/** Returns an owned geometry. The caller should dispose it when replaced. */
+export async function loadPanelGeometry(
+  model: SpeakerModel,
+  style: PanelStyle,
+  signal?: AbortSignal,
+): Promise<BufferGeometry> {
+  const response = await fetch(PANEL_ASSETS[model][style], { signal })
+  if (!response.ok)
+    throw new Error(`Unable to load the panel (${response.status}).`)
+  return parsePanelGeometry(await response.arrayBuffer(), model)
+}
+
+/**
+ * Add material ahead of the main face's inner surface, preserving every vertex
+ * at or behind Z=.5 mm and the folded controls. A continuous, monotonic depth
+ * map retains connectivity, openings, XY dimensions, and the attachment fit.
+ * This changes face depth, not the speaker's acoustic or mechanical design.
+ */
+export function buildPanelGeometry(
+  source: BufferGeometry,
+  model: SpeakerModel,
+  style: PanelStyle,
+  relief = 0,
+): BufferGeometry {
+  if (!Number.isFinite(relief) || relief < 0 || relief > MAX_FACE_DEPTH) {
+    throw new RangeError(
+      `Added face depth must be between 0 and ${MAX_FACE_DEPTH} mm.`,
+    )
+  }
+
+  const geometry = source.clone()
+  geometry.userData = { model, style, addedFaceDepth: relief, units: 'mm' }
+  if (relief > 0) {
+    const positions = geometry.getAttribute('position')
+    // The fade ends below the folded control surface, retaining its exact fit.
+    const faceTop = model === 's' ? 19 : 57
+    for (let index = 0; index < positions.count; index += 1) {
+      const y = positions.getY(index)
+      const z = positions.getZ(index)
+      const frontWeight = MathUtils.clamp((z - 0.5) / 3.5, 0, 1)
+      const controlWeight = 1 - MathUtils.smoothstep(y, faceTop - 3, faceTop)
+      if (frontWeight > 0 && controlWeight > 0) {
+        positions.setZ(index, z + relief * frontWeight * controlWeight)
+      }
+    }
+    positions.needsUpdate = true
+    geometry.computeVertexNormals()
+  }
+  geometry.computeBoundingBox()
+  geometry.computeBoundingSphere()
+  return geometry
+}
+
+export function getPanelDimensions(geometry: BufferGeometry) {
+  geometry.computeBoundingBox()
+  const size = geometry.boundingBox!.getSize(new Vector3())
+  return { width: size.x, height: size.y, depth: size.z }
+}
+
+/**
+ * Binary STL contains only the panel, with the front toward the print bed.
+ * The lowest point is Z=0; distances remain in mm. Slicer orientation, supports,
+ * tolerances, and material still need checking for the selected printer.
+ */
+export function exportPanelStl(geometry: BufferGeometry): ArrayBuffer {
+  const printable = geometry.clone()
+  printable.rotateY(Math.PI)
+  printable.computeBoundingBox()
+  printable.translate(0, 0, -printable.boundingBox!.min.z)
+  const mesh = new Mesh(printable)
+  mesh.updateMatrixWorld(true)
+  const binary = new STLExporter().parse(mesh, { binary: true })
+  const result = new ArrayBuffer(binary.byteLength)
+  new Uint8Array(result).set(
+    new Uint8Array(binary.buffer, binary.byteOffset, binary.byteLength),
+  )
+  printable.dispose()
+  return result
+}
+
+export function panelFilename(
+  model: SpeakerModel,
+  style: PanelStyle,
+  addedDepth = 0,
+): string {
+  const styleName = getPanelStyles(model)
+    .find((option) => option.id === style)!
+    .label.toLowerCase()
+    .replaceAll(' ', '-')
+  const suffix = addedDepth > 0 ? `-depth-${addedDepth.toFixed(1)}mm` : ''
+  return `cmf-speaker-${model}-${styleName}${suffix}.stl`
+}
+
+export function downloadPanelStl(
+  geometry: BufferGeometry,
+  model: SpeakerModel,
+  style: PanelStyle,
+  addedDepth = 0,
+): void {
+  const url = URL.createObjectURL(
+    new Blob([exportPanelStl(geometry)], { type: 'model/stl' }),
+  )
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = panelFilename(model, style, addedDepth)
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  // Keep the URL alive until the browser has accepted the download.
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000)
+}
