@@ -237,15 +237,19 @@ main {
   min-width: 0;
 }
 .preview-card {
+  height: 656px;
   border: 1px solid #e2e1da;
   border-radius: 12px;
   overflow: hidden;
   position: relative;
+  isolation: isolate;
   background: #eeede8;
 }
 .preview-topbar {
-  position: relative;
+  position: absolute;
+  inset: 0 0 auto;
   z-index: 2;
+  pointer-events: none;
   padding: 20px 23px;
   display: flex;
   align-items: center;
@@ -255,13 +259,21 @@ main {
   font-size: 8px;
   letter-spacing: 1.1px;
   color: #6e7168;
+  padding: 6px 8px;
+  border-radius: 5px;
+  background: #eeede8d9;
+  backdrop-filter: blur(8px);
+}
+.preview-card button {
+  pointer-events: auto;
 }
 .live-dot {
   background: #7b896c;
   box-shadow: 0 0 0 3px #7b896c13;
 }
 .view-switch {
-  background: #e3e2dc;
+  background: #e3e2dcde;
+  backdrop-filter: blur(12px);
   border-radius: 6px;
   padding: 3px;
   display: flex;
@@ -296,11 +308,11 @@ main {
   color: #dfded7;
 }
 .preview-stage {
-  position: relative;
-  height: 472px;
+  position: absolute;
+  inset: 0;
+  height: 100%;
   width: 100%;
   z-index: 1;
-  margin-top: -5px;
 }
 .preview-stage > div {
   width: 100%;
@@ -317,8 +329,10 @@ main {
 }
 .preview-side-label {
   position: absolute;
+  z-index: 2;
   right: 17px;
-  top: 245px;
+  top: 50%;
+  transform: translateY(-50%);
   writing-mode: vertical-rl;
   font-family: 'Space Mono', monospace;
   letter-spacing: 1.6px;
@@ -327,18 +341,25 @@ main {
   pointer-events: none;
 }
 .preview-bottom {
-  position: relative;
+  position: absolute;
+  inset: auto 0 76px;
   z-index: 2;
+  pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 26px 23px;
-  margin-top: -4px;
+  gap: 12px;
+  padding: 0 22px;
 }
 .preview-bottom > div:first-child {
   display: flex;
   flex-direction: column;
   gap: 7px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #eeede8d9;
+  backdrop-filter: blur(8px);
 }
 .preview-model {
   font-size: 12px;
@@ -359,6 +380,7 @@ main {
 }
 .preview-actions {
   display: flex;
+  flex-shrink: 0;
   gap: 7px;
 }
 .preview-actions button {
@@ -369,15 +391,18 @@ main {
   display: grid;
   place-items: center;
   color: #686d61;
-  background: transparent;
+  background: #eeede8de;
+  backdrop-filter: blur(12px);
 }
 .preview-actions button:hover {
   background: #fff;
 }
 .preview-toolbar {
-  padding: 12px 22px;
-  background: #f4f3ef;
-  border-top: 1px solid #e1e1d9;
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 2;
+  pointer-events: none;
+  padding: 18px 22px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -386,6 +411,11 @@ main {
 .assembly-switch {
   display: flex;
   gap: 5px;
+  padding: 3px;
+  border: 1px solid #e1e1d9;
+  border-radius: 8px;
+  background: #f4f3efde;
+  backdrop-filter: blur(12px);
 }
 .assembly-switch button {
   background: none;
@@ -407,8 +437,12 @@ main {
   display: flex;
   align-items: center;
   gap: 5px;
-  color: #95978d;
+  color: #777c6f;
   font-size: 9px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #eeede8d9;
+  backdrop-filter: blur(8px);
 }
 .looks-bar {
   border: 1px solid var(--border);
@@ -1199,8 +1233,8 @@ footer > a:last-child {
     grid-template-columns: minmax(0, 1fr) 375px;
     gap: 27px;
   }
-  .preview-stage {
-    height: 490px;
+  .preview-card {
+    height: 674px;
   }
   .control-section {
     padding-top: 21px;
@@ -1303,8 +1337,8 @@ footer > a:last-child {
     grid-template-columns: minmax(0, 1fr) 301px;
     gap: 14px;
   }
-  .preview-stage {
-    height: 460px;
+  .preview-card {
+    height: 640px;
   }
   .preview-topbar {
     padding: 16px 15px;
@@ -1326,7 +1360,8 @@ footer > a:last-child {
     font-size: 9px;
   }
   .preview-bottom {
-    padding: 0 17px 20px;
+    bottom: 64px;
+    padding: 0 10px;
   }
   .preview-model {
     font-size: 10px;
@@ -1488,12 +1523,12 @@ footer > a:last-child {
     font-size: 51px;
     top: 73px;
   }
-  .preview-stage {
-    height: 365px;
+  .preview-card {
+    height: 510px;
   }
   .preview-bottom {
-    margin-top: -5px;
-    padding: 0 18px 20px;
+    bottom: 70px;
+    padding: 0 14px;
   }
   .preview-actions {
     flex-direction: row;
