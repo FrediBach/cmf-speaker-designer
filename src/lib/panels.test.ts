@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { BufferGeometry } from 'three'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 import { describe, expect, it } from 'vitest'
+import { getFaceFold } from './face-depth'
 import {
   buildPanelGeometry,
   exportPanelStl,
@@ -107,35 +108,31 @@ describe('official panel geometry and millimeter STL export', () => {
       const positions = source.getAttribute('position')
       const modified = customized.getAttribute('position')
       const modifiedVertices = new Set<string>()
-      for (let i = 0; i < modified.count; i += 1)
+      const modifiedXY = new Set<string>()
+      for (let i = 0; i < modified.count; i += 1) {
         modifiedVertices.add(
           `${modified.getX(i)},${modified.getY(i)},${modified.getZ(i)}`,
         )
+        modifiedXY.add(`${modified.getX(i)},${modified.getY(i)}`)
+      }
+      const fold = getFaceFold(model)
       let protectedVertices = 0
       let changedVertices = 0
       let invalidCoordinates = 0
       for (let i = 0; i < positions.count; i += 1) {
+        const x = positions.getX(i)
         const z = positions.getZ(i)
         const y = positions.getY(i)
-        const t = Math.min(1, Math.max(0, (y - (model === 's' ? 16 : 54)) / 3))
-        const nextZ = Math.fround(
-          z +
-            2 *
-              Math.min(1, Math.max(0, (z - 0.5) / 3.5)) *
-              (1 - t * t * (3 - 2 * t)),
-        )
-        const protectedVertex =
-          z <= 0.5 || positions.getY(i) >= (model === 's' ? 19 : 57)
-        // Refinement adds vertices, but every original point must retain its
-        // XY coordinate and the intended depth (including the mounting fit).
-        if (!modifiedVertices.has(`${positions.getX(i)},${y},${nextZ}`))
-          invalidCoordinates += 1
-        if (protectedVertex) {
+        // Refinement retains the original XY coordinates. The mounting region
+        // and deck stay fixed; the broad front receives the full added depth.
+        if (!modifiedXY.has(`${x},${y}`)) invalidCoordinates += 1
+        if (z <= 0.5 || y >= fold.deckY) {
           protectedVertices += 1
-          if (nextZ !== z) invalidCoordinates += 1
+          if (!modifiedVertices.has(`${x},${y},${z}`)) invalidCoordinates += 1
+        } else if (z === 4 && y <= fold.frontY - 2) {
+          changedVertices += 1
+          if (!modifiedVertices.has(`${x},${y},6`)) invalidCoordinates += 1
         }
-        if (nextZ !== z) changedVertices += 1
-        if (nextZ < z || nextZ - z > 2.00001) invalidCoordinates += 1
       }
       expect(invalidCoordinates).toBe(0)
       expect(protectedVertices).toBeGreaterThan(1000)

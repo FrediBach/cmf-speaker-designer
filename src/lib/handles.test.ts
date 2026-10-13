@@ -101,6 +101,33 @@ function intersections(geometry: BufferGeometry, x: number, y: number) {
   )
 }
 
+function expectSingleControlBend(
+  geometry: BufferGeometry,
+  model: SpeakerModel,
+) {
+  const offset = model === 's' ? 0 : 38
+  for (const x of [-30, 0, 30]) {
+    let previousZ: number | undefined
+    let previousSlope = 0
+    for (let step = 0; step <= 40; step += 1) {
+      const y = offset + 15 + step / 8
+      const front = intersections(geometry, x, y).at(-1)
+      expect(front, `corner surface at (${x}, ${y})`).toBeDefined()
+      if (previousZ !== undefined) {
+        const slope = (front! - previousZ) * 8
+        // A single convex round transitions from a flat face to the 45° deck.
+        // Reversing that curvature creates the previous S-shaped shoulder.
+        expect(slope).toBeLessThanOrEqual(previousSlope + 0.06)
+        expect(slope).toBeGreaterThanOrEqual(-1.03)
+        expect(slope).toBeLessThanOrEqual(0.03)
+        previousSlope = slope
+      }
+      if (y >= offset + 18) expect(front).toBeCloseTo(23.5 + offset - y, 2)
+      previousZ = front
+    }
+  }
+}
+
 describe('generative handles', () => {
   it.each(cases)(
     'keeps the %s/%s front planar and watertight after adding handle and face depth',
@@ -146,6 +173,11 @@ describe('generative handles', () => {
         invalidEdges: 0,
         components: 1,
       })
+      expectSingleControlBend(geometry, model)
+      // Undo the print-bed orientation to check the serialized surface too.
+      roundtrip.translate(0, 0, -geometry.boundingBox!.max.z)
+      roundtrip.rotateY(Math.PI)
+      expectSingleControlBend(roundtrip, model)
       roundtrip.dispose()
       geometry.dispose()
       original.dispose()

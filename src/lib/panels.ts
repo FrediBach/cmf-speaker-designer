@@ -98,9 +98,9 @@ export async function loadPanelGeometry(
 
 /**
  * Add material ahead of the main face's inner surface, preserving every vertex
- * at or behind Z=.5 mm and the folded controls. A continuous, monotonic depth
- * map retains connectivity, openings, XY dimensions, and the attachment fit.
- * Refine the depth transition before deforming so broad triangles stay planar.
+ * at or behind Z=.5 mm and the control deck. Carry the original rounded fold
+ * forward to meet the thicker face, retaining openings, XY dimensions and fit.
+ * Refine the bend before deforming so broad triangles stay planar.
  * This changes face depth, not the speaker's acoustic or mechanical design.
  */
 export function buildPanelGeometry(

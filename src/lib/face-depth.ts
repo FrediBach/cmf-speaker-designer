@@ -5,10 +5,18 @@ export const MAX_FACE_DEPTH = 2
 type Point = [number, number, number]
 type Plane = { axis: 1 | 2; value: number }
 
+/** The original panel has a 1 mm fillet between its front and 45° controls. */
+export function getFaceFold(model: SpeakerModel) {
+  const deckIntercept = model === 's' ? 23.5 : 61.5
+  const frontY = deckIntercept - 3 - Math.SQRT2
+  return { frontY, deckY: frontY + Math.SQRT1_2, deckIntercept }
+}
+
 /**
- * Refine only triangles crossing the depth-map boundaries and its 3 mm curved
- * transition. Boolean simplification can leave very large triangles here;
- * deforming only their corners would bend the entire otherwise planar face.
+ * Extend the existing control slope to meet the deeper front with its original
+ * 1 mm bend radius. Refinement is confined to the shifted fold and depth-map
+ * boundaries: deforming large boolean triangles only at their original corners
+ * would bend the entire otherwise planar face.
  * Shared, Float32 intersections keep adjacent triangles exactly watertight.
  * The input stays owned by its caller and is never changed.
  */
@@ -22,15 +30,25 @@ export function applyFaceDepth(
       `Added face depth must be between 0 and ${MAX_FACE_DEPTH} mm.`,
     )
   if (relief === 0) return positions
-  const faceTop = model === 's' ? 19 : 57
+  const { frontY, deckY, deckIntercept } = getFaceFold(model)
+  const profile = (y: number) => {
+    if (y <= frontY) return 4
+    if (y >= deckY) return deckIntercept - y
+    return 3 + Math.sqrt(1 - (y - frontY) ** 2)
+  }
   const planes: Plane[] = [
     { axis: 2, value: 0.5 },
     { axis: 2, value: 4 },
   ]
-  // On the flat front, interpolation error at maximum relief is below 0.011 mm.
+  // Split both the new bend and the old bend that becomes part of the slope.
+  // Float32 cut coordinates make adjacent faces agree with stored STL vertices.
   // Cuts continue through the rear so their shared edges have no T-junctions.
-  for (let band = 0; band <= 12; band += 1)
-    planes.push({ axis: 1, value: faceTop - 3 + band / 4 })
+  const cuts = new Set([frontY - relief, deckY - relief, frontY, deckY])
+  const bands = Math.ceil((deckY - frontY + relief) / 0.125)
+  for (let band = 1; band < bands; band += 1)
+    cuts.add(frontY - relief + ((deckY - frontY + relief) * band) / bands)
+  for (const value of [...cuts].sort((a, b) => a - b))
+    planes.push({ axis: 1, value: Math.fround(value) })
 
   const result: number[] = []
   const intersections = new Map<string, Point>()
@@ -55,10 +73,16 @@ export function applyFaceDepth(
     return crossing
   }
   const append = ([x, y, z]: Point) => {
-    const frontWeight = Math.min(1, Math.max(0, (z - 0.5) / 3.5))
-    const t = Math.min(1, Math.max(0, (y - faceTop + 3) / 3))
-    const controlWeight = 1 - t * t * (3 - 2 * t)
-    result.push(x, y, z + relief * frontWeight * controlWeight)
+    if (z <= 0.5 || y >= deckY) {
+      result.push(x, y, z)
+      return
+    }
+    const sourceFront = profile(y)
+    // Translating the profile by (-relief, +relief) leaves the 45° deck in
+    // place. Unlike a smoothstep fade, it cannot introduce an S-shaped ledge.
+    const addedDepth = Math.max(0, relief + profile(y + relief) - sourceFront)
+    const frontWeight = Math.min(1, (z - 0.5) / (sourceFront - 0.5))
+    result.push(x, y, z + addedDepth * frontWeight)
   }
   const emit = (polygon: Point[]) => {
     const unique = polygon.filter(
