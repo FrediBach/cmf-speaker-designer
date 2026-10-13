@@ -1,6 +1,8 @@
-import { BufferGeometry, MathUtils, Mesh, Vector3 } from 'three'
+import { BufferGeometry, Mesh, Vector3 } from 'three'
 import { STLExporter } from 'three/addons/exporters/STLExporter.js'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
+import { applyFaceDepth, MAX_FACE_DEPTH } from './face-depth'
+export { MAX_FACE_DEPTH } from './face-depth'
 
 import sOriginal from '../../resources/stl-files/cmf-speaker-s-3d-printing-panel-original-v1.stl?url'
 import sOne from '../../resources/stl-files/cmf-speaker-s-3d-printing-panel-1-v1.stl?url'
@@ -84,8 +86,6 @@ export const PANEL_ASSETS: Record<SpeakerModel, Record<PanelStyle, string>> = {
   m: { original: mOriginal, '1': mOne, '2': mTwo, '3': mThree },
 }
 
-export const MAX_FACE_DEPTH = 2
-
 /** Style numbers in the supplied S and M collections describe different designs. */
 export function getPanelStyles(
   model: SpeakerModel,
@@ -151,17 +151,7 @@ export function buildPanelGeometry(
   geometry.userData = { model, style, addedFaceDepth: relief, units: 'mm' }
   if (relief > 0) {
     const positions = geometry.getAttribute('position')
-    // The fade ends below the folded control surface, retaining its exact fit.
-    const faceTop = model === 's' ? 19 : 57
-    for (let index = 0; index < positions.count; index += 1) {
-      const y = positions.getY(index)
-      const z = positions.getZ(index)
-      const frontWeight = MathUtils.clamp((z - 0.5) / 3.5, 0, 1)
-      const controlWeight = 1 - MathUtils.smoothstep(y, faceTop - 3, faceTop)
-      if (frontWeight > 0 && controlWeight > 0) {
-        positions.setZ(index, z + relief * frontWeight * controlWeight)
-      }
-    }
+    applyFaceDepth(positions.array, model, relief)
     positions.needsUpdate = true
     geometry.computeVertexNormals()
   }
@@ -222,11 +212,17 @@ export function downloadPanelStl(
   const anchor = document.createElement('a')
   anchor.href = url
   const customHandle = geometry.userData.handle?.settings?.mode === 'custom'
+  const grille = geometry.userData.grille?.settings
+  const handleSuffix = customHandle
+    ? `-handle-${Number(geometry.userData.handle.settings.height).toFixed(1)}mm`
+    : ''
+  const grilleSuffix =
+    grille?.mode === 'custom'
+      ? `-grille-${grille.pattern}${grille.extendPattern ? '-extended' : ''}`
+      : ''
   anchor.download = panelFilename(model, style, addedDepth).replace(
     '.stl',
-    customHandle
-      ? `-handle-${Number(geometry.userData.handle.settings.height).toFixed(1)}mm.stl`
-      : '.stl',
+    `${handleSuffix}${grilleSuffix}.stl`,
   )
   document.body.appendChild(anchor)
   anchor.click()

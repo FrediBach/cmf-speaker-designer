@@ -30,7 +30,9 @@ import {
 } from '@/components/ui/dialog'
 import { PanelIcon } from '@/components/PanelIcon'
 import { HandleEditor } from '@/components/HandleEditor'
+import { GrilleEditor } from '@/components/GrilleEditor'
 import { normalizeHandleSettings } from '@/lib/handle-settings'
+import { normalizeGrilleSettings } from '@/lib/grille-settings'
 import { usePanelGeometry } from '@/lib/use-panel-geometry'
 import {
   DEFAULT_DESIGN,
@@ -60,6 +62,11 @@ const looks = [
   { name: 'Less is more', panelColor: '#eeeae1', knobColor: '#13b7b1' },
   { name: 'After hours', panelColor: '#303538', knobColor: '#f45427' },
 ]
+const EDITOR_TABS = [
+  { id: 'panel', label: 'Front panel' },
+  { id: 'grille', label: 'Grille' },
+  { id: 'handle', label: 'Handle' },
+] as const
 
 function ColorPicker({
   label,
@@ -119,8 +126,13 @@ function ColorPicker({
 
 function App() {
   const [design, setDesign] = useState<Design>(readDesign)
-  const [editorTab, setEditorTab] = useState<'panel' | 'handle'>(() =>
-    design.handle.mode === 'custom' ? 'handle' : 'panel',
+  const [editorTab, setEditorTab] = useState<'panel' | 'grille' | 'handle'>(
+    () =>
+      design.grille.mode === 'custom'
+        ? 'grille'
+        : design.handle.mode === 'custom'
+          ? 'handle'
+          : 'panel',
   )
   const [view, setView] = useState<'perspective' | 'front'>('perspective')
   const [assembly, setAssembly] = useState<'assembled' | 'panel' | 'exploded'>(
@@ -141,12 +153,20 @@ function App() {
   const update = (patch: Partial<Design>) =>
     setDesign((current) => {
       const next = { ...current, ...patch }
-      return patch.model
-        ? { ...next, handle: normalizeHandleSettings(next.model, next.handle) }
-        : next
+      return {
+        ...next,
+        handle: normalizeHandleSettings(next.model, next.handle),
+        grille: normalizeGrilleSettings(next.grille),
+      }
     })
   const styles = getPanelStyles(design.model)
   const currentStyle = styles.find((item) => item.id === design.style)!
+  const sourceStyle =
+    design.grille.mode === 'custom' ? 'original' : design.style
+  const panelLabel =
+    design.grille.mode === 'custom'
+      ? `${{ round: 'Round', hex: 'Hexagonal', slot: 'Slotted' }[design.grille.pattern]} grille`
+      : currentStyle.label
   const {
     geometry,
     previewGeometry,
@@ -181,7 +201,7 @@ function App() {
     let active = true
     const controller = new AbortController()
     setLoadError('')
-    loadPanelGeometry(design.model, design.style, controller.signal)
+    loadPanelGeometry(design.model, sourceStyle, controller.signal)
       .then((loaded) => {
         if (!active) {
           loaded.dispose()
@@ -190,7 +210,7 @@ function App() {
         setSource({
           geometry: loaded,
           model: design.model,
-          style: design.style,
+          style: sourceStyle,
         })
       })
       .catch(() => {
@@ -200,7 +220,7 @@ function App() {
       active = false
       controller.abort()
     }
-  }, [design.model, design.style, retryKey])
+  }, [design.model, sourceStyle, retryKey])
 
   useEffect(
     () => () => {
@@ -234,7 +254,7 @@ function App() {
       await new Promise<void>((resolve) =>
         requestAnimationFrame(() => resolve()),
       )
-      downloadPanelStl(geometry, design.model, design.style, design.relief)
+      downloadPanelStl(geometry, design.model, sourceStyle, design.relief)
       setExportOpen(false)
       setToast('Your STL is downloaded. Time to make it real.')
     } catch {
@@ -246,6 +266,7 @@ function App() {
 
   function resetDesign() {
     setDesign({ ...DEFAULT_DESIGN })
+    setEditorTab('panel')
     setView('perspective')
     setAssembly('assembled')
     setResetKey((value) => value + 1)
@@ -349,7 +370,7 @@ function App() {
                     error={error}
                     key={retryKey}
                     model={design.model}
-                    style={design.style}
+                    style={sourceStyle}
                     panelColor={design.panelColor}
                     knobColor={design.knobColor}
                     relief={design.relief}
@@ -370,7 +391,7 @@ function App() {
                   <span className="preview-model">
                     CMF Speaker {design.model.toUpperCase()}
                     <span> / </span>
-                    {currentStyle.label}
+                    {panelLabel}
                   </span>
                   <span className="preview-dimensions">
                     {panelWidth} × {panelHeight} MM <span>·</span>{' '}
@@ -513,29 +534,39 @@ function App() {
               role="tablist"
               aria-label="Design area"
             >
-              {(['panel', 'handle'] as const).map((tab) => (
+              {EDITOR_TABS.map(({ id: tab, label }, index) => (
                 <button
                   key={tab}
                   role="tab"
-                  aria-label={tab === 'panel' ? 'Front panel' : 'Handle'}
+                  aria-label={label}
                   id={`${tab}-tab`}
                   aria-controls={`${tab}-editor`}
                   aria-selected={editorTab === tab}
                   tabIndex={editorTab === tab ? 0 : -1}
                   onKeyDown={(event) => {
                     if (
-                      event.key === 'ArrowLeft' ||
-                      event.key === 'ArrowRight'
+                      ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(
+                        event.key,
+                      )
                     ) {
-                      const next = tab === 'panel' ? 'handle' : 'panel'
+                      event.preventDefault()
+                      const nextIndex =
+                        event.key === 'Home'
+                          ? 0
+                          : event.key === 'End'
+                            ? EDITOR_TABS.length - 1
+                            : (index +
+                                (event.key === 'ArrowRight' ? 1 : -1) +
+                                EDITOR_TABS.length) %
+                              EDITOR_TABS.length
+                      const next = EDITOR_TABS[nextIndex].id
                       setEditorTab(next)
                       document.getElementById(`${next}-tab`)?.focus()
                     }
                   }}
                   onClick={() => setEditorTab(tab)}
                 >
-                  {tab === 'panel' ? 'Front panel' : 'Handle'}
-                  {tab === 'handle' && <span>NEW</span>}
+                  {label}
                 </button>
               ))}
             </div>
@@ -553,19 +584,32 @@ function App() {
                   {styles.map((style) => (
                     <button
                       key={style.id}
-                      className={`style-option ${design.style === style.id ? 'selected' : ''}`}
-                      onClick={() => update({ style: style.id })}
-                      aria-pressed={design.style === style.id}
+                      className={`style-option ${design.grille.mode === 'original' && design.style === style.id ? 'selected' : ''}`}
+                      onClick={() =>
+                        update({
+                          style: style.id,
+                          grille: { ...design.grille, mode: 'original' },
+                        })
+                      }
+                      aria-pressed={
+                        design.grille.mode === 'original' &&
+                        design.style === style.id
+                      }
                     >
                       <PanelIcon model={design.model} style={style.id} />
                       <span>{style.label}</span>
-                      {design.style === style.id && (
-                        <Check className="style-check" size={12} />
-                      )}
+                      {design.grille.mode === 'original' &&
+                        design.style === style.id && (
+                          <Check className="style-check" size={12} />
+                        )}
                     </button>
                   ))}
                 </div>
-                <p className="style-description">{currentStyle.description}</p>
+                <p className="style-description">
+                  {design.grille.mode === 'custom'
+                    ? 'Custom grille active. Choose a shape to return to a supplied panel.'
+                    : currentStyle.description}
+                </p>
               </section>
               <section className="control-section">
                 <h3>
@@ -615,6 +659,18 @@ function App() {
                   <span>+2 mm</span>
                 </div>
               </section>
+            </div>
+            <div
+              id="grille-editor"
+              role="tabpanel"
+              aria-labelledby="grille-tab"
+              hidden={editorTab !== 'grille'}
+            >
+              <GrilleEditor
+                model={design.model}
+                value={design.grille}
+                onChange={(grille) => update({ grille })}
+              />
             </div>
             <div
               id="handle-editor"
@@ -799,15 +855,15 @@ function App() {
             slicer.
           </DialogDescription>
           <div className="download-summary">
-            <PanelIcon model={design.model} style={design.style} />
+            <PanelIcon model={design.model} style={sourceStyle} />
             <div>
               <strong>
-                Speaker {design.model.toUpperCase()} · {currentStyle.label}
+                Speaker {design.model.toUpperCase()} · {panelLabel}
               </strong>
               <span>
                 {design.relief > 0
                   ? `${design.relief.toFixed(1)} mm added face depth`
-                  : 'Original surface'}{' '}
+                  : 'Standard face depth'}{' '}
                 · Binary STL
               </span>
               {design.handle.mode === 'custom' && (
@@ -816,6 +872,16 @@ function App() {
                   {design.handle.cutout === 'none'
                     ? 'Solid'
                     : `${design.handle.holeCount} ${design.handle.cutout === 'circle' ? 'round' : 'slot'} ${design.handle.holeCount === 1 ? 'hole' : 'holes'}`}
+                </span>
+              )}
+              {design.grille.mode === 'custom' && (
+                <span>
+                  Custom grille · {design.grille.size} mm openings ·{' '}
+                  {design.grille.spacing} mm spacing · {design.grille.thickness}{' '}
+                  mm thick
+                  {design.grille.extendPattern
+                    ? ` · ${design.grille.recessDepth} mm recessed face pattern`
+                    : ''}
                 </span>
               )}
               <span>

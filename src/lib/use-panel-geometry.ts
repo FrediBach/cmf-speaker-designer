@@ -23,8 +23,10 @@ export function usePanelGeometry(
     message: string
   } | null>(null)
   const matches =
-    source?.model === design.model && source?.style === design.style
-  const key = `${matches ? source.geometry.uuid : 'loading'}:${design.model}:${design.style}:${design.relief}:${JSON.stringify(design.handle)}:${retryKey}`
+    source?.model === design.model &&
+    source?.style ===
+      (design.grille.mode === 'custom' ? 'original' : design.style)
+  const key = `${matches ? source.geometry.uuid : 'loading'}:${design.model}:${design.style}:${design.relief}:${JSON.stringify(design.handle)}:${JSON.stringify(design.grille)}:${retryKey}`
 
   useEffect(() => {
     if (!matches || !source) return
@@ -32,7 +34,7 @@ export function usePanelGeometry(
     const generate = async () => {
       try {
         const geometry =
-          design.handle.mode === 'original'
+          design.handle.mode === 'original' && design.grille.mode === 'original'
             ? buildPanelGeometry(
                 source.geometry,
                 source.model,
@@ -47,6 +49,7 @@ export function usePanelGeometry(
                 source.style,
                 design.relief,
                 design.handle,
+                design.grille,
               )
         if (!active) {
           geometry.dispose()
@@ -61,13 +64,15 @@ export function usePanelGeometry(
             message:
               error instanceof Error
                 ? error.message
-                : 'This handle could not be generated. Please try again.',
+                : 'This panel could not be generated. Please try again.',
           })
       }
     }
     const timer = window.setTimeout(
       generate,
-      design.handle.mode === 'custom' ? 160 : 0,
+      design.handle.mode === 'custom' || design.grille.mode === 'custom'
+        ? 180
+        : 0,
     )
     return () => {
       active = false
@@ -79,7 +84,9 @@ export function usePanelGeometry(
   useEffect(() => () => result?.geometry.dispose(), [result])
   const geometry = result?.key === key ? result.geometry : null
   const previewGeometry =
-    matches && result?.model === design.model && result?.style === design.style
+    matches &&
+    result?.model === source?.model &&
+    result?.style === source?.style
       ? result.geometry
       : null
   const error = failure?.key === key ? failure.message : ''

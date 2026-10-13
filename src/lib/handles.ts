@@ -5,18 +5,21 @@ import {
   type SpeakerModel,
 } from './panels'
 import { normalizeHandleSettings, type HandleSettings } from './handle-settings'
-import type { HandleResult } from './handle-geometry'
+import { normalizeGrilleSettings, type GrilleSettings } from './grille-settings'
+import type { GeneratedPanel } from './panel-engine'
 
 export interface HandleWorkerRequest {
   id: number
   model: SpeakerModel
   style: PanelStyle
   settings: HandleSettings
+  grille: GrilleSettings
+  relief: number
   source?: Float32Array
 }
 export interface HandleWorkerResponse {
   id: number
-  result?: HandleResult
+  result?: GeneratedPanel
   error?: string
 }
 
@@ -27,7 +30,7 @@ const pending = new Map<
   number,
   {
     key: string
-    resolve(result: HandleResult): void
+    resolve(result: GeneratedPanel): void
     reject(reason: Error): void
   }
 >()
@@ -48,14 +51,14 @@ function getWorker(): Worker {
     } else {
       sources.delete(request.key)
       request.reject(
-        new Error(error || 'The custom handle could not be generated.'),
+        new Error(error || 'The custom panel could not be generated.'),
       )
     }
   }
   worker.onerror = () => {
     for (const request of pending.values())
       request.reject(
-        new Error('The handle generator could not start. Please retry.'),
+        new Error('The panel generator could not start. Please retry.'),
       )
     pending.clear()
     worker?.terminate()
@@ -66,11 +69,12 @@ function getWorker(): Worker {
 }
 
 let testEngine:
-  ReturnType<typeof import('./handle-geometry').createHandleEngine> | undefined
+  | Promise<ReturnType<typeof import('./panel-engine').createPanelEngine>>
+  | undefined
 
 /**
- * Generate real upper geometry in a dedicated WASM worker, then apply the
- * independent front-face depth setting. Callers own the returned geometry.
+ * Generate the handle, face depth, and grille in a dedicated WASM worker.
+ * Callers own the returned geometry; preview and STL export use this same mesh.
  * The original path clones the original mesh without any CSG or remeshing.
  */
 export async function buildHandledPanelGeometry(
@@ -79,23 +83,29 @@ export async function buildHandledPanelGeometry(
   style: PanelStyle,
   relief: number,
   input: HandleSettings,
+  grilleInput?: GrilleSettings,
 ): Promise<BufferGeometry> {
   const settings = normalizeHandleSettings(model, input)
-  if (settings.mode === 'original')
+  const grille = normalizeGrilleSettings(grilleInput)
+  if (settings.mode === 'original' && grille.mode === 'original')
     return buildPanelGeometry(source, model, style, relief)
 
-  let result: HandleResult
+  let result: GeneratedPanel
   if (typeof Worker === 'undefined') {
     // Tests use the identical geometry kernel without a browser Worker runtime.
-    testEngine ??= import('./handle-geometry').then((module) =>
-      module.createHandleEngine(),
+    testEngine ??= import('./panel-engine').then((module) =>
+      module.createPanelEngine(),
     )
-    result = (await testEngine).build(
+    result = await (
+      await testEngine
+    ).build({
       model,
       style,
       settings,
-      new Float32Array(source.getAttribute('position').array),
-    )
+      grille,
+      relief,
+      source: new Float32Array(source.getAttribute('position').array),
+    })
   } else {
     const generator = getWorker()
     const key = `${model}:${style}`
@@ -103,7 +113,7 @@ export async function buildHandledPanelGeometry(
       ? undefined
       : new Float32Array(source.getAttribute('position').array)
     const id = ++nextRequest
-    result = await new Promise<HandleResult>((resolve, reject) => {
+    result = await new Promise<GeneratedPanel>((resolve, reject) => {
       pending.set(id, { key, resolve, reject })
       try {
         generator.postMessage(
@@ -112,6 +122,8 @@ export async function buildHandledPanelGeometry(
             model,
             style,
             settings,
+            grille,
+            relief,
             source: positions,
           } satisfies HandleWorkerRequest,
           positions ? [positions.buffer] : [],
@@ -121,7 +133,7 @@ export async function buildHandledPanelGeometry(
         reject(
           error instanceof Error
             ? error
-            : new Error('The handle generator could not start.'),
+            : new Error('The panel generator could not start.'),
         )
       }
     })
@@ -132,9 +144,11 @@ export async function buildHandledPanelGeometry(
     new Float32BufferAttribute(result.positions, 3),
   )
   handled.computeVertexNormals()
-  const completed = buildPanelGeometry(handled, model, style, relief)
+  const completed = buildPanelGeometry(handled, model, style, 0)
   handled.dispose()
-  completed.userData.handle = result.metadata
+  completed.userData.addedFaceDepth = relief
+  if (result.handle) completed.userData.handle = result.handle
+  if (result.grille) completed.userData.grille = result.grille
   completed.computeBoundingBox()
   completed.computeBoundingSphere()
   return completed

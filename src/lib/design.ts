@@ -3,6 +3,11 @@ import {
   normalizeHandleSettings,
   type HandleSettings,
 } from './handle-settings'
+import {
+  DEFAULT_GRILLE_SETTINGS,
+  normalizeGrilleSettings,
+  type GrilleSettings,
+} from './grille-settings'
 
 export const PALETTE = [
   { name: 'CMF orange', value: '#f45427' },
@@ -20,6 +25,7 @@ export type Design = {
   knobColor: string
   relief: number
   handle: HandleSettings
+  grille: GrilleSettings
 }
 export const DEFAULT_DESIGN: Design = {
   model: 's',
@@ -28,6 +34,7 @@ export const DEFAULT_DESIGN: Design = {
   knobColor: '#303538',
   relief: 0,
   handle: getDefaultHandleSettings('s'),
+  grille: { ...DEFAULT_GRILLE_SETTINGS },
 }
 export const STORAGE_KEY = 'cmf-speaker-design-v1'
 const isColor = (value: unknown): value is string =>
@@ -39,6 +46,7 @@ export function validateDesign(value: unknown): Design {
   const model = data.model === 'm' ? 'm' : 's'
   return {
     model,
+    grille: normalizeGrilleSettings(data.grille ?? {}),
     handle: normalizeHandleSettings(
       model,
       data.handle ?? getDefaultHandleSettings(model),
