@@ -5,6 +5,7 @@ import initializeManifold, {
 import {
   getHandleHoleCenters,
   getHandleOutline,
+  getHandleSvgPaths,
   HANDLE_THICKNESS,
   normalizeHandleSettings,
   type HandleSettings,
@@ -137,7 +138,32 @@ export async function createHandleEngine(wasmUrl?: string) {
           ]),
         )
         const holeCenters: HandleMetadata['holeCenters'] = []
-        if (settings.cutout !== 'none') {
+        if (settings.cutout === 'svg') {
+          const paths = getHandleSvgPaths(model, settings)
+          if (paths.length) {
+            const filledPaths = paths.map((path) =>
+              own(
+                new module.CrossSection(
+                  path.contours,
+                  path.fillRule === 'evenodd' ? 'EvenOdd' : 'NonZero',
+                ),
+              ),
+            )
+            const cutouts = own(module.CrossSection.union(filledPaths))
+            if (cutouts.isEmpty())
+              throw new Error(
+                'The SVG has no filled cutout area. Use closed, filled shapes.',
+              )
+            section = own(section.subtract(cutouts))
+            const sections = section.decompose()
+            const count = sections.length
+            sections.forEach((part) => part.delete())
+            if (count !== 1)
+              throw new Error(
+                'This SVG leaves floating islands in the handle. Add bridges to enclosed details or use a solid silhouette.',
+              )
+          }
+        } else if (settings.cutout !== 'none') {
           const holes: Point[][] = []
           for (const hole of getHandleHoleCenters(model, settings)) {
             holes.push(capsule(hole.width, hole.height, hole.x, hole.y))

@@ -1,5 +1,6 @@
 import type { SetStateAction } from 'react'
 import type { Design } from './design'
+import type { SvgCutout } from './svg-cutout'
 
 export const DESIGN_HISTORY_LIMIT = 100
 
@@ -20,7 +21,20 @@ export type DesignHistoryAction =
 function snapshot(design: Design): Design {
   return {
     ...design,
-    handle: { ...design.handle },
+    handle: {
+      ...design.handle,
+      svgCutout: design.handle.svgCutout
+        ? {
+            ...design.handle.svgCutout,
+            paths: design.handle.svgCutout.paths.map((path) => ({
+              ...path,
+              contours: path.contours.map((contour) =>
+                contour.map(([x, y]): [number, number] => [x, y]),
+              ),
+            })),
+          }
+        : null,
+    },
     grille: { ...design.grille },
     halo: { ...design.halo },
     knob: { ...design.knob },
@@ -35,7 +49,37 @@ function settingsEqual<T extends object>(left: T, right: T) {
   )
 }
 
+function svgCutoutsEqual(left: SvgCutout | null, right: SvgCutout | null) {
+  if (left === right) return true
+  if (!left || !right) return false
+  return (
+    left.name === right.name &&
+    left.aspectRatio === right.aspectRatio &&
+    left.paths.length === right.paths.length &&
+    left.paths.every((path, pathIndex) => {
+      const otherPath = right.paths[pathIndex]
+      return (
+        path.fillRule === otherPath.fillRule &&
+        path.contours.length === otherPath.contours.length &&
+        path.contours.every((contour, contourIndex) => {
+          const otherContour = otherPath.contours[contourIndex]
+          return (
+            contour.length === otherContour.length &&
+            contour.every(
+              ([x, y], pointIndex) =>
+                x === otherContour[pointIndex][0] &&
+                y === otherContour[pointIndex][1],
+            )
+          )
+        })
+      )
+    })
+  )
+}
+
 function designsEqual(left: Design, right: Design) {
+  const { svgCutout: leftSvg, ...leftHandle } = left.handle
+  const { svgCutout: rightSvg, ...rightHandle } = right.handle
   return (
     left.model === right.model &&
     left.bodyColor === right.bodyColor &&
@@ -43,7 +87,8 @@ function designsEqual(left: Design, right: Design) {
     left.panelColor === right.panelColor &&
     left.knobColor === right.knobColor &&
     left.relief === right.relief &&
-    settingsEqual(left.handle, right.handle) &&
+    settingsEqual(leftHandle, rightHandle) &&
+    svgCutoutsEqual(leftSvg, rightSvg) &&
     settingsEqual(left.grille, right.grille) &&
     settingsEqual(left.halo, right.halo) &&
     settingsEqual(left.knob, right.knob)

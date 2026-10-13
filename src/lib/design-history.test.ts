@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_DESIGN } from './design'
+import { DEFAULT_DESIGN, validateDesign } from './design'
 import {
   createDesignHistory,
   designHistoryReducer,
   DESIGN_HISTORY_LIMIT,
   type DesignHistory,
 } from './design-history'
+import type { SvgCutout } from './svg-cutout'
 
 const initial = () => createDesignHistory(DEFAULT_DESIGN)
 const setRelief = (state: DesignHistory, relief: number) =>
@@ -13,6 +14,22 @@ const setRelief = (state: DesignHistory, relief: number) =>
     type: 'set',
     update: (design) => ({ ...design, relief }),
   })
+const svgCutout = (): SvgCutout => ({
+  name: 'triangle.svg',
+  aspectRatio: 2,
+  paths: [
+    {
+      fillRule: 'nonzero',
+      contours: [
+        [
+          [-0.5, -0.5],
+          [0.5, -0.5],
+          [0, 0.5],
+        ],
+      ],
+    },
+  ],
+})
 
 describe('design history', () => {
   it('records body-only changes and restores them with undo and redo', () => {
@@ -91,6 +108,115 @@ describe('design history', () => {
     expect(designHistoryReducer(branched, { type: 'undo' }).present).toEqual(
       first.present,
     )
+  })
+
+  it('keeps uploaded SVG contours isolated from callers and updater mutations', () => {
+    const input = {
+      ...DEFAULT_DESIGN,
+      handle: {
+        ...DEFAULT_DESIGN.handle,
+        mode: 'custom' as const,
+        cutout: 'svg' as const,
+        svgCutout: svgCutout(),
+      },
+    }
+    const start = createDesignHistory(input)
+    input.handle.svgCutout.paths[0].contours[0][0][0] = -0.25
+    expect(start.present.handle.svgCutout).toEqual(svgCutout())
+
+    const changed = designHistoryReducer(start, {
+      type: 'set',
+      update: (design) => {
+        design.handle.svgCutout!.paths[0].contours[0][1][0] = 0.25
+        return design
+      },
+    })
+    expect(changed.past[0].handle.svgCutout).toEqual(svgCutout())
+    expect(start.present.handle.svgCutout).toEqual(svgCutout())
+    const recorded = structuredClone(changed.present)
+    const undone = designHistoryReducer(changed, { type: 'undo' })
+    expect(undone.present.handle.svgCutout).toEqual(svgCutout())
+    expect(undone.present.handle.svgCutout).not.toBe(
+      changed.past[0].handle.svgCutout,
+    )
+    expect(designHistoryReducer(undone, { type: 'redo' }).present).toEqual(
+      recorded,
+    )
+  })
+
+  it('ignores cloned and normalized SVG values without clearing redo', () => {
+    const start = createDesignHistory(
+      validateDesign({
+        ...DEFAULT_DESIGN,
+        handle: {
+          ...DEFAULT_DESIGN.handle,
+          mode: 'custom',
+          cutout: 'svg',
+          svgCutout: svgCutout(),
+        },
+      }),
+    )
+    const undone = designHistoryReducer(setRelief(start, 1), { type: 'undo' })
+    expect(
+      designHistoryReducer(undone, {
+        type: 'set',
+        update: structuredClone(undone.present),
+      }),
+    ).toBe(undone)
+    expect(
+      designHistoryReducer(undone, {
+        type: 'set',
+        update: validateDesign(undone.present),
+      }),
+    ).toBe(undone)
+  })
+
+  it('undoes and redoes uploading, replacing, and removing an SVG cutout', () => {
+    const uploaded = designHistoryReducer(initial(), {
+      type: 'set',
+      update: (design) => ({
+        ...design,
+        handle: {
+          ...design.handle,
+          mode: 'custom',
+          cutout: 'svg',
+          svgCutout: svgCutout(),
+        },
+      }),
+    })
+    const replacement = svgCutout()
+    replacement.name = 'inverted-triangle.svg'
+    replacement.paths[0].contours[0] = [
+      [-0.5, 0.5],
+      [0.5, 0.5],
+      [0, -0.5],
+    ]
+    const replaced = designHistoryReducer(uploaded, {
+      type: 'set',
+      update: (design) => ({
+        ...design,
+        handle: { ...design.handle, svgCutout: replacement },
+      }),
+    })
+    const removed = designHistoryReducer(replaced, {
+      type: 'set',
+      update: (design) => ({
+        ...design,
+        handle: { ...design.handle, svgCutout: null },
+      }),
+    })
+    const restoredReplacement = designHistoryReducer(removed, { type: 'undo' })
+    expect(restoredReplacement.present.handle.svgCutout).toEqual(replacement)
+    const restoredUpload = designHistoryReducer(restoredReplacement, {
+      type: 'undo',
+    })
+    expect(restoredUpload.present.handle.svgCutout).toEqual(svgCutout())
+    expect(
+      designHistoryReducer(restoredUpload, { type: 'undo' }).present,
+    ).toEqual(DEFAULT_DESIGN)
+    expect(
+      designHistoryReducer(restoredUpload, { type: 'redo' }).present,
+    ).toEqual(replaced.present)
   })
 
   it('ignores equivalent values, including settings with different key order', () => {

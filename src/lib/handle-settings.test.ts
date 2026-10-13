@@ -1,10 +1,30 @@
 import { describe, expect, it } from 'vitest'
 import {
   getDefaultHandleSettings,
+  getHandleHoleCenters,
   getHandleLimits,
+  getHandleSvgPaths,
   normalizeHandleSettings,
   type HandleSettings,
 } from './handle-settings'
+import type { SvgCutout } from './svg-cutout'
+
+const svgTriangle: SvgCutout = {
+  name: 'triangle.svg',
+  aspectRatio: 1.5,
+  paths: [
+    {
+      fillRule: 'nonzero',
+      contours: [
+        [
+          [-0.5, 0.5],
+          [0.5, 0.5],
+          [0, -0.5],
+        ],
+      ],
+    },
+  ],
+}
 
 function outerDistance(x: number, y: number, handle: HandleSettings) {
   const qx = Math.abs(x) - handle.width / 2 + handle.cornerRadius
@@ -54,6 +74,112 @@ describe('printable custom handle settings', () => {
       normalizeHandleSettings('m'),
     )
   })
+
+  it('keeps SVG paths and their orientation through a saved JSON round trip', () => {
+    const settings = normalizeHandleSettings('s', {
+      mode: 'custom',
+      height: 48,
+      cutout: 'svg',
+      svgCutout: svgTriangle,
+      holeWidth: 30,
+      holeHeight: 6,
+      holeCount: 3,
+      offsetX: 2,
+      offsetY: 3,
+    })
+    expect(settings.holeCount).toBe(1)
+    expect(settings.holeHeight).toBe(20)
+    expect(getHandleHoleCenters('s', settings)).toEqual([])
+    expect(getHandleSvgPaths('s', settings)).toEqual([
+      {
+        fillRule: 'nonzero',
+        contours: [
+          [
+            [-13, 19],
+            [17, 19],
+            [2, 39],
+          ],
+        ],
+      },
+    ])
+    expect(normalizeHandleSettings('s', settings)).toEqual(settings)
+    expect(svgTriangle.paths[0].contours[0][0]).toEqual([-0.5, 0.5])
+  })
+
+  it('ignores missing or invalid saved SVG data while retaining the selected variant', () => {
+    for (const svgCutout of [
+      undefined,
+      null,
+      {},
+      { ...svgTriangle, aspectRatio: Infinity },
+      {
+        ...svgTriangle,
+        paths: [{ contours: [[[NaN, 0]]], fillRule: 'nonzero' }],
+      },
+    ]) {
+      const settings = normalizeHandleSettings('m', {
+        cutout: 'svg',
+        svgCutout: svgCutout as SvgCutout,
+      })
+      expect(settings.cutout).toBe('svg')
+      expect(settings.svgCutout).toBeNull()
+      expect(getHandleSvgPaths('m', settings)).toEqual([])
+      expect(getHandleHoleCenters('m', settings)).toEqual([])
+    }
+  })
+
+  it.each(['s', 'm'] as const)(
+    'fits tall and wide SVGs into %s handles with a three millimeter outer wall',
+    (model) => {
+      for (const aspectRatio of [0.05, 0.2, 1, 5, 20]) {
+        for (const height of [16, 24, 70]) {
+          for (const width of [60, 110]) {
+            for (const direction of [-1, 1]) {
+              const settings = normalizeHandleSettings(model, {
+                mode: 'custom',
+                height,
+                width,
+                cornerRadius: 16,
+                cutout: 'svg',
+                svgCutout: { ...svgTriangle, aspectRatio },
+                holeWidth: 64,
+                offsetX: 30 * direction,
+                offsetY: 24 * direction,
+              })
+              expect(settings.holeWidth / settings.holeHeight).toBeCloseTo(
+                aspectRatio,
+                8,
+              )
+              expect(settings.holeCount).toBe(1)
+              const centerY = settings.height / 2 + 2 + settings.offsetY
+              for (const x of [-0.5, 0.5]) {
+                for (const y of [-0.5, 0.5]) {
+                  const px = settings.offsetX + x * settings.holeWidth
+                  const py = centerY + y * settings.holeHeight
+                  expect(outerDistance(px, py, settings)).toBeLessThanOrEqual(
+                    -3 + 1e-6,
+                  )
+                  expect(py).toBeGreaterThanOrEqual(7 - 1e-6)
+                }
+              }
+              for (const [key, limit] of Object.entries(
+                getHandleLimits(model, settings),
+              )) {
+                const value = settings[key as keyof HandleSettings] as number
+                expect(
+                  Number.isFinite(limit.min) && Number.isFinite(limit.max),
+                ).toBe(true)
+                expect(limit.min).toBeLessThanOrEqual(limit.max)
+                expect(value).toBeGreaterThanOrEqual(limit.min - 1e-6)
+                expect(value).toBeLessThanOrEqual(limit.max + 1e-6)
+              }
+              expect(normalizeHandleSettings(model, settings)).toEqual(settings)
+            }
+          }
+        }
+      }
+    },
+  )
 
   it('retains circular holes and at least three millimeters of material under extreme edits', () => {
     const violations: string[] = []

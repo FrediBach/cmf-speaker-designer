@@ -171,6 +171,16 @@ export function ExportDialog({
   )
 }
 
+function handleCutoutSummary(handle: Design['handle']) {
+  if (handle.cutout === 'none') return 'Solid'
+  if (handle.cutout === 'svg')
+    return handle.svgCutout
+      ? `SVG cutout · ${handle.svgCutout.name}`
+      : 'Solid · no SVG uploaded'
+  const shape = handle.cutout === 'circle' ? 'round' : 'slot'
+  return `${handle.holeCount} ${shape} ${handle.holeCount === 1 ? 'hole' : 'holes'}`
+}
+
 function PanelExportSummary({
   design,
   panelWidth,
@@ -197,9 +207,7 @@ function PanelExportSummary({
         {design.handle.mode === 'custom' && (
           <span>
             Custom handle · {design.handle.height} mm extension ·{' '}
-            {design.handle.cutout === 'none'
-              ? 'Solid'
-              : `${design.handle.holeCount} ${design.handle.cutout === 'circle' ? 'round' : 'slot'} ${design.handle.holeCount === 1 ? 'hole' : 'holes'}`}
+            {handleCutoutSummary(design.handle)}
           </span>
         )}
         {design.grille.mode === 'custom' && (

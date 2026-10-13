@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_DESIGN,
+  designShareUrl,
   readDesign,
   STORAGE_KEY,
   validateDesign,
 } from './design'
 import { DEFAULT_KNOB_SETTINGS } from './knob-settings'
 import { DEFAULT_HALO_SETTINGS } from './halo-settings'
+import type { SvgCutout } from './svg-cutout'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -139,6 +141,166 @@ describe('saved and shared handle designs', () => {
       },
     })
     expect(readDesign()).toEqual(shared)
+  })
+
+  it('preserves uploaded SVG geometry and fill rules in saved and shared handles', () => {
+    const svgCutout: SvgCutout = {
+      name: 'custom-opening.svg',
+      aspectRatio: 2,
+      paths: [
+        {
+          fillRule: 'evenodd',
+          contours: [
+            [
+              [-0.5, -0.5],
+              [0.5, -0.5],
+              [0.5, 0.5],
+              [-0.5, 0.5],
+            ],
+            [
+              [-0.2, -0.2],
+              [0.2, -0.2],
+              [0, 0.2],
+            ],
+          ],
+        },
+        {
+          fillRule: 'nonzero',
+          contours: [
+            [
+              [-0.1, -0.1],
+              [0.1, -0.1],
+              [0, 0.1],
+            ],
+          ],
+        },
+      ],
+    }
+    const design = validateDesign({
+      ...DEFAULT_DESIGN,
+      handle: {
+        ...DEFAULT_DESIGN.handle,
+        mode: 'custom',
+        cutout: 'svg',
+        height: 48,
+        width: 96,
+        holeWidth: 36,
+        holeHeight: 18,
+        svgCutout,
+      },
+    })
+    expect(design.handle.cutout).toBe('svg')
+    expect(design.handle.svgCutout).toEqual(svgCutout)
+    vi.stubGlobal('window', { location: { search: '' } })
+    vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(design) })
+    expect(readDesign()).toEqual(design)
+    vi.stubGlobal('window', {
+      location: {
+        search: `?design=${encodeURIComponent(JSON.stringify(design))}`,
+      },
+    })
+    expect(readDesign()).toEqual(design)
+    svgCutout.paths[0].contours[0][0][0] = -0.25
+    expect(design.handle.svgCutout!.paths[0].contours[0][0][0]).toBe(-0.5)
+  })
+
+  it('shares designs without uploaded artwork through the existing query format', () => {
+    const url = designShareUrl(
+      DEFAULT_DESIGN,
+      'https://example.com/designer/?design=old&unrelated=value#design=old',
+    )
+    expect(url.origin).toBe('https://example.com')
+    expect(url.pathname).toBe('/designer/')
+    expect(url.hash).toBe('')
+    expect(Array.from(url.searchParams.keys())).toEqual(['design'])
+    expect(JSON.parse(url.searchParams.get('design')!)).toEqual(DEFAULT_DESIGN)
+    vi.stubGlobal('window', { location: url })
+    expect(readDesign()).toEqual(DEFAULT_DESIGN)
+  })
+
+  it.each(['svg', 'slot'] as const)(
+    'keeps a maximum-size SVG out of HTTP query strings with the %s cutout selected',
+    (cutout) => {
+      const design = validateDesign({
+        ...DEFAULT_DESIGN,
+        handle: {
+          ...DEFAULT_DESIGN.handle,
+          mode: 'custom',
+          cutout,
+          svgCutout: {
+            name: 'Large # & + cutout.svg',
+            aspectRatio: 1,
+            paths: [
+              {
+                fillRule: 'nonzero',
+                contours: [
+                  Array.from({ length: 4096 }, (_, index) => {
+                    const angle = (index / 4096) * 2 * Math.PI
+                    return [Math.cos(angle) / 2, Math.sin(angle) / 2]
+                  }),
+                ],
+              },
+            ],
+          },
+        },
+      })
+      expect(design.handle.svgCutout).not.toBeNull()
+      const url = designShareUrl(
+        design,
+        'https://example.com/designer/?design=old',
+      )
+      expect(url.search).toBe('')
+      expect(url.hash.length).toBeGreaterThan(100_000)
+      expect(
+        JSON.parse(new URLSearchParams(url.hash.slice(1)).get('design')!),
+      ).toEqual(design)
+      vi.stubGlobal('window', { location: url })
+      vi.stubGlobal('localStorage', {
+        getItem: () => JSON.stringify(DEFAULT_DESIGN),
+      })
+      expect(readDesign()).toEqual(design)
+
+      const changed = validateDesign({ ...design, panelColor: '#123abc' })
+      const changedUrl = designShareUrl(changed, url.href)
+      expect(changedUrl.search).toBe('')
+      vi.stubGlobal('window', { location: changedUrl })
+      expect(readDesign()).toEqual(changed)
+
+      const removed = validateDesign({
+        ...changed,
+        handle: { ...changed.handle, svgCutout: null },
+      })
+      const removedUrl = designShareUrl(removed, changedUrl.href)
+      expect(removedUrl.hash).toBe('')
+      expect(removedUrl.searchParams.has('design')).toBe(true)
+      vi.stubGlobal('window', { location: removedUrl })
+      expect(readDesign()).toEqual(removed)
+    },
+  )
+
+  it('prefers a shared fragment over legacy query data and local storage', () => {
+    const design = validateDesign({ ...DEFAULT_DESIGN, model: 'm' })
+    const url = designShareUrl(DEFAULT_DESIGN, 'https://example.com/')
+    url.hash = new URLSearchParams({
+      design: JSON.stringify(design),
+    }).toString()
+    vi.stubGlobal('window', { location: url })
+    vi.stubGlobal('localStorage', {
+      getItem: () => JSON.stringify(DEFAULT_DESIGN),
+    })
+    expect(readDesign()).toEqual(design)
+  })
+
+  it('opens legacy handles with no SVG data and discards malformed SVG payloads', () => {
+    expect(
+      validateDesign({ handle: { mode: 'custom', cutout: 'slot' } }).handle,
+    ).toMatchObject({ mode: 'custom', cutout: 'slot', svgCutout: null })
+    for (const svgCutout of [null, 'invalid', {}, { paths: [] }]) {
+      expect(
+        validateDesign({ handle: { mode: 'custom', cutout: 'svg', svgCutout } })
+          .handle.svgCutout,
+      ).toBeNull()
+    }
   })
 
   it('keeps old defaults usable when a stored record is malformed or storage is denied', () => {

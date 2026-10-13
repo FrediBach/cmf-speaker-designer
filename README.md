@@ -70,7 +70,7 @@ Choose **Black** or **Gray** under **Speaker body**, next to the model selection
 - Continue the grille pattern onto the surrounding front face as recesses up to 3 mm deep, with solid material behind them.
 - Preview front panel and volume knob colors with a black or gray speaker body in an interactive Three.js scene, including panel-only and exploded views.
 - Add up to 2 mm of face depth while retaining the original mounting region and overall face dimensions.
-- Generate a custom upper handle: adjust its height, width, and rounded corners, then choose a solid face or one to three circular or slotted openings.
+- Generate a custom upper handle: adjust its height, width, and rounded corners, then choose a solid face, one to three circular or slotted openings, or an uploaded SVG cutout.
 - Change hole size, spacing, and position, with dependent dimensions constrained to leave at least 3 mm of surrounding material.
 - Keep your current design locally and copy a link to share a configuration.
 - Select the supplied ring, bar, and cross volume knobs, or generate fluted and faceted grips.
@@ -80,6 +80,8 @@ Choose **Black** or **Gray** under **Speaker body**, next to the model selection
 - Download panel and knob together as a ZIP with separate binary STLs in millimeters and a `design.json` containing settings and colors. Individual STL downloads are also available.
 
 The designer starts from each model's original front panel mesh. **Custom** selects an open panel ready to configure in the **Halo** and **Grille** tabs; it does not add either feature automatically. Selecting **Original** removes generated halos and grilles while retaining their parameters for later use. The **Original handle** option retains the source upper section. **Custom handle** removes that upper section above the control deck and joins a newly generated extension to the remaining panel; its openings are actual through-holes in the exported solid. Carry loop, Three dots, and Solid presets provide starting points. STL has no color or unit metadata: the exported coordinates are intended as millimeters. The ZIP records panel and knob colors in `design.json`. Choose the corresponding filament or material in your slicer. This POC does not include freeform drawing, text embossing, slicer integration, or multi-material exports.
+
+In **Handle → Custom handle → SVG**, upload a filled SVG (up to 256 KB) to use its shapes as through-cutouts. Adjust **Cutout width** and **Position**; the design keeps its proportions and fits inside the handle's 3 mm outer border. Internal detail spacing comes from your artwork. Use a stencil with bridges where needed: a cutout that leaves floating islands cannot be exported. Convert text and strokes to filled paths, and export inline styles without images, linked shapes, clipping, or masks. The uploaded geometry is saved locally, included in shared links and the ZIP's `design.json`, and participates in undo/redo. Switching cutout types retains the uploaded artwork; **Remove SVG cutout** clears it.
 
 The **Grille** tab generates a perforated grille over the original driver openings: one on S and both on M. Custom grilles use the original open panel as their base and can be combined with a custom handle, halo, and added face depth. Selecting **Original grille** removes the generated grille; a custom halo can remain active.
 

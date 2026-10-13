@@ -1,12 +1,14 @@
 import type { SpeakerModel } from './panels'
+import { normalizeSvgCutout, type SvgCutout } from './svg-cutout'
 
-export type HandleCutout = 'none' | 'circle' | 'slot'
+export type HandleCutout = 'none' | 'circle' | 'slot' | 'svg'
 export interface HandleSettings {
   mode: 'original' | 'custom'
   height: number
   width: number
   cornerRadius: number
   cutout: HandleCutout
+  svgCutout: SvgCutout | null
   holeCount: number
   holeWidth: number
   holeHeight: number
@@ -14,7 +16,10 @@ export interface HandleSettings {
   offsetX: number
   offsetY: number
 }
-export type HandleNumericKey = Exclude<keyof HandleSettings, 'mode' | 'cutout'>
+export type HandleNumericKey = Exclude<
+  keyof HandleSettings,
+  'mode' | 'cutout' | 'svgCutout'
+>
 export type HandleLimits = Record<
   HandleNumericKey,
   { min: number; max: number }
@@ -29,6 +34,7 @@ export const DEFAULT_HANDLE_SETTINGS: HandleSettings = {
   width: 85,
   cornerRadius: 3,
   cutout: 'slot',
+  svgCutout: null,
   holeCount: 1,
   holeWidth: 40,
   holeHeight: 12,
@@ -66,14 +72,16 @@ export function normalizeHandleSettings(
   const cutout =
     input.cutout === 'none' ||
     input.cutout === 'circle' ||
-    input.cutout === 'slot'
+    input.cutout === 'slot' ||
+    input.cutout === 'svg'
       ? input.cutout
       : defaults.cutout
-  const holeCount = clamp(
-    Math.round(finite(input.holeCount, defaults.holeCount)),
-    1,
-    3,
-  )
+  const svgCutout = normalizeSvgCutout(input.svgCutout)
+  const aspectRatio = svgCutout?.aspectRatio ?? 1
+  const holeCount =
+    cutout === 'svg'
+      ? 1
+      : clamp(Math.round(finite(input.holeCount, defaults.holeCount)), 1, 3)
   const availableWidth = width - 2 * (cornerRadius + HANDLE_MIN_WEB)
   const availableHeight = height - HANDLE_SHOULDER_HEIGHT - 2 * HANDLE_MIN_WEB
   const maxGap =
@@ -84,21 +92,27 @@ export function normalizeHandleSettings(
   const maxWidth = Math.min(
     64,
     (availableWidth - (holeCount - 1) * holeGap) / holeCount,
-    cutout === 'circle' ? availableHeight : 64,
+    cutout === 'circle'
+      ? availableHeight
+      : cutout === 'svg'
+        ? availableHeight * aspectRatio
+        : 64,
   )
   const holeWidth = clamp(
     finite(input.holeWidth, defaults.holeWidth),
-    6,
+    cutout === 'svg' ? Math.min(6, maxWidth) : 6,
     maxWidth,
   )
   const holeHeight =
     cutout === 'circle'
       ? holeWidth
-      : clamp(
-          finite(input.holeHeight, defaults.holeHeight),
-          6,
-          Math.min(30, availableHeight, holeWidth),
-        )
+      : cutout === 'svg'
+        ? holeWidth / aspectRatio
+        : clamp(
+            finite(input.holeHeight, defaults.holeHeight),
+            6,
+            Math.min(30, availableHeight, holeWidth),
+          )
   const groupWidth = holeCount * holeWidth + (holeCount - 1) * holeGap
   const xRoom = Math.min(30, Math.max(0, (availableWidth - groupWidth) / 2))
   const yRoom = Math.min(24, Math.max(0, (availableHeight - holeHeight) / 2))
@@ -108,6 +122,7 @@ export function normalizeHandleSettings(
     width,
     cornerRadius,
     cutout,
+    svgCutout,
     holeCount,
     holeWidth,
     holeHeight,
@@ -134,6 +149,16 @@ export function getHandleLimits(
     24,
     Math.max(0, (availableHeight - settings.holeHeight) / 2),
   )
+  const maxWidth = Math.min(
+    64,
+    (availableWidth - (settings.holeCount - 1) * settings.holeGap) /
+      settings.holeCount,
+    settings.cutout === 'circle'
+      ? availableHeight
+      : settings.cutout === 'svg'
+        ? availableHeight * (settings.svgCutout?.aspectRatio ?? 1)
+        : 64,
+  )
   return {
     height: { min: 16, max: 70 },
     width: { min: 60, max: 110 },
@@ -141,19 +166,14 @@ export function getHandleLimits(
       min: 0,
       max: Math.min(16, (settings.width - 30) / 2, (settings.height - 4) / 2),
     },
-    holeCount: { min: 1, max: 3 },
+    holeCount: { min: 1, max: settings.cutout === 'svg' ? 1 : 3 },
     holeWidth: {
-      min: 6,
-      max: Math.min(
-        64,
-        (availableWidth - (settings.holeCount - 1) * settings.holeGap) /
-          settings.holeCount,
-        settings.cutout === 'circle' ? availableHeight : 64,
-      ),
+      min: settings.cutout === 'svg' ? Math.min(6, maxWidth) : 6,
+      max: maxWidth,
     },
     holeHeight:
-      settings.cutout === 'circle'
-        ? { min: settings.holeWidth, max: settings.holeWidth }
+      settings.cutout === 'circle' || settings.cutout === 'svg'
+        ? { min: settings.holeHeight, max: settings.holeHeight }
         : { min: 6, max: Math.min(30, availableHeight, settings.holeWidth) },
     holeGap: {
       min: 3,
@@ -212,7 +232,7 @@ export function getHandleHoleCenters(
   input: Partial<HandleSettings>,
 ) {
   const settings = normalizeHandleSettings(model, input)
-  if (settings.cutout === 'none') return []
+  if (settings.cutout === 'none' || settings.cutout === 'svg') return []
   return Array.from({ length: settings.holeCount }, (_, index) => ({
     x:
       settings.offsetX +
@@ -222,5 +242,25 @@ export function getHandleHoleCenters(
     width: settings.holeWidth,
     height:
       settings.cutout === 'circle' ? settings.holeWidth : settings.holeHeight,
+  }))
+}
+
+/** SVG's downward Y axis is flipped into the handle's upward profile axis. */
+export function getHandleSvgPaths(
+  model: SpeakerModel,
+  input: Partial<HandleSettings>,
+): SvgCutout['paths'] {
+  const settings = normalizeHandleSettings(model, input)
+  if (settings.cutout !== 'svg' || !settings.svgCutout) return []
+  const centerY =
+    settings.height / 2 + HANDLE_SHOULDER_HEIGHT / 2 + settings.offsetY
+  return settings.svgCutout.paths.map((path) => ({
+    fillRule: path.fillRule,
+    contours: path.contours.map((contour) =>
+      contour.map(([x, y]) => [
+        settings.offsetX + x * settings.holeWidth,
+        centerY - y * settings.holeHeight,
+      ]),
+    ),
   }))
 }

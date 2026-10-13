@@ -1,24 +1,131 @@
+import { useEffect, useRef, useState } from 'react'
 import { useNumericDraft } from '@/lib/use-numeric-draft'
 import {
   Circle,
   Minus,
   MoveHorizontal,
   RectangleHorizontal,
+  FileUp,
+  Upload,
+  X,
 } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import {
   getHandleLimits,
   getHandleOutline,
   getHandleHoleCenters,
+  getHandleSvgPaths,
   normalizeHandleSettings,
   type HandleSettings,
 } from '@/lib/handle-settings'
 import type { SpeakerModel } from '@/lib/panels'
+import { SVG_MAX_FILE_SIZE, type SvgCutout } from '@/lib/svg-cutout'
 
 interface Props {
   model: SpeakerModel
   value: HandleSettings
   onChange: (value: HandleSettings) => void
+}
+
+function SvgUpload({
+  value,
+  onChange,
+}: {
+  value: SvgCutout | null
+  onChange: (value: SvgCutout | null) => void
+}) {
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const request = useRef(0)
+  const input = useRef<HTMLInputElement>(null)
+  const latestChange = useRef(onChange)
+  useEffect(() => {
+    latestChange.current = onChange
+  }, [onChange])
+  useEffect(
+    () => () => {
+      request.current += 1
+    },
+    [],
+  )
+
+  async function upload(file: File) {
+    const id = ++request.current
+    setError('')
+    setLoading(true)
+    try {
+      if (!/\.svg$/i.test(file.name))
+        throw new Error('Choose an SVG file for your cutout.')
+      if (file.size > SVG_MAX_FILE_SIZE)
+        throw new Error('Choose an SVG smaller than 256 KB.')
+      const { parseSvgCutout } = await import('@/lib/svg-cutout-parser')
+      const cutout = parseSvgCutout(await file.text(), file.name)
+      if (id === request.current) latestChange.current(cutout)
+    } catch (cause) {
+      if (id === request.current)
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : 'This SVG could not be read.',
+        )
+    } finally {
+      if (id === request.current) setLoading(false)
+    }
+  }
+
+  return (
+    <div className="svg-upload" aria-busy={loading}>
+      <p id="svg-cutout-help">
+        Filled shapes become cutouts. Convert text and strokes to filled paths
+        before uploading. SVG, up to 256 KB.
+      </p>
+      <input
+        ref={input}
+        className="sr-only"
+        type="file"
+        accept=".svg,image/svg+xml"
+        aria-label="Upload SVG cutout"
+        aria-describedby="svg-cutout-help"
+        tabIndex={-1}
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          event.target.value = ''
+          if (file) void upload(file)
+        }}
+      />
+      <button
+        className="svg-upload-button"
+        type="button"
+        disabled={loading}
+        onClick={() => input.current?.click()}
+      >
+        <Upload size={16} aria-hidden="true" />
+        {loading ? 'Reading SVG…' : value ? 'Replace SVG' : 'Upload SVG'}
+      </button>
+      {value && (
+        <div className="svg-upload-file">
+          <span title={value.name}>{value.name}</span>
+          <button
+            type="button"
+            aria-label="Remove SVG cutout"
+            onClick={() => {
+              request.current += 1
+              setLoading(false)
+              setError('')
+              onChange(null)
+            }}
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+      )}
+      {error && (
+        <p className="svg-upload-error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  )
 }
 
 function Parameter({
@@ -103,6 +210,7 @@ function HandleDiagram({
     .map(([x, y]) => `${x},${h / 2 - y}`)
     .join(' ')
   const holes = getHandleHoleCenters(model, value)
+  const svgPaths = getHandleSvgPaths(model, value)
   return (
     <div className="handle-diagram" aria-hidden="true">
       <svg viewBox="-72 -49 144 100">
@@ -143,6 +251,21 @@ function HandleDiagram({
             width={hole.width}
             height={hole.height}
             rx={Math.min(hole.width, hole.height) / 2}
+            fill="var(--card)"
+            stroke="var(--accent-ink)"
+            strokeWidth=".6"
+          />
+        ))}
+        {svgPaths.map((path, index) => (
+          <path
+            key={index}
+            d={path.contours
+              .map(
+                (contour) =>
+                  `${contour.map(([x, y], point) => `${point ? 'L' : 'M'}${x},${h / 2 - y}`).join(' ')}Z`,
+              )
+              .join(' ')}
+            fillRule={path.fillRule}
             fill="var(--card)"
             stroke="var(--accent-ink)"
             strokeWidth=".6"
@@ -319,7 +442,7 @@ export function HandleEditor({ model, value, onChange }: Props) {
               <span aria-hidden="true">02</span> Cutouts
             </h3>
             <div
-              className="cutout-options"
+              className="cutout-options handle-cutout-options"
               role="group"
               aria-label="Hole shape"
             >
@@ -328,6 +451,7 @@ export function HandleEditor({ model, value, onChange }: Props) {
                   { id: 'none', label: 'None', Icon: Minus },
                   { id: 'circle', label: 'Round', Icon: Circle },
                   { id: 'slot', label: 'Slot', Icon: RectangleHorizontal },
+                  { id: 'svg', label: 'SVG', Icon: FileUp },
                 ] as const
               ).map(({ id, label, Icon }) => (
                 <button
@@ -342,7 +466,42 @@ export function HandleEditor({ model, value, onChange }: Props) {
                 </button>
               ))}
             </div>
-            {value.cutout !== 'none' && (
+            {value.cutout === 'svg' && (
+              <>
+                <SvgUpload
+                  key={model}
+                  value={value.svgCutout}
+                  onChange={(svgCutout) =>
+                    set({
+                      svgCutout,
+                      holeWidth: value.svgCutout ? value.holeWidth : 40,
+                      offsetX: 0,
+                      offsetY: 0,
+                    })
+                  }
+                />
+                {value.svgCutout && (
+                  <>
+                    {parameter('holeWidth', 'Cutout width', 0.5)}
+                    <p className="svg-cutout-size">
+                      {Number(value.holeWidth.toFixed(2))} ×{' '}
+                      {Number(value.holeHeight.toFixed(2))} mm · proportions
+                      locked
+                    </p>
+                    <details className="handle-placement">
+                      <summary>
+                        Position <span aria-hidden="true">+</span>
+                      </summary>
+                      <div>
+                        {parameter('offsetX', 'Horizontal offset', 0.5)}
+                        {parameter('offsetY', 'Vertical offset', 0.5)}
+                      </div>
+                    </details>
+                  </>
+                )}
+              </>
+            )}
+            {(value.cutout === 'circle' || value.cutout === 'slot') && (
               <>
                 <div className="hole-count">
                   <span>Number of holes</span>
@@ -382,8 +541,9 @@ export function HandleEditor({ model, value, onChange }: Props) {
             )}
           </section>
           <p className="handle-footnote">
-            Openings keep at least 3 mm of surrounding material. The control
-            deck and mounting features stay in place.
+            {value.cutout === 'svg'
+              ? 'Your SVG fits inside a 3 mm outer border. Use a stencil shape without floating islands, and leave enough material between its details.'
+              : 'Openings keep at least 3 mm of surrounding material. The control deck and mounting features stay in place.'}
           </p>
         </>
       )}

@@ -99,9 +99,22 @@ export function validateDesign(value: unknown): Design {
   }
 }
 
+/** Keep uploaded geometry out of the URL sent to the web server. */
+export function designShareUrl(design: Design, href: string): URL {
+  const url = new URL(href)
+  url.search = ''
+  url.hash = ''
+  const parameters = new URLSearchParams({ design: JSON.stringify(design) })
+  if (design.handle.svgCutout) url.hash = parameters.toString()
+  else url.search = parameters.toString()
+  return url
+}
+
 export function readDesign(): Design {
   try {
-    const shared = new URLSearchParams(window.location.search).get('design')
+    const shared =
+      new URLSearchParams(window.location.hash?.slice(1)).get('design') ??
+      new URLSearchParams(window.location.search).get('design')
     if (shared) return validateDesign(JSON.parse(shared))
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) return validateDesign(JSON.parse(saved))

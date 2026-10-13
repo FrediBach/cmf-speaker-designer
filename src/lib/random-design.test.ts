@@ -28,6 +28,7 @@ describe('random designs', () => {
       ]
       for (const design of designs) {
         expect(design.model).toBe(model)
+        expect(design.handle.svgCutout).toBeNull()
         expect(['black', 'gray']).toContain(design.bodyColor)
         expect(validateDesign(design)).toEqual(design)
         expect(design.style).toBe('custom')
@@ -62,7 +63,7 @@ describe('random designs', () => {
     expect(randomizeDesign('m', seededRandom(39218))).not.toEqual(second)
   })
 
-  it('varies every setting, including inactive settings and each component mode', () => {
+  it('varies generated settings, including inactive settings and each component mode', () => {
     const designs = sampleDesigns('s')
     for (const key of [
       'bodyColor',
@@ -75,6 +76,8 @@ describe('random designs', () => {
       ).toBeGreaterThan(1)
     for (const component of ['handle', 'grille', 'halo', 'knob'] as const) {
       for (const key of Object.keys(designs[0][component])) {
+        // Uploaded artwork is provided by the user, never generated at random.
+        if (component === 'handle' && key === 'svgCutout') continue
         const values = designs.map(
           (design) =>
             (design[component] as unknown as Record<string, unknown>)[key],

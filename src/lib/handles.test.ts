@@ -21,6 +21,7 @@ import {
   type PanelStyle,
   type SpeakerModel,
 } from './panels'
+import type { SvgCutout } from './svg-cutout'
 
 const cases: [SpeakerModel, PanelStyle][] = [
   ['s', 'original'],
@@ -129,6 +130,218 @@ function expectSingleControlBend(
 }
 
 describe('generative handles', () => {
+  it.each(cases)(
+    'cuts an uploaded SVG triangle through %s/%s and exports one watertight solid',
+    async (model, style) => {
+      const original = readPanel(model, style)
+      const settings = normalizeHandleSettings(model, {
+        mode: 'custom',
+        height: 48,
+        cutout: 'svg',
+        holeWidth: 30,
+        offsetX: 3,
+        offsetY: 2,
+        svgCutout: {
+          name: 'triangle.svg',
+          aspectRatio: 1.5,
+          paths: [
+            {
+              fillRule: 'nonzero',
+              contours: [
+                [
+                  [-0.5, 0.5],
+                  [0.5, 0.5],
+                  [0, -0.5],
+                ],
+              ],
+            },
+          ],
+        },
+      })
+      const geometry = await buildHandledPanelGeometry(
+        original,
+        model,
+        style,
+        0,
+        settings,
+      )
+      const centerX = settings.offsetX
+      const centerY =
+        geometry.userData.handle.seamY +
+        settings.height / 2 +
+        2 +
+        settings.offsetY
+      expect(geometry.userData.handle.holeCenters).toEqual([])
+      expect(intersections(geometry, centerX, centerY)).toEqual([])
+      // The triangle points up after converting SVG's downward Y axis.
+      expect(intersections(geometry, centerX + 9, centerY - 6)).toEqual([])
+      expect(intersections(geometry, centerX + 9, centerY + 6)).toHaveLength(2)
+      expect(intersections(geometry, centerX, centerY + 11)).toHaveLength(2)
+      expect(inspectTopology(geometry)).toEqual({
+        invalidEdges: 0,
+        components: 1,
+      })
+      const roundtrip = new STLLoader().parse(exportPanelStl(geometry))
+      expect(inspectTopology(roundtrip)).toEqual({
+        invalidEdges: 0,
+        components: 1,
+      })
+      roundtrip.dispose()
+      geometry.dispose()
+      original.dispose()
+    },
+    30_000,
+  )
+
+  it('unions separate SVG fills so overlapping shapes remain open', async () => {
+    const original = readPanel('s', 'original')
+    const settings = normalizeHandleSettings('s', {
+      mode: 'custom',
+      height: 48,
+      cutout: 'svg',
+      holeWidth: 30,
+      svgCutout: {
+        name: 'overlap.svg',
+        aspectRatio: 1.5,
+        paths: [
+          {
+            fillRule: 'evenodd',
+            contours: [
+              [
+                [-0.5, -0.5],
+                [0.1, -0.5],
+                [0.1, 0.5],
+                [-0.5, 0.5],
+              ],
+            ],
+          },
+          {
+            fillRule: 'evenodd',
+            contours: [
+              [
+                [-0.1, -0.5],
+                [0.5, -0.5],
+                [0.5, 0.5],
+                [-0.1, 0.5],
+              ],
+            ],
+          },
+        ],
+      },
+    })
+    const geometry = await buildHandledPanelGeometry(
+      original,
+      's',
+      'original',
+      0,
+      settings,
+    )
+    const centerY = geometry.userData.handle.seamY + settings.height / 2 + 2
+    for (const x of [-10, 0, 10])
+      expect(intersections(geometry, x, centerY)).toEqual([])
+    expect(inspectTopology(geometry)).toEqual({
+      invalidEdges: 0,
+      components: 1,
+    })
+    geometry.dispose()
+    original.dispose()
+  }, 30_000)
+
+  it.each(['evenodd', 'nonzero'] as const)(
+    'rejects SVG %s fills that leave unsupported islands with an actionable error',
+    async (fillRule) => {
+      const original = readPanel('s', 'original')
+      const outer: [number, number][] = [
+        [-0.5, -0.5],
+        [0.5, -0.5],
+        [0.5, 0.5],
+        [-0.5, 0.5],
+      ]
+      const inner: [number, number][] = [
+        [-0.2, -0.2],
+        [0.2, -0.2],
+        [0.2, 0.2],
+        [-0.2, 0.2],
+      ]
+      const svgCutout: SvgCutout = {
+        name: 'ring.svg',
+        aspectRatio: 1,
+        paths: [
+          {
+            fillRule,
+            contours: [
+              outer,
+              fillRule === 'nonzero' ? [...inner].reverse() : inner,
+            ],
+          },
+        ],
+      }
+      const settings = normalizeHandleSettings('s', {
+        mode: 'custom',
+        height: 48,
+        cutout: 'svg',
+        holeWidth: 24,
+        svgCutout,
+      })
+      await expect(
+        buildHandledPanelGeometry(original, 's', 'original', 0, settings),
+      ).rejects.toThrow(
+        'This SVG leaves floating islands in the handle. Add bridges to enclosed details or use a solid silhouette.',
+      )
+      original.dispose()
+    },
+    30_000,
+  )
+
+  it('honors nonzero fill for nested SVG contours with the same winding', async () => {
+    const original = readPanel('s', 'original')
+    const settings = normalizeHandleSettings('s', {
+      mode: 'custom',
+      height: 48,
+      cutout: 'svg',
+      holeWidth: 24,
+      svgCutout: {
+        name: 'nested.svg',
+        aspectRatio: 1,
+        paths: [
+          {
+            fillRule: 'nonzero',
+            contours: [
+              [
+                [-0.5, -0.5],
+                [0.5, -0.5],
+                [0.5, 0.5],
+                [-0.5, 0.5],
+              ],
+              [
+                [-0.2, -0.2],
+                [0.2, -0.2],
+                [0.2, 0.2],
+                [-0.2, 0.2],
+              ],
+            ],
+          },
+        ],
+      },
+    })
+    const geometry = await buildHandledPanelGeometry(
+      original,
+      's',
+      'original',
+      0,
+      settings,
+    )
+    expect(
+      intersections(geometry, 0, geometry.userData.handle.seamY + 26),
+    ).toEqual([])
+    expect(inspectTopology(geometry)).toEqual({
+      invalidEdges: 0,
+      components: 1,
+    })
+    geometry.dispose()
+    original.dispose()
+  }, 30_000)
+
   it.each(cases)(
     'keeps the %s/%s front planar and watertight after adding handle and face depth',
     async (model, style) => {
@@ -263,7 +476,7 @@ describe('generative handles', () => {
     30_000,
   )
 
-  it.each(['none', 'circle', 'slot'] as const)(
+  it.each(['none', 'circle', 'slot', 'svg'] as const)(
     'keeps constrained minimum-size %s designs connected',
     async (cutout) => {
       const original = readPanel('s', 'original')
@@ -293,7 +506,7 @@ describe('generative handles', () => {
       })
       for (const center of geometry.userData.handle.holeCenters)
         expect(intersections(geometry, center.x, center.y)).toEqual([])
-      if (cutout === 'none')
+      if (cutout === 'none' || cutout === 'svg')
         expect(
           intersections(geometry, 0, geometry.userData.handle.seamY + 10),
         ).toHaveLength(2)

@@ -11,6 +11,7 @@ import { normalizeGrilleSettings } from '@/lib/grille-settings'
 import { normalizeHaloSettings } from '@/lib/halo-settings'
 import {
   STORAGE_KEY,
+  designShareUrl,
   readDesign,
   validateDesign,
   type Design,
@@ -71,9 +72,11 @@ function App() {
       /* Editing still works when local storage is disabled. */
     }
     const url = new URL(window.location.href)
-    if (url.searchParams.has('design')) {
-      url.searchParams.set('design', JSON.stringify(design))
-      window.history.replaceState(null, '', url)
+    if (
+      url.searchParams.has('design') ||
+      new URLSearchParams(url.hash.slice(1)).has('design')
+    ) {
+      window.history.replaceState(null, '', designShareUrl(design, url.href))
     }
   }, [design])
 
@@ -89,9 +92,7 @@ function App() {
   }
 
   async function shareDesign() {
-    const url = new URL(window.location.href)
-    url.search = ''
-    url.searchParams.set('design', JSON.stringify(design))
+    const url = designShareUrl(design, window.location.href)
     try {
       await navigator.clipboard.writeText(url.toString())
       setToast('Design link copied.')
