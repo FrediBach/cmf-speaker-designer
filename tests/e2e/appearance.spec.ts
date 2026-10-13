@@ -197,7 +197,7 @@ test('all appearance combinations remain readable and preserve the speaker desig
   await page.getByRole('button', { name: 'Reset', exact: true }).click()
   await expectPanelReady(page)
   await expect(
-    page.getByRole('button', { name: /^Speaker S/ }),
+    page.getByRole('button', { name: /^Speaker M/ }),
   ).toHaveAttribute('aria-pressed', 'true')
   await expect(
     page.getByRole('button', { name: 'Front panel: CMF orange', exact: true }),

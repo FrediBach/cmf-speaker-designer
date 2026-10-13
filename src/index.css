@@ -500,6 +500,9 @@ main {
   font-weight: 600;
   margin: 0;
 }
+.design-actions {
+  flex-shrink: 0;
+}
 .text-button {
   display: flex;
   align-items: center;
@@ -2056,6 +2059,15 @@ main {
   }
 }
 @media (max-width: 480px) {
+  .controls-heading {
+    gap: 8px;
+  }
+  .controls-heading-title > svg {
+    display: none;
+  }
+  .controls-heading h2 {
+    font-size: 14px;
+  }
   .brand-title {
     flex-direction: column;
     align-items: flex-start;

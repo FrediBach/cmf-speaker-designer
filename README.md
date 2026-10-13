@@ -46,6 +46,8 @@ Use **Appearance** in the header to choose a light or dark theme and an orange o
 
 Controls use larger text and targets, high-contrast selected states, and visible keyboard focus. Use the skip link to reach design controls, arrow keys or Home/End within the editor tabs, and arrow keys on sliders. Focus the 3D preview to rotate with arrow keys or zoom with +/−. Closing a dialog returns focus to its opener. Reduced-motion and forced-color preferences are supported.
 
+**Randomize**, next to **Reset**, replaces all design settings with a fresh combination of colors and geometry. Both actions keep the selected Speaker S or M. Undo design changes with **⌘/Ctrl+Z**; redo with **⌘/Ctrl+Shift+Z** or **Ctrl+Y**. A slider drag or held arrow key is one undo step. Text and number fields keep their native editing shortcuts. History includes up to 100 changes in the current session; reloading starts a new history from the saved design.
+
 ## What the POC does
 
 - Switch between Speaker S and M.

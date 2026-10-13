@@ -13,6 +13,7 @@ import {
   MousePointer2,
   MoveUpRight,
   RotateCcw,
+  Shuffle,
   SlidersHorizontal,
   X,
 } from 'lucide-react'
@@ -42,12 +43,14 @@ import { normalizeGrilleSettings } from '@/lib/grille-settings'
 import { normalizeHaloSettings } from '@/lib/halo-settings'
 import { usePanelGeometry } from '@/lib/use-panel-geometry'
 import {
-  DEFAULT_DESIGN,
   STORAGE_KEY,
   colorName,
   readDesign,
+  validateDesign,
   type Design,
 } from '@/lib/design'
+import { randomizeDesign } from '@/lib/random-design'
+import { useDesignHistory } from '@/lib/use-design-history'
 import {
   getPanelStyles,
   getPanelDimensions,
@@ -78,7 +81,17 @@ const EDITOR_TABS = [
 function App() {
   const guideTriggerRef = useRef<HTMLButtonElement>(null)
   const exportTriggerRef = useRef<HTMLButtonElement>(null)
-  const [design, setDesign] = useState<Design>(readDesign)
+  const {
+    design,
+    setDesign,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    beginTransaction,
+    endTransaction,
+  } = useDesignHistory(readDesign)
+  const historyGesture = useRef<'pointer' | 'keyboard' | null>(null)
   const [editorTab, setEditorTab] = useState<
     'panel' | 'halo' | 'grille' | 'handle' | 'knob'
   >(() =>
@@ -215,6 +228,68 @@ function App() {
     return () => clearTimeout(timer)
   }, [toast])
 
+  useEffect(() => {
+    const finishGesture = () => {
+      if (!historyGesture.current) return
+      historyGesture.current = null
+      endTransaction()
+    }
+    const finishPointer = () => {
+      if (historyGesture.current === 'pointer') finishGesture()
+    }
+    const finishKey = (event: KeyboardEvent) => {
+      if (
+        historyGesture.current === 'keyboard' &&
+        /^(Arrow(Left|Right|Up|Down)|Home|End|PageUp|PageDown)$/.test(event.key)
+      )
+        finishGesture()
+    }
+    const handleShortcut = (event: KeyboardEvent) => {
+      const target = event.target
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.altKey ||
+        !(event.metaKey || event.ctrlKey) ||
+        (target instanceof HTMLElement &&
+          (target.isContentEditable ||
+            (target instanceof HTMLInputElement &&
+              !['checkbox', 'radio', 'range', 'color'].includes(target.type)) ||
+            target.closest(
+              'textarea, select, [role="textbox"], [role="dialog"], [role="alertdialog"]',
+            )))
+      )
+        return
+      const key = event.key.toLowerCase()
+      const isUndo = key === 'z' && !event.shiftKey
+      const isRedo =
+        (key === 'z' && event.shiftKey) ||
+        (key === 'y' && event.ctrlKey && !event.metaKey && !event.shiftKey)
+      if (!isUndo && !isRedo) return
+      event.preventDefault()
+      finishGesture()
+      if (isUndo && canUndo) {
+        undo()
+        setToast('Design change undone.')
+      } else if (isRedo && canRedo) {
+        redo()
+        setToast('Design change redone.')
+      }
+    }
+    window.addEventListener('keydown', handleShortcut)
+    window.addEventListener('keyup', finishKey)
+    window.addEventListener('pointerup', finishPointer)
+    window.addEventListener('pointercancel', finishPointer)
+    window.addEventListener('blur', finishGesture)
+    return () => {
+      window.removeEventListener('keydown', handleShortcut)
+      window.removeEventListener('keyup', finishKey)
+      window.removeEventListener('pointerup', finishPointer)
+      window.removeEventListener('pointercancel', finishPointer)
+      window.removeEventListener('blur', finishGesture)
+    }
+  }, [canUndo, canRedo, undo, redo, endTransaction])
+
   async function shareDesign() {
     const url = new URL(window.location.href)
     url.search = ''
@@ -256,12 +331,20 @@ function App() {
   }
 
   function resetDesign() {
-    setDesign({ ...DEFAULT_DESIGN })
+    endTransaction()
+    setDesign(validateDesign({ model: design.model }))
     setEditorTab('panel')
     setView('perspective')
     setAssembly('assembled')
     setResetKey((value) => value + 1)
     setToast('Design reset.')
+  }
+
+  function shuffleDesign() {
+    endTransaction()
+    setDesign(randomizeDesign(design.model))
+    setAssembly('assembled')
+    setToast('Design randomized. Undo with ⌘/Ctrl+Z.')
   }
 
   return (
@@ -448,16 +531,74 @@ function App() {
             className="controls"
             id="design-controls"
             aria-label="Design controls"
+            aria-description="Undo with Command or Control plus Z. Redo with Command or Control plus Shift plus Z, or Control plus Y."
             tabIndex={-1}
+            onPointerDownCapture={(event) => {
+              if (
+                event.target instanceof Element &&
+                event.target.closest('[data-slot="slider"]')
+              ) {
+                // Commit a numeric draft before starting the slider's undo step.
+                if (document.activeElement instanceof HTMLInputElement)
+                  document.activeElement.blur()
+                endTransaction()
+                beginTransaction()
+                historyGesture.current = 'pointer'
+              }
+            }}
+            onKeyDownCapture={(event) => {
+              if (
+                !event.altKey &&
+                !event.ctrlKey &&
+                !event.metaKey &&
+                event.target instanceof Element &&
+                event.target.closest('[role="slider"]') &&
+                /^(Arrow(Left|Right|Up|Down)|Home|End|PageUp|PageDown)$/.test(
+                  event.key,
+                ) &&
+                historyGesture.current !== 'keyboard'
+              ) {
+                endTransaction()
+                beginTransaction()
+                historyGesture.current = 'keyboard'
+              }
+            }}
+            onFocusCapture={(event) => {
+              if (
+                event.target instanceof HTMLInputElement &&
+                ['number', 'text', 'color'].includes(event.target.type)
+              )
+                beginTransaction()
+            }}
+            onBlur={(event) => {
+              if (
+                event.target instanceof HTMLInputElement &&
+                historyGesture.current !== 'pointer'
+              )
+                endTransaction()
+            }}
           >
             <div className="controls-heading">
-              <div>
+              <div className="controls-heading-title">
                 <SlidersHorizontal size={17} />
                 <h2>Design controls</h2>
               </div>
-              <button className="text-button" onClick={resetDesign}>
-                <RotateCcw size={12} /> Reset
-              </button>
+              <div className="design-actions">
+                <button
+                  className="text-button"
+                  onClick={shuffleDesign}
+                  title="Randomize all settings for the selected speaker. Undo with ⌘/Ctrl+Z."
+                >
+                  <Shuffle size={12} aria-hidden="true" /> Randomize
+                </button>
+                <button
+                  className="text-button"
+                  onClick={resetDesign}
+                  title="Reset all settings for the selected speaker"
+                >
+                  <RotateCcw size={12} aria-hidden="true" /> Reset
+                </button>
+              </div>
             </div>
             <section className="control-section model-section">
               <h3>
