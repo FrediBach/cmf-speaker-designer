@@ -15,11 +15,22 @@ Open the local URL printed by Vite. Other commands:
 
 ```sh
 npm run check    # TypeScript validation
+npm run doctor -- --verbose # React Doctor diagnostics
 npm test         # Geometry and STL export checks
 npm run build    # Production files in dist/
 npm run preview  # Serve the production build locally
 npm run test:production # Build and run the full browser regression suite
 ```
+
+React Doctor is installed as a development dependency. Run `npm run doctor -- --verbose`
+for a full scan; add `--no-score` to skip the remote score and telemetry. The initial
+cleanup leaves warnings about `App` size/complexity and the geometry hooks' serialized
+dependency keys. Review those keys before changing dependencies: settings objects are
+recreated during color edits, which should not trigger geometry regeneration. Version
+0.9.18 also reports two cleanup errors in `SpeakerPreview` because it mistakes Three.js
+`Vector3.sub()` subtraction for a subscription. The camera keyboard listener already
+has matching cleanup. These findings remain visible and currently make the scan exit
+with a nonzero status.
 
 Browser regression checks use Playwright with a locally installed Google Chrome:
 

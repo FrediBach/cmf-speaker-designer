@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useNumericDraft } from '@/lib/use-numeric-draft'
 import {
   Circle,
   Minus,
@@ -36,8 +36,7 @@ function Parameter({
   step?: number
   onChange: (value: number) => void
 }) {
-  const [draft, setDraft] = useState(String(Number(value.toFixed(2))))
-  useEffect(() => setDraft(String(Number(value.toFixed(2)))), [value])
+  const [draft, setDraft] = useNumericDraft(value)
   const commit = () => {
     const numeric = Number(draft)
     const next =

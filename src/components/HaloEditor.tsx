@@ -1,4 +1,5 @@
-import { useEffect, useId, useState } from 'react'
+import { useNumericDraft } from '@/lib/use-numeric-draft'
+import { useId } from 'react'
 import { ArrowRight, Circle } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import {
@@ -37,8 +38,7 @@ function HaloParameter({
   onChange: (value: number) => void
 }) {
   const descriptionId = useId()
-  const [draft, setDraft] = useState(String(Number(value.toFixed(2))))
-  useEffect(() => setDraft(String(Number(value.toFixed(2)))), [value])
+  const [draft, setDraft] = useNumericDraft(value)
   const unitName = unit === 'mm' ? 'millimeters' : 'degrees'
   const commit = () => {
     const numeric = Number(draft)

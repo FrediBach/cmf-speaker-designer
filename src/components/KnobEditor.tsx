@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useNumericDraft } from '@/lib/use-numeric-draft'
 import { Check, RotateCcw, SlidersHorizontal } from 'lucide-react'
 import { ColorPicker } from '@/components/ColorPicker'
 import { KnobIcon } from '@/components/KnobIcon'
@@ -36,8 +36,7 @@ function KnobParameter({
   unit?: 'mm' | ''
   onChange: (value: number) => void
 }) {
-  const [draft, setDraft] = useState(String(Number(value.toFixed(2))))
-  useEffect(() => setDraft(String(Number(value.toFixed(2)))), [value])
+  const [draft, setDraft] = useNumericDraft(value)
   const spokenUnit = unit === 'mm' ? 'millimeters' : ''
   const commit = () => {
     // Showing a rounded measurement must not alter an untouched source mesh.

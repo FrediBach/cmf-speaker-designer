@@ -1,4 +1,5 @@
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useNumericDraft } from '@/lib/use-numeric-draft'
+import { useId, useMemo } from 'react'
 import { ArrowRight, Check, Grid2X2 } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import {
@@ -35,8 +36,7 @@ function GrilleParameter({
   onChange: (value: number) => void
 }) {
   const descriptionId = useId()
-  const [draft, setDraft] = useState(String(Number(value.toFixed(2))))
-  useEffect(() => setDraft(String(Number(value.toFixed(2)))), [value])
+  const [draft, setDraft] = useNumericDraft(value)
   const commit = () => {
     const numeric = Number(draft)
     const next =

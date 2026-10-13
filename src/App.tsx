@@ -160,9 +160,9 @@ function App() {
     error: knobError,
     generating: knobGenerating,
   } = useKnobGeometry(design.knob, retryKey)
-  const knobLabel = KNOB_STYLES.find(
-    (item) => item.id === design.knob.style,
-  )!.label
+  const knobLabel =
+    KNOB_STYLES.find((item) => item.id === design.knob.style)?.label ??
+    'Volume knob'
   const knobBounds = previewKnobGeometry?.boundingBox
   const knobDimensions = knobBounds
     ? `Ø${Number(Math.max(knobBounds.max.x - knobBounds.min.x, knobBounds.max.y - knobBounds.min.y).toFixed(2))} × ${Number((knobBounds.max.z - knobBounds.min.z).toFixed(2))}`
@@ -757,7 +757,7 @@ function App() {
                     </button>
                   </h3>
                   <div className="control-label">
-                    <label id="relief-label">Added face depth</label>
+                    <span id="relief-label">Added face depth</span>
                     <span className="value-chip">
                       {design.relief.toFixed(1)} mm
                     </span>
