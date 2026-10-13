@@ -1,10 +1,16 @@
 type Props = {
   model: 's' | 'm'
   style?: 'original' | '1' | '2' | '3'
+  generatedHalo?: boolean
   className?: string
 }
 
-export function PanelIcon({ model, style = 'original', className }: Props) {
+export function PanelIcon({
+  model,
+  style = 'original',
+  generatedHalo = false,
+  className,
+}: Props) {
   const tall = model === 'm'
   const h = tall ? 70 : 54
   const radius = tall ? 9 : 12
@@ -64,7 +70,7 @@ export function PanelIcon({ model, style = 'original', className }: Props) {
       {(tall ? [38, 61] : [50]).map((y, index) => {
         const perforated = tall ? style === '3' && index === 0 : style === '2'
         const slotted = !tall && style === '3'
-        const halo = style === '1' && index === 0
+        const halo = generatedHalo || (style === '1' && index === 0)
         const twinContours = tall && style === '2'
         return (
           <g key={index}>

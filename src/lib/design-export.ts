@@ -1,7 +1,7 @@
 import type { BufferGeometry } from 'three'
 import type { Design } from './design'
 import { exportKnobStl, knobFilename } from './knobs'
-import { exportPanelStl, panelFilename } from './panels'
+import { exportPanelStl, haloFilenameSuffix, panelFilename } from './panels'
 
 export type DesignExportTarget = 'both' | 'panel' | 'knob'
 
@@ -96,7 +96,9 @@ function buildArchive(entries: ArchiveEntry[]): ArrayBuffer {
 
 function selectedPanelFilename(design: Design): string {
   const sourceStyle =
-    design.grille.mode === 'custom' ? 'original' : design.style
+    design.grille.mode === 'custom' || design.halo.mode === 'custom'
+      ? 'original'
+      : design.style
   const handleSuffix =
     design.handle.mode === 'custom'
       ? `-handle-${design.handle.height.toFixed(1)}mm`
@@ -107,7 +109,7 @@ function selectedPanelFilename(design: Design): string {
       : ''
   return panelFilename(design.model, sourceStyle, design.relief).replace(
     '.stl',
-    `${handleSuffix}${grilleSuffix}.stl`,
+    `${handleSuffix}${grilleSuffix}${haloFilenameSuffix(design.halo)}.stl`,
   )
 }
 

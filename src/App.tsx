@@ -29,6 +29,7 @@ import { PanelIcon } from '@/components/PanelIcon'
 import { AppearanceSettings } from '@/components/AppearanceSettings'
 import { HandleEditor } from '@/components/HandleEditor'
 import { GrilleEditor } from '@/components/GrilleEditor'
+import { HaloEditor } from '@/components/HaloEditor'
 import { ColorPicker } from '@/components/ColorPicker'
 import { KnobEditor } from '@/components/KnobEditor'
 import { KnobIcon } from '@/components/KnobIcon'
@@ -38,6 +39,7 @@ import { useKnobGeometry } from '@/lib/use-knob-geometry'
 import type { DesignExportTarget } from '@/lib/design-export'
 import { normalizeHandleSettings } from '@/lib/handle-settings'
 import { normalizeGrilleSettings } from '@/lib/grille-settings'
+import { normalizeHaloSettings } from '@/lib/halo-settings'
 import { usePanelGeometry } from '@/lib/use-panel-geometry'
 import {
   DEFAULT_DESIGN,
@@ -67,6 +69,7 @@ const looks = [
 ]
 const EDITOR_TABS = [
   { id: 'panel', label: 'Front panel' },
+  { id: 'halo', label: 'Halo' },
   { id: 'grille', label: 'Grille' },
   { id: 'handle', label: 'Handle' },
   { id: 'knob', label: 'Knob' },
@@ -77,13 +80,15 @@ function App() {
   const exportTriggerRef = useRef<HTMLButtonElement>(null)
   const [design, setDesign] = useState<Design>(readDesign)
   const [editorTab, setEditorTab] = useState<
-    'panel' | 'grille' | 'handle' | 'knob'
+    'panel' | 'halo' | 'grille' | 'handle' | 'knob'
   >(() =>
-    design.grille.mode === 'custom'
-      ? 'grille'
-      : design.handle.mode === 'custom'
-        ? 'handle'
-        : 'panel',
+    design.halo.mode === 'custom'
+      ? 'halo'
+      : design.grille.mode === 'custom'
+        ? 'grille'
+        : design.handle.mode === 'custom'
+          ? 'handle'
+          : 'panel',
   )
   const [view, setView] = useState<'perspective' | 'front'>('perspective')
   const [assembly, setAssembly] = useState<
@@ -109,17 +114,27 @@ function App() {
         ...next,
         handle: normalizeHandleSettings(next.model, next.handle),
         grille: normalizeGrilleSettings(next.grille),
+        halo: normalizeHaloSettings(next.halo),
         knob: normalizeKnobSettings(next.knob),
       }
     })
   const styles = getPanelStyles(design.model)
   const currentStyle = styles.find((item) => item.id === design.style)!
-  const sourceStyle =
-    design.grille.mode === 'custom' ? 'original' : design.style
-  const panelLabel =
-    design.grille.mode === 'custom'
-      ? `${{ round: 'Round', hex: 'Hexagonal', slot: 'Slotted' }[design.grille.pattern]} grille`
+  const customHalo = design.halo.mode === 'custom'
+  const customGrille = design.grille.mode === 'custom'
+  const sourceStyle = customHalo || customGrille ? 'original' : design.style
+  const grilleLabel = `${{ round: 'Round', hex: 'Hexagonal', slot: 'Slotted' }[design.grille.pattern]} grille`
+  const haloLabel = design.model === 'm' ? 'Custom Halos' : 'Custom Halo'
+  const panelLabel = customHalo
+    ? `${haloLabel}${customGrille ? ` · ${grilleLabel}` : ''}`
+    : customGrille
+      ? grilleLabel
       : currentStyle.label
+  const suppliedHalo = !customHalo && !customGrille && design.style === '1'
+  const panelStyleSelected = (style: Design['style']) =>
+    style === '1'
+      ? customHalo || suppliedHalo
+      : !customHalo && !customGrille && design.style === style
   const {
     geometry,
     previewGeometry,
@@ -515,7 +530,7 @@ function App() {
                     else if (assembly === 'knob') setAssembly('assembled')
                   }}
                 >
-                  {label}
+                  {tab === 'panel' ? 'Panel' : label}
                 </button>
               ))}
             </div>
@@ -540,31 +555,43 @@ function App() {
                     {styles.map((style) => (
                       <button
                         key={style.id}
-                        className={`style-option ${design.grille.mode === 'original' && design.style === style.id ? 'selected' : ''}`}
-                        onClick={() =>
-                          update({
-                            style: style.id,
-                            grille: { ...design.grille, mode: 'original' },
-                          })
-                        }
-                        aria-pressed={
-                          design.grille.mode === 'original' &&
-                          design.style === style.id
-                        }
+                        className={`style-option ${panelStyleSelected(style.id) ? 'selected' : ''}`}
+                        onClick={() => {
+                          if (style.id === '1') {
+                            update({
+                              style: style.id,
+                              halo: { ...design.halo, mode: 'custom' },
+                            })
+                            setEditorTab('halo')
+                            document.getElementById('halo-tab')?.focus()
+                          } else {
+                            update({
+                              style: style.id,
+                              halo: { ...design.halo, mode: 'original' },
+                              grille: { ...design.grille, mode: 'original' },
+                            })
+                          }
+                        }}
+                        aria-pressed={panelStyleSelected(style.id)}
                       >
-                        <PanelIcon model={design.model} style={style.id} />
+                        <PanelIcon
+                          model={design.model}
+                          style={style.id}
+                          generatedHalo={style.id === '1'}
+                        />
                         <span>{style.label}</span>
-                        {design.grille.mode === 'original' &&
-                          design.style === style.id && (
-                            <Check className="style-check" size={12} />
-                          )}
+                        {panelStyleSelected(style.id) && (
+                          <Check className="style-check" size={12} />
+                        )}
                       </button>
                     ))}
                   </div>
                   <p className="style-description">
-                    {design.grille.mode === 'custom'
-                      ? 'Custom grille active. Choose a shape to return to a supplied panel.'
-                      : currentStyle.description}
+                    {customHalo
+                      ? `${haloLabel}${customGrille ? ' and grille' : ''} active. Open Halo to edit the profile, or choose another panel shape.`
+                      : customGrille
+                        ? 'Custom grille active. Choose a shape to return to a supplied panel.'
+                        : currentStyle.description}
                   </p>
                 </section>
                 <section className="control-section">
@@ -659,6 +686,32 @@ function App() {
                     ))}
                   </div>
                 </div>
+              </div>
+              <div
+                id="halo-editor"
+                role="tabpanel"
+                aria-labelledby="halo-tab"
+                hidden={editorTab !== 'halo'}
+              >
+                <HaloEditor
+                  model={design.model}
+                  value={design.halo}
+                  suppliedHalo={suppliedHalo}
+                  onChange={(halo) => update({ halo })}
+                  onRemove={() =>
+                    update({
+                      style: 'original',
+                      halo: { ...design.halo, mode: 'original' },
+                    })
+                  }
+                  onRestoreSupplied={() =>
+                    update({
+                      style: '1',
+                      halo: { ...design.halo, mode: 'original' },
+                      grille: { ...design.grille, mode: 'original' },
+                    })
+                  }
+                />
               </div>
               <div
                 id="grille-editor"
@@ -771,10 +824,12 @@ function App() {
                 <p>
                   Choose Speaker S or M and a panel shape. Added face depth
                   thickens the front while retaining the original mounting
-                  features and folded controls. In the Handle tab, generate a
-                  new upper extension with your own outline and openings. In the
-                  Knob tab, shape the upper grip while retaining the original
-                  base and socket dimensions.
+                  features and folded controls. In the Halo tab, adjust the ring
+                  profile and base rim, or tilt its front cut into a hood.
+                  Combine it with your own opening pattern in the Grille tab. In
+                  the Handle tab, generate a new upper extension and openings.
+                  In the Knob tab, shape the upper grip while retaining the
+                  original base and socket dimensions.
                 </p>
               </div>
             </li>
@@ -870,7 +925,11 @@ function App() {
           </div>
           {exportTarget !== 'knob' && (
             <div className="download-summary">
-              <PanelIcon model={design.model} style={sourceStyle} />
+              <PanelIcon
+                model={design.model}
+                style={sourceStyle}
+                generatedHalo={customHalo}
+              />
               <div>
                 <strong>
                   Speaker {design.model.toUpperCase()} · {panelLabel}
@@ -897,6 +956,17 @@ function App() {
                     {design.grille.extendPattern
                       ? ` · ${design.grille.recessDepth} mm recessed face pattern`
                       : ''}
+                  </span>
+                )}
+                {customHalo && (
+                  <span>
+                    {haloLabel} · {design.halo.depth} mm depth ·{' '}
+                    {design.halo.thickness} mm wall · {design.halo.outwardAngle}
+                    ° outward · {design.halo.cutAngle}° cut ·{' '}
+                    {design.halo.cutRotation}° rotation ·{' '}
+                    {design.halo.rimHeight === 0
+                      ? 'Flush rim'
+                      : `${design.halo.rimHeight} mm rim`}
                   </span>
                 )}
                 <span>

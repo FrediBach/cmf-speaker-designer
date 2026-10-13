@@ -27,7 +27,7 @@ Browser regression checks use Playwright with a locally installed Google Chrome:
 npm run test:e2e
 ```
 
-The tests start Vite automatically when needed and cover the WebGL preview, model and style changes, saved colors, keyboard face-depth controls, generated handles and grilles, actual STL downloads, and a narrow mobile layout. Downloads are inspected independently for closed edges, one connected component, hole topology, clear passages through each opening, and solid backing behind face recesses. Screenshots, downloaded STLs, and failure traces are written to the ignored `test-results/` directory. GitHub Actions runs the unit checks and full production browser suite on Node.js 24 for pushes and pull requests, retaining browser artifacts when a run fails.
+The tests start Vite automatically when needed and cover the WebGL preview, model and style changes, saved colors, keyboard face-depth controls, generated handles, grilles, and halos, actual STL downloads, and a narrow mobile layout. Downloads are inspected independently for closed edges, one connected component, hole topology, clear passages through each opening, solid backing behind face recesses, and the projection of an angled halo cover. Screenshots, downloaded STLs, and failure traces are written to the ignored `test-results/` directory. GitHub Actions runs the unit checks and full production browser suite on Node.js 24 for pushes and pull requests, retaining browser artifacts when a run fails.
 
 To check the bundled geometry worker and WebAssembly module against a production build:
 
@@ -50,6 +50,7 @@ Controls use larger text and targets, high-contrast selected states, and visible
 
 - Switch between Speaker S and M.
 - Choose from the original front panel and the three supplied alternate designs.
+- Generate a halo around each driver with adjustable outward angle, depth, wall thickness, and an angled cut that can turn the ring into a rain-cover shape.
 - Generate round, hexagonal, or slotted grilles with adjustable opening size, material spacing, arrangement, rotation, and thickness.
 - Continue the grille pattern onto the surrounding front face as recesses up to 3 mm deep, with solid material behind them.
 - Preview front panel and volume knob colors in an interactive Three.js scene, including panel-only and exploded views.
@@ -65,11 +66,32 @@ Controls use larger text and targets, high-contrast selected states, and visible
 
 The designer starts from the supplied front panel meshes. The **Original handle** option retains the source upper section. **Custom handle** removes that upper section above the control deck and joins a newly generated extension to the remaining panel; its openings are actual through-holes in the exported solid. Carry loop, Three dots, and Solid presets provide starting points. STL has no color or unit metadata: the exported coordinates are intended as millimeters. The ZIP records panel and knob colors in `design.json`. Choose the corresponding filament or material in your slicer. This POC does not include freeform drawing, text embossing, slicer integration, or multi-material exports.
 
-The **Grille** tab generates a perforated grille over the original driver openings: one on S and both on M. Custom grilles use the original open panel as their base and can be combined with a custom handle and added face depth. Selecting **Original grille** restores the selected supplied panel style. Selecting a supplied front-panel shape also turns off the generated grille while retaining its settings.
+The **Grille** tab generates a perforated grille over the original driver openings: one on S and both on M. Custom grilles use the original open panel as their base and can be combined with a custom handle, halo, and added face depth. Selecting **Original grille** removes the generated grille; a custom halo can remain active. Selecting a supplied front-panel shape also turns off the generated grille while retaining its settings.
 
 **Continue across the face** continues the same pattern seamlessly from the through-holes into matching blind recesses across the front face, including along the driver opening rims. These are real surface geometry in the STL, with solid material behind each recess. The outside edges, control deck, and mounting regions are preserved. Preview and export share the same generated mesh, and grille dimensions are applied after added face depth so their selected thickness and recess depth stay in millimeters.
 
 Recess depth ranges from 0.2 to 3 mm and is limited to the grille thickness minus 0.5 mm to retain a solid floor. A 2 mm grille allows recesses up to 1.5 mm; the default 3.5 mm grille allows the full 3 mm. Reducing grille thickness also reduces the recess depth when needed.
+
+## Generative halo
+
+Selecting **Halo** in Front panel opens the **Halo** tab with a generated ring ready to edit. S receives one halo, and M receives identical halos around both driver openings. All controls apply to both M halos together, including the cutting angle, direction, and rim height. Switching back to S retains the settings and returns to one halo. **Full halo** starts with an uncut ring; **Rain hood** starts with an angled opening and a longer upper edge, like a street-light cover. These are starting shapes, and each dimension remains editable.
+
+| Control        | Range   | Effect                                                                                                          |
+| -------------- | ------- | --------------------------------------------------------------------------------------------------------------- |
+| Outward angle  | 0–45°   | Flares the wall away from the driver as it projects forwards. Zero creates a straight cylindrical wall.         |
+| Halo depth     | 1–40 mm | Sets the maximum forward projection from the panel face.                                                        |
+| Wall thickness | 1–6 mm  | Sets the radial thickness of the halo wall.                                                                     |
+| Cutting angle  | 0–75°*  | Cuts the entire front lip along one straight plane to shorten one side of the ring. Zero leaves the ring uncut. |
+| Cut rotation   | 0–360°  | Rotates the longer side clockwise: 0° points upwards and 90° points right.                                      |
+| Rim height     | 0–5 mm  | Leaves a continuous raised rim along the cut-away side. Zero ends flush with the panel face.                    |
+
+\*The maximum cutting angle is the smaller of 75° and 89° minus the outward angle, so the plane can intersect the flared wall cleanly. For example, a 45° outward angle allows cuts up to 44°. Increasing the outward angle reduces an existing cutting angle when needed.
+
+The cut passes through the longest outer tip at the selected halo depth, leaving a single angled lip. **Rim height** defaults to 0 mm for a flush finish where the cut reaches the panel. Increase it to preserve a continuous raised rim up to 5 mm high. The rim cannot exceed the halo depth; reducing the depth also reduces the rim height when needed. The halo stays joined to the panel at every setting.
+
+**Supplied** restores the original Halo STL and removes the generated grille; the supplied M reference retains its original upper-only halo. **None** removes the generated halos while keeping a custom grille. Selecting **Custom** restores the retained halo dimensions. Halo parameters are saved locally, included in shared design links and the exported `design.json`, and retained when switching speaker models. Existing designs without halo settings continue to use their selected supplied shape.
+
+The generated halo uses the original open panel as its base and combines with a custom handle, face depth, and a generated grille, including recessed face patterns. Preview and STL export use the same connected solid. The rain-cover shape is a geometric option; weather resistance and print supports still require physical evaluation.
 
 ## Source models and printing
 
@@ -81,7 +103,7 @@ The original panels measure approximately 85 × 131 mm for S and 85 × 225 mm fo
 
 The generated upper section is joined with a Boolean union into one connected solid above the preserved control deck. Boolean operations can retessellate the original lower mesh; the generator uses a 0.00005 mm simplification tolerance to resolve numerical slivers. Downloads orient the front toward the print bed and place the lowest point at Z=0, with coordinates expressed in millimeters. Import at 100% scale and check orientation, supports, and material settings in your slicer before printing.
 
-The automated checks validate mesh topology, attachment geometry, actual openings, solid backing behind decorative recesses, and STL serialization. Physical fit, printer tolerances, carrying strength, and acoustic performance still need validation with test prints on the actual speakers. The 3 mm handle material constraint is a geometry limit, not a load rating. The speaker body shown in the preview is an approximate context model. Downloads include the selected front panel with its integrated handle and grille, the separate volume knob, or both, according to the export selection. The speaker body and power button are preview context only.
+The automated checks validate mesh topology, attachment geometry, actual openings, solid backing behind decorative recesses, and STL serialization. Physical fit, printer tolerances, carrying strength, and acoustic performance still need validation with test prints on the actual speakers. The 3 mm handle material constraint is a geometry limit, not a load rating. The speaker body shown in the preview is an approximate context model. Downloads include the selected front panel with its integrated handle, grille, and halo, the separate volume knob, or both, according to the export selection. The speaker body and power button are preview context only.
 
 ## Volume knobs
 
@@ -96,12 +118,13 @@ The default **Panel + knob** export is a ZIP containing two STLs and `design.jso
 - **Vite, React, and TypeScript** provide the application shell and production build.
 - **shadcn/ui components, Radix UI, and Tailwind CSS** provide buttons, the face-depth slider, and accessible dialogs, with custom product-inspired styling.
 - **Three.js, React Three Fiber, and Drei** provide mesh loading, material previews, lighting, and camera interaction.
-- **Manifold** performs solid Boolean operations in a WebAssembly worker, keeping handle and grille generation off the main UI thread.
+- **Manifold** performs solid Boolean operations in a WebAssembly worker, keeping handle, grille, and halo generation off the main UI thread.
 - `src/lib/panels.ts` owns source selection, model coordinates, face-depth transformations, and STL exports.
 - `src/lib/handle-settings.ts` validates dependent handle dimensions and material constraints.
 - `src/lib/handle-geometry.ts` trims the source upper section and generates a connected handle with real cutouts; `handles.worker.ts` runs this kernel in the browser.
 - `src/lib/grille-settings.ts` constrains grille dimensions and defines the shared pattern layout; `grille-geometry.ts` joins perforated inserts and cuts blind decorative recesses.
-- `src/lib/panel-engine.ts` combines handle generation, the shared face-depth transformation, and grille generation in order inside the worker.
+- `src/lib/halo-settings.ts` constrains halo dimensions; `halo-geometry.ts` generates a flared annular wall, trims it with the selected cutting plane, and joins it to the panel.
+- `src/lib/panel-engine.ts` combines handle generation, the shared face-depth transformation, grille generation, and halo generation in order inside the worker.
 - `src/lib/use-panel-geometry.ts` schedules geometry updates, retains the last preview during generation, and enables export when the current design is ready.
 - `src/lib/knob-settings.ts` validates knob styles and dimensions; `knobs.ts` extracts the source parts, preserves the mounting interface, and builds the preview/export geometry.
 - `src/lib/use-knob-geometry.ts` loads and updates knobs while preventing stale geometry from being exported.
@@ -110,7 +133,7 @@ The default **Panel + knob** export is a ZIP containing two STLs and `design.jso
 - `src/components/SpeakerPreview.tsx` renders the selected panel and the contextual speaker body.
 - `src/App.tsx` connects the controls, preview, and download workflow.
 
-Models and the geometry generator are loaded on demand. Large STL resources and the WebAssembly module are part of the deployable assets, so a first load can take a moment. No backend, account, or API key is required; geometry processing and export run in the browser. Existing saved designs and shared links without handle or grille settings continue to open with the original source geometry.
+Models and the geometry generator are loaded on demand. Large STL resources and the WebAssembly module are part of the deployable assets, so a first load can take a moment. No backend, account, or API key is required; geometry processing and export run in the browser. Existing saved designs and shared links without handle, grille, or halo settings continue to open with their selected source geometry.
 
 ## Deploy to cmfspeakerdesigner.com
 

@@ -6,6 +6,7 @@ import {
   validateDesign,
 } from './design'
 import { DEFAULT_KNOB_SETTINGS } from './knob-settings'
+import { DEFAULT_HALO_SETTINGS } from './halo-settings'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -22,6 +23,7 @@ describe('saved and shared handle designs', () => {
     expect(restored).toMatchObject(oldDesign)
     expect(restored.handle).toMatchObject({ mode: 'original', height: 27 })
     expect(restored.grille.mode).toBe('original')
+    expect(restored.halo).toEqual(DEFAULT_HALO_SETTINGS)
     expect(restored.knob).toEqual(DEFAULT_KNOB_SETTINGS)
     expect(validateDesign({ model: 'm', handle: null }).handle).toEqual(
       restored.handle,
@@ -170,5 +172,49 @@ describe('saved and shared handle designs', () => {
       recessDepth: 0.8,
     })
     expect(validateDesign({ grille: null }).grille.mode).toBe('original')
+  })
+
+  it('restores all halo settings through storage and links, including combined grilles', () => {
+    const custom = validateDesign({
+      ...DEFAULT_DESIGN,
+      model: 'm',
+      style: '1',
+      halo: {
+        mode: 'custom',
+        outwardAngle: 25,
+        depth: 32,
+        thickness: 2.4,
+        cutAngle: 40,
+        cutRotation: 90,
+        rimHeight: 2.4,
+      },
+      grille: { ...DEFAULT_DESIGN.grille, mode: 'custom' },
+      handle: { ...DEFAULT_DESIGN.handle, mode: 'custom' },
+    })
+    expect(custom.halo).toEqual({
+      mode: 'custom',
+      outwardAngle: 25,
+      depth: 32,
+      thickness: 2.4,
+      cutAngle: 40,
+      cutRotation: 90,
+      rimHeight: 2.4,
+    })
+    vi.stubGlobal('window', { location: { search: '' } })
+    vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(custom) })
+    expect(readDesign()).toEqual(custom)
+    vi.stubGlobal('window', {
+      location: {
+        search: `?design=${encodeURIComponent(JSON.stringify(custom))}`,
+      },
+    })
+    expect(readDesign()).toEqual(custom)
+    expect(validateDesign({ halo: null }).halo).toEqual(DEFAULT_HALO_SETTINGS)
+    expect(validateDesign({ halo: 'invalid' }).halo).toEqual(
+      DEFAULT_HALO_SETTINGS,
+    )
+    expect(
+      validateDesign({ halo: { mode: 'custom', cutAngle: 35 } }).halo.rimHeight,
+    ).toBe(0)
   })
 })

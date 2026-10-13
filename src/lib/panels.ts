@@ -2,6 +2,7 @@ import { BufferGeometry, Mesh, Vector3 } from 'three'
 import { STLExporter } from 'three/addons/exporters/STLExporter.js'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 import { applyFaceDepth, MAX_FACE_DEPTH } from './face-depth'
+import type { HaloSettings } from './halo-settings'
 export { MAX_FACE_DEPTH } from './face-depth'
 
 import sOriginal from '../../resources/stl-files/cmf-speaker-s-3d-printing-panel-original-v1.stl?url'
@@ -200,6 +201,11 @@ export function panelFilename(
   return `cmf-speaker-${model}-${styleName}${suffix}.stl`
 }
 
+export function haloFilenameSuffix(settings?: HaloSettings): string {
+  if (settings?.mode !== 'custom') return ''
+  return `-halo-${settings.depth.toFixed(1)}mm${settings.cutAngle > 0 ? `-cut-${settings.cutAngle.toFixed(1)}deg` : ''}`
+}
+
 export function downloadPanelStl(
   geometry: BufferGeometry,
   model: SpeakerModel,
@@ -222,7 +228,7 @@ export function downloadPanelStl(
       : ''
   anchor.download = panelFilename(model, style, addedDepth).replace(
     '.stl',
-    `${handleSuffix}${grilleSuffix}.stl`,
+    `${handleSuffix}${grilleSuffix}${haloFilenameSuffix(geometry.userData.halo?.settings)}.stl`,
   )
   document.body.appendChild(anchor)
   anchor.click()

@@ -293,9 +293,17 @@ test('renders WebGL and switches real panel designs, colors, and preview modes',
       variant.styles,
     )
     for (const style of variant.styles) {
+      // Choosing Halo opens its generative editor; source styles stay in Front panel.
+      await page.getByRole('tab', { name: 'Front panel', exact: true }).click()
       const styleButton = page.getByRole('button', { name: style, exact: true })
       await styleButton.click()
-      await expect(styleButton).toHaveAttribute('aria-pressed', 'true')
+      if (style === 'Halo') {
+        await expect(
+          page.getByRole('button', { name: 'Custom halo', exact: true }),
+        ).toHaveAttribute('aria-pressed', 'true')
+      } else {
+        await expect(styleButton).toHaveAttribute('aria-pressed', 'true')
+      }
       await expectPanelReady(page)
       await expect(page.locator('.preview-model')).toContainText(
         `CMF Speaker ${variant.model}`,

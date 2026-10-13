@@ -165,4 +165,36 @@ describe('design export', () => {
     panel.dispose()
     knob.dispose()
   })
+
+  it('names generated halos and retains every halo parameter in the archive', () => {
+    const panel = new BoxGeometry(85, 131, 48)
+    const knob = new CylinderGeometry(10, 10, 12, 16)
+    const design = validateDesign({
+      ...DEFAULT_DESIGN,
+      style: '1',
+      halo: {
+        mode: 'custom',
+        outwardAngle: 20,
+        depth: 30,
+        thickness: 3.2,
+        cutAngle: 45,
+        cutRotation: 180,
+        rimHeight: 3,
+      },
+    })
+    const filename = 'cmf-speaker-s-original-halo-30.0mm-cut-45.0deg.stl'
+    expect(
+      buildDesignExport({ panel, knob, design, target: 'panel' }).filename,
+    ).toBe(filename)
+    const entries = readArchive(
+      buildDesignExport({ panel, knob, design, target: 'both' }).data,
+    )
+    expect(entries.get(filename)).toEqual(new Uint8Array(exportPanelStl(panel)))
+    const restored = validateDesign(
+      JSON.parse(decoder.decode(entries.get('design.json'))),
+    )
+    expect(restored).toEqual(design)
+    panel.dispose()
+    knob.dispose()
+  })
 })

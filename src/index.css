@@ -606,7 +606,7 @@ main {
 .editor-tabs {
   flex-shrink: 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   padding: 0 12px;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
@@ -1007,6 +1007,7 @@ main {
 
 /* Shared generative controls. */
 .handle-heading,
+.halo-heading,
 .grille-heading {
   display: flex;
   justify-content: space-between;
@@ -1014,10 +1015,12 @@ main {
   gap: 8px;
 }
 .handle-heading h3,
+.halo-heading h3,
 .grille-heading h3 {
   margin: 0;
 }
 .handle-intro > p,
+.halo-intro > p,
 .grille-intro > p {
   margin: 8px 0 16px;
   color: var(--muted-foreground);
@@ -1025,6 +1028,7 @@ main {
   line-height: 1.5;
 }
 .handle-mode,
+.halo-mode,
 .grille-mode {
   display: flex;
   gap: 4px;
@@ -1033,6 +1037,7 @@ main {
   border-radius: 3px;
 }
 .handle-mode button,
+.halo-mode button,
 .grille-mode button {
   display: flex;
   flex: 1;
@@ -1047,16 +1052,19 @@ main {
   font-size: 14px;
 }
 .handle-mode button.active,
+.halo-mode button[aria-pressed='true'],
 .grille-mode button[aria-pressed='true'] {
   background: var(--foreground);
   color: var(--inverse);
 }
 .handle-original,
+.halo-original,
 .grille-original {
   padding: 20px;
   text-align: left;
 }
 .original-handle-icon,
+.halo-original-icon,
 .grille-original-icon {
   position: relative;
   display: grid;
@@ -1068,7 +1076,8 @@ main {
   position: absolute;
   color: var(--accent-ink);
 }
-.grille-original-icon svg {
+.grille-original-icon svg,
+.halo-original-icon svg {
   width: 92px;
   height: 80px;
   stroke: var(--accent-ink);
@@ -1076,12 +1085,14 @@ main {
   fill: var(--accent-soft);
 }
 .handle-original h4,
+.halo-original h4,
 .grille-original h4 {
   margin: 14px 0 8px;
   font-size: 17px;
   font-weight: 600;
 }
 .handle-original p,
+.halo-original p,
 .grille-original p {
   margin: 0;
   color: var(--muted-foreground);
@@ -1089,6 +1100,7 @@ main {
   line-height: 1.6;
 }
 .handle-original > button,
+.halo-original > button,
 .grille-original > button {
   display: inline-flex;
   align-items: center;
@@ -1120,19 +1132,22 @@ main {
   color: var(--muted-foreground);
   font: 10px var(--mono);
 }
-.handle-presets {
+.handle-presets,
+.halo-presets {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   margin: 8px 20px 0;
 }
-.handle-presets > span {
+.handle-presets > span,
+.halo-presets > span {
   font: 11px var(--mono);
   color: var(--muted-foreground);
   margin-right: 2px;
 }
-.handle-presets button {
+.handle-presets button,
+.halo-presets button {
   min-height: 44px;
   padding: 8px 10px;
   border: 1px solid var(--control-border);
@@ -1140,18 +1155,22 @@ main {
   background: transparent;
   font-size: 13px;
 }
-.handle-presets button:hover {
+.handle-presets button:hover,
+.halo-presets button:hover {
   background: var(--surface-hover);
 }
 .handle-parameter,
+.halo-parameter,
 .grille-parameter {
   margin-top: 16px;
 }
 .handle-parameter .control-label,
+.halo-parameter .control-label,
 .grille-parameter .control-label {
   margin-bottom: 2px;
 }
 .dimension-input,
+.halo-dimension-input,
 .grille-dimension-input {
   display: flex;
   align-items: center;
@@ -1166,6 +1185,7 @@ main {
   color: var(--muted-foreground);
 }
 .dimension-input input,
+.halo-dimension-input input,
 .grille-dimension-input input {
   width: 54px;
   height: 40px;
@@ -1178,17 +1198,21 @@ main {
 }
 .dimension-input input::-webkit-inner-spin-button,
 .dimension-input input::-webkit-outer-spin-button,
+.halo-dimension-input input::-webkit-inner-spin-button,
+.halo-dimension-input input::-webkit-outer-spin-button,
 .grille-dimension-input input::-webkit-inner-spin-button,
 .grille-dimension-input input::-webkit-outer-spin-button {
   appearance: none;
   margin: 0;
 }
 .dimension-input:focus-within,
+.halo-dimension-input:focus-within,
 .grille-dimension-input:focus-within {
   outline: 3px solid var(--ring);
   outline-offset: 2px;
 }
 .dimension-input input:focus-visible,
+.halo-dimension-input input:focus-visible,
 .grille-dimension-input input:focus-visible {
   outline: none;
 }
@@ -1265,13 +1289,15 @@ main {
 .grille-details[open] summary > span {
   transform: rotate(45deg);
 }
-.handle-footnote {
+.handle-footnote,
+.halo-footnote {
   margin: 16px 20px 24px;
   color: var(--muted-foreground);
   font-size: 14px;
   line-height: 1.6;
 }
-.grille-diagram {
+.grille-diagram,
+.halo-diagram {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -1281,26 +1307,31 @@ main {
   border: 1px solid var(--border);
   border-radius: 3px;
 }
-.grille-diagram > svg {
+.grille-diagram > svg,
+.halo-diagram > svg {
   width: 104px;
   height: 104px;
   flex: 0 0 104px;
   overflow: hidden;
 }
-.grille-diagram-notes {
+.grille-diagram-notes,
+.halo-diagram-notes {
   min-width: 0;
 }
-.grille-diagram-notes > span:first-child {
+.grille-diagram-notes > span:first-child,
+.halo-diagram-notes > span:first-child {
   font: 10px var(--mono);
   color: var(--muted-foreground);
 }
-.grille-diagram-notes > strong {
+.grille-diagram-notes > strong,
+.halo-diagram-notes > strong {
   display: block;
   margin-top: 6px;
   font-size: 15px;
   font-weight: 600;
 }
-.grille-diagram-notes > p {
+.grille-diagram-notes > p,
+.halo-diagram-notes > p {
   font-size: 13px;
   line-height: 1.5;
   color: var(--muted-foreground);
@@ -1324,6 +1355,23 @@ main {
 }
 .grille-diagram-key.recess i {
   background: var(--diagram-recess);
+}
+.halo-diagram > svg {
+  height: 138px;
+}
+.halo-direction {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.halo-direction svg {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+  stroke-width: 1.2;
 }
 .grille-pattern-options {
   display: grid;
@@ -1381,7 +1429,8 @@ main {
   stroke: currentColor;
   stroke-width: 1.5;
 }
-.grille-parameter > p {
+.grille-parameter > p,
+.halo-parameter > p {
   font-size: 13px;
   line-height: 1.5;
   color: var(--muted-foreground);

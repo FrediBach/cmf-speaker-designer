@@ -6,6 +6,7 @@ import {
 } from './panels'
 import { normalizeHandleSettings, type HandleSettings } from './handle-settings'
 import { normalizeGrilleSettings, type GrilleSettings } from './grille-settings'
+import { normalizeHaloSettings, type HaloSettings } from './halo-settings'
 import type { GeneratedPanel } from './panel-engine'
 
 export interface HandleWorkerRequest {
@@ -14,6 +15,7 @@ export interface HandleWorkerRequest {
   style: PanelStyle
   settings: HandleSettings
   grille: GrilleSettings
+  halo: HaloSettings
   relief: number
   source?: Float32Array
 }
@@ -73,7 +75,7 @@ let testEngine:
   | undefined
 
 /**
- * Generate the handle, face depth, and grille in a dedicated WASM worker.
+ * Generate the handle, face depth, grille, and halo in a dedicated WASM worker.
  * Callers own the returned geometry; preview and STL export use this same mesh.
  * The original path clones the original mesh without any CSG or remeshing.
  */
@@ -84,10 +86,16 @@ export async function buildHandledPanelGeometry(
   relief: number,
   input: HandleSettings,
   grilleInput?: GrilleSettings,
+  haloInput?: HaloSettings,
 ): Promise<BufferGeometry> {
   const settings = normalizeHandleSettings(model, input)
   const grille = normalizeGrilleSettings(grilleInput)
-  if (settings.mode === 'original' && grille.mode === 'original')
+  const halo = normalizeHaloSettings(haloInput)
+  if (
+    settings.mode === 'original' &&
+    grille.mode === 'original' &&
+    halo.mode === 'original'
+  )
     return buildPanelGeometry(source, model, style, relief)
 
   let result: GeneratedPanel
@@ -103,6 +111,7 @@ export async function buildHandledPanelGeometry(
       style,
       settings,
       grille,
+      halo,
       relief,
       source: new Float32Array(source.getAttribute('position').array),
     })
@@ -123,6 +132,7 @@ export async function buildHandledPanelGeometry(
             style,
             settings,
             grille,
+            halo,
             relief,
             source: positions,
           } satisfies HandleWorkerRequest,
@@ -149,6 +159,7 @@ export async function buildHandledPanelGeometry(
   completed.userData.addedFaceDepth = relief
   if (result.handle) completed.userData.handle = result.handle
   if (result.grille) completed.userData.grille = result.grille
+  if (result.halo) completed.userData.halo = result.halo
   completed.computeBoundingBox()
   completed.computeBoundingSphere()
   return completed
