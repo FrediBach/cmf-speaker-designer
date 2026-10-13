@@ -49,7 +49,7 @@ Controls use larger text and targets, high-contrast selected states, and visible
 ## What the POC does
 
 - Switch between Speaker S and M.
-- Choose from the original front panel and the three supplied alternate designs.
+- Choose the original front panel or build a custom panel with parametric halos and grilles.
 - Generate a halo around each driver with adjustable outward angle, depth, wall thickness, and an angled cut that can turn the ring into a rain-cover shape.
 - Generate round, hexagonal, or slotted grilles with adjustable opening size, material spacing, arrangement, rotation, and thickness.
 - Continue the grille pattern onto the surrounding front face as recesses up to 3 mm deep, with solid material behind them.
@@ -64,9 +64,9 @@ Controls use larger text and targets, high-contrast selected states, and visible
 - Inspect the knob at full size in a dedicated preview, or see it mounted on either speaker.
 - Download panel and knob together as a ZIP with separate binary STLs in millimeters and a `design.json` containing settings and colors. Individual STL downloads are also available.
 
-The designer starts from the supplied front panel meshes. The **Original handle** option retains the source upper section. **Custom handle** removes that upper section above the control deck and joins a newly generated extension to the remaining panel; its openings are actual through-holes in the exported solid. Carry loop, Three dots, and Solid presets provide starting points. STL has no color or unit metadata: the exported coordinates are intended as millimeters. The ZIP records panel and knob colors in `design.json`. Choose the corresponding filament or material in your slicer. This POC does not include freeform drawing, text embossing, slicer integration, or multi-material exports.
+The designer starts from each model's original front panel mesh. **Custom** selects an open panel ready to configure in the **Halo** and **Grille** tabs; it does not add either feature automatically. Selecting **Original** removes generated halos and grilles while retaining their parameters for later use. The **Original handle** option retains the source upper section. **Custom handle** removes that upper section above the control deck and joins a newly generated extension to the remaining panel; its openings are actual through-holes in the exported solid. Carry loop, Three dots, and Solid presets provide starting points. STL has no color or unit metadata: the exported coordinates are intended as millimeters. The ZIP records panel and knob colors in `design.json`. Choose the corresponding filament or material in your slicer. This POC does not include freeform drawing, text embossing, slicer integration, or multi-material exports.
 
-The **Grille** tab generates a perforated grille over the original driver openings: one on S and both on M. Custom grilles use the original open panel as their base and can be combined with a custom handle, halo, and added face depth. Selecting **Original grille** removes the generated grille; a custom halo can remain active. Selecting a supplied front-panel shape also turns off the generated grille while retaining its settings.
+The **Grille** tab generates a perforated grille over the original driver openings: one on S and both on M. Custom grilles use the original open panel as their base and can be combined with a custom handle, halo, and added face depth. Selecting **Original grille** removes the generated grille; a custom halo can remain active.
 
 **Continue across the face** continues the same pattern seamlessly from the through-holes into matching blind recesses across the front face, including along the driver opening rims. These are real surface geometry in the STL, with solid material behind each recess. The outside edges, control deck, and mounting regions are preserved. Preview and export share the same generated mesh, and grille dimensions are applied after added face depth so their selected thickness and recess depth stay in millimeters.
 
@@ -74,7 +74,7 @@ Recess depth ranges from 0.2 to 3 mm and is limited to the grille thickness minu
 
 ## Generative halo
 
-Selecting **Halo** in Front panel opens the **Halo** tab with a generated ring ready to edit. S receives one halo, and M receives identical halos around both driver openings. All controls apply to both M halos together, including the cutting angle, direction, and rim height. Switching back to S retains the settings and returns to one halo. **Full halo** starts with an uncut ring; **Rain hood** starts with an angled opening and a longer upper edge, like a street-light cover. These are starting shapes, and each dimension remains editable.
+Select **Custom** in the **Halo** tab to generate a ring ready to edit. S receives one halo, and M receives identical halos around both driver openings. All controls apply to both M halos together, including the cutting angle, direction, and rim height. Switching back to S retains the settings and returns to one halo. **Full halo** starts with an uncut ring; **Rain hood** starts with an angled opening and a longer upper edge, like a street-light cover. These are starting shapes, and each dimension remains editable.
 
 | Control        | Range   | Effect                                                                                                          |
 | -------------- | ------- | --------------------------------------------------------------------------------------------------------------- |
@@ -89,7 +89,7 @@ Selecting **Halo** in Front panel opens the **Halo** tab with a generated ring r
 
 The cut passes through the longest outer tip at the selected halo depth, leaving a single angled lip. **Rim height** defaults to 0 mm for a flush finish where the cut reaches the panel. Increase it to preserve a continuous raised rim up to 5 mm high. The rim cannot exceed the halo depth; reducing the depth also reduces the rim height when needed. The halo stays joined to the panel at every setting.
 
-**Supplied** restores the original Halo STL and removes the generated grille; the supplied M reference retains its original upper-only halo. **None** removes the generated halos while keeping a custom grille. Selecting **Custom** restores the retained halo dimensions. Halo parameters are saved locally, included in shared design links and the exported `design.json`, and retained when switching speaker models. Existing designs without halo settings continue to use their selected supplied shape.
+**Original** removes the generated halos while keeping a custom grille. Selecting **Custom** restores the retained halo dimensions. Halo parameters are saved locally, included in shared design links and the exported `design.json`, and retained when switching speaker models.
 
 The generated halo uses the original open panel as its base and combines with a custom handle, face depth, and a generated grille, including recessed face patterns. Preview and STL export use the same connected solid. The rain-cover shape is a geometric option; weather resistance and print supports still require physical evaluation.
 
@@ -97,7 +97,7 @@ The generated halo uses the original open panel as its base and combines with a 
 
 The original assets live in `resources/product-images/` and `resources/stl-files/`. Background and source information is available in the [Nothing Community announcement](https://nothing.community/d/63517-3d-print-your-own-cmf-speaker).
 
-The selectable meshes are the `panel-original`, `panel-1`, `panel-2`, and `panel-3` files for each model. All selectable knob geometries use `cmf-speaker-sm-3d-printing-knob-original-v1.stl` as their source. Each knob is extracted as its own connected part. The combined `panel-merge` files and separate power buttons remain available in the repository but are not exported by the designer.
+Both panel modes use the `panel-original` file for the selected speaker model. The numbered alternate panel files remain in the repository but are no longer loaded by the designer. All selectable knob geometries use `cmf-speaker-sm-3d-printing-knob-original-v1.stl` as their source. Each knob is extracted as its own connected part. The combined `panel-merge` files and separate power buttons remain available in the repository but are not exported by the designer.
 
 The original panels measure approximately 85 × 131 mm for S and 85 × 225 mm for M. Added face depth affects the front surface; the attachment region and folded control plate stay unchanged. A custom handle changes the overall panel bounds, shown in the preview and download summary. It is 4 mm thick, with an extension height of 16–70 mm and width of 60–110 mm. Corner radius, hole sizes, and offsets are limited together to retain the connecting shoulder and minimum wall thickness.
 
@@ -133,7 +133,7 @@ The default **Panel + knob** export is a ZIP containing two STLs and `design.jso
 - `src/components/SpeakerPreview.tsx` renders the selected panel and the contextual speaker body.
 - `src/App.tsx` connects the controls, preview, and download workflow.
 
-Models and the geometry generator are loaded on demand. Large STL resources and the WebAssembly module are part of the deployable assets, so a first load can take a moment. No backend, account, or API key is required; geometry processing and export run in the browser. Existing saved designs and shared links without handle, grille, or halo settings continue to open with their selected source geometry.
+Models and the geometry generator are loaded on demand. Large STL resources and the WebAssembly module are part of the deployable assets, so a first load can take a moment. No backend, account, or API key is required; geometry processing and export run in the browser. Existing saved designs and shared links that select a numbered alternate panel now open as **Original**, or **Custom** when they include an active custom halo or grille. Other saved parameters are retained.
 
 ## Deploy to cmfspeakerdesigner.com
 

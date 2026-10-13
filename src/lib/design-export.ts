@@ -95,10 +95,6 @@ function buildArchive(entries: ArchiveEntry[]): ArrayBuffer {
 }
 
 function selectedPanelFilename(design: Design): string {
-  const sourceStyle =
-    design.grille.mode === 'custom' || design.halo.mode === 'custom'
-      ? 'original'
-      : design.style
   const handleSuffix =
     design.handle.mode === 'custom'
       ? `-handle-${design.handle.height.toFixed(1)}mm`
@@ -107,7 +103,7 @@ function selectedPanelFilename(design: Design): string {
     design.grille.mode === 'custom'
       ? `-grille-${design.grille.pattern}${design.grille.extendPattern ? '-extended' : ''}`
       : ''
-  return panelFilename(design.model, sourceStyle, design.relief).replace(
+  return panelFilename(design.model, 'original', design.relief).replace(
     '.stl',
     `${handleSuffix}${grilleSuffix}${haloFilenameSuffix(design.halo)}.stl`,
   )

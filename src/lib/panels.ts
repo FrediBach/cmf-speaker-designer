@@ -6,16 +6,10 @@ import type { HaloSettings } from './halo-settings'
 export { MAX_FACE_DEPTH } from './face-depth'
 
 import sOriginal from '../../resources/stl-files/cmf-speaker-s-3d-printing-panel-original-v1.stl?url'
-import sOne from '../../resources/stl-files/cmf-speaker-s-3d-printing-panel-1-v1.stl?url'
-import sTwo from '../../resources/stl-files/cmf-speaker-s-3d-printing-panel-2-v1.stl?url'
-import sThree from '../../resources/stl-files/cmf-speaker-s-3d-printing-panel-3-v1.stl?url'
 import mOriginal from '../../resources/stl-files/cmf-speaker-m-3d-printing-panel-original-v1.stl?url'
-import mOne from '../../resources/stl-files/cmf-speaker-m-3d-printing-panel-1-v1.stl?url'
-import mTwo from '../../resources/stl-files/cmf-speaker-m-3d-printing-panel-2-v1.stl?url'
-import mThree from '../../resources/stl-files/cmf-speaker-m-3d-printing-panel-3-v1.stl?url'
 
 export type SpeakerModel = 's' | 'm'
-export type PanelStyle = 'original' | '1' | '2' | '3'
+export type PanelStyle = 'original' | 'custom'
 
 export interface PanelStyleOption {
   id: PanelStyle
@@ -47,51 +41,22 @@ export const PANEL_STYLES: readonly PanelStyleOption[] = [
     description: 'The original open speaker face.',
   },
   {
-    id: '1',
-    label: 'Halo',
-    description: 'A sculptural ring around the driver.',
-  },
-  {
-    id: '2',
-    label: 'Perforated',
-    description: 'A precise grid of circular openings.',
-  },
-  {
-    id: '3',
-    label: 'Slotted',
-    description: 'Horizontal lines with an open rhythm.',
-  },
-]
-
-const MEDIUM_STYLES: readonly PanelStyleOption[] = [
-  PANEL_STYLES[0],
-  {
-    id: '1',
-    label: 'Halo',
-    description: 'A sculptural ring around the upper driver.',
-  },
-  {
-    id: '2',
-    label: 'Twin contours',
-    description: 'Raised contours around both drivers.',
-  },
-  {
-    id: '3',
-    label: 'Perforated',
-    description: 'Circular openings over the upper driver.',
+    id: 'custom',
+    label: 'Custom',
+    description: 'Shape your panel in the Halo and Grille tabs.',
   },
 ]
 
 export const PANEL_ASSETS: Record<SpeakerModel, Record<PanelStyle, string>> = {
-  s: { original: sOriginal, '1': sOne, '2': sTwo, '3': sThree },
-  m: { original: mOriginal, '1': mOne, '2': mTwo, '3': mThree },
+  s: { original: sOriginal, custom: sOriginal },
+  m: { original: mOriginal, custom: mOriginal },
 }
 
-/** Style numbers in the supplied S and M collections describe different designs. */
+/** Both models use the original face as the starting point for custom geometry. */
 export function getPanelStyles(
-  model: SpeakerModel,
+  _model: SpeakerModel,
 ): readonly PanelStyleOption[] {
-  return model === 's' ? PANEL_STYLES : MEDIUM_STYLES
+  return PANEL_STYLES
 }
 
 /**
@@ -190,15 +155,11 @@ export function exportPanelStl(geometry: BufferGeometry): ArrayBuffer {
 
 export function panelFilename(
   model: SpeakerModel,
-  style: PanelStyle,
+  _style: PanelStyle,
   addedDepth = 0,
 ): string {
-  const styleName = getPanelStyles(model)
-    .find((option) => option.id === style)!
-    .label.toLowerCase()
-    .replaceAll(' ', '-')
   const suffix = addedDepth > 0 ? `-depth-${addedDepth.toFixed(1)}mm` : ''
-  return `cmf-speaker-${model}-${styleName}${suffix}.stl`
+  return `cmf-speaker-${model}-original${suffix}.stl`
 }
 
 export function haloFilenameSuffix(settings?: HaloSettings): string {

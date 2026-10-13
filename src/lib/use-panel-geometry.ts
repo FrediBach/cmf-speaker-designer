@@ -22,12 +22,7 @@ export function usePanelGeometry(
     key: string
     message: string
   } | null>(null)
-  const matches =
-    source?.model === design.model &&
-    source?.style ===
-      (design.grille.mode === 'custom' || design.halo.mode === 'custom'
-        ? 'original'
-        : design.style)
+  const matches = source?.model === design.model && source?.style === 'original'
   const key = `${matches ? source.geometry.uuid : 'loading'}:${design.model}:${design.style}:${design.relief}:${JSON.stringify(design.handle)}:${JSON.stringify(design.grille)}:${JSON.stringify(design.halo)}:${retryKey}`
 
   useEffect(() => {

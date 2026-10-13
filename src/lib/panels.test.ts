@@ -7,6 +7,7 @@ import {
   exportPanelStl,
   getPanelDimensions,
   getPanelStyles,
+  PANEL_ASSETS,
   panelFilename,
   parsePanelGeometry,
   type PanelStyle,
@@ -15,13 +16,7 @@ import {
 
 const fixtures: [SpeakerModel, PanelStyle, number, number][] = [
   ['s', 'original', 168472, 24],
-  ['s', '1', 178018, 48],
-  ['s', '2', 252498, 24],
-  ['s', '3', 159686, 24],
   ['m', 'original', 200022, 29],
-  ['m', '1', 211998, 53],
-  ['m', '2', 233048, 52.575],
-  ['m', '3', 255720, 29],
 ]
 
 function readPanel(model: SpeakerModel, style: PanelStyle) {
@@ -177,16 +172,23 @@ describe('official panel geometry and millimeter STL export', () => {
     source.dispose()
   })
 
-  it('uses the correct design labels for each model and descriptive filenames', () => {
-    expect(getPanelStyles('s').find((style) => style.id === '2')!.label).toBe(
-      'Perforated',
-    )
-    expect(getPanelStyles('m').find((style) => style.id === '2')!.label).toBe(
-      'Twin contours',
-    )
-    expect(panelFilename('s', '3')).toBe('cmf-speaker-s-slotted.stl')
-    expect(panelFilename('m', '2', 1.2)).toBe(
-      'cmf-speaker-m-twin-contours-depth-1.2mm.stl',
-    )
-  })
+  it.each(['s', 'm'] as const)(
+    'offers only original and custom modes using the original %s source',
+    (model) => {
+      expect(
+        getPanelStyles(model).map(({ id, label }) => ({ id, label })),
+      ).toEqual([
+        { id: 'original', label: 'Original' },
+        { id: 'custom', label: 'Custom' },
+      ])
+      expect(Object.keys(PANEL_ASSETS[model])).toEqual(['original', 'custom'])
+      expect(PANEL_ASSETS[model].custom).toBe(PANEL_ASSETS[model].original)
+      expect(panelFilename(model, 'original')).toBe(
+        `cmf-speaker-${model}-original.stl`,
+      )
+      expect(panelFilename(model, 'custom', 1.2)).toBe(
+        `cmf-speaker-${model}-original-depth-1.2mm.stl`,
+      )
+    },
+  )
 })

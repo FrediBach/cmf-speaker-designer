@@ -36,8 +36,6 @@ test('generates a custom speaker grille with through-holes, blind face recesses,
   await page.goto('/')
   await expectGeneratedPanelReady(page)
 
-  // Preserve a supplied style so restoring the original grille also exercises source selection.
-  await page.getByRole('button', { name: 'Slotted', exact: true }).click()
   await page.getByRole('tab', { name: 'Handle', exact: true }).click()
   await page.getByRole('button', { name: 'Custom handle', exact: true }).click()
   await page.getByRole('button', { name: 'Carry loop', exact: true }).click()
@@ -238,13 +236,34 @@ test('generates a custom speaker grille with through-holes, blind face recesses,
   await expect(
     page.getByRole('button', { name: 'Slot', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('tab', { name: 'Front panel', exact: true }).click()
+  await expect(
+    page.getByRole('button', { name: 'Custom', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Original', exact: true }).click()
+  await expectGeneratedPanelReady(page)
+  await expect(page.locator('.preview-model')).toContainText('Original')
+  await page.getByRole('tab', { name: 'Grille', exact: true }).click()
+  await expect(
+    page.getByRole('button', { name: 'Original grille', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Custom grille', exact: true }).click()
+  await expect(
+    page.getByRole('button', { name: 'Slot', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await expect(
+    page.getByRole('spinbutton', {
+      name: 'Slot length in millimeters',
+      exact: true,
+    }),
+  ).toHaveValue('12')
   await page
     .getByRole('button', { name: 'Original grille', exact: true })
     .click()
   await expectGeneratedPanelReady(page)
   await page.getByRole('tab', { name: 'Front panel', exact: true }).click()
   await expect(
-    page.getByRole('button', { name: 'Slotted', exact: true }),
+    page.getByRole('button', { name: 'Custom', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true')
   await page.getByRole('tab', { name: 'Handle', exact: true }).click()
   await expect(

@@ -20,7 +20,7 @@ describe('saved and shared handle designs', () => {
       relief: 1.2,
     }
     const restored = validateDesign(oldDesign)
-    expect(restored).toMatchObject(oldDesign)
+    expect(restored).toMatchObject({ ...oldDesign, style: 'original' })
     expect(restored.handle).toMatchObject({ mode: 'original', height: 27 })
     expect(restored.grille.mode).toBe('original')
     expect(restored.halo).toEqual(DEFAULT_HALO_SETTINGS)
@@ -29,6 +29,54 @@ describe('saved and shared handle designs', () => {
       restored.handle,
     )
   })
+
+  it.each(['1', '2', '3'])(
+    'migrates legacy panel %s without inventing custom geometry',
+    (style) => {
+      const saved = {
+        ...DEFAULT_DESIGN,
+        style,
+        relief: 1.5,
+        handle: { ...DEFAULT_DESIGN.handle, mode: 'custom' },
+        halo: { ...DEFAULT_DESIGN.halo, depth: 32, cutAngle: 40 },
+        grille: { ...DEFAULT_DESIGN.grille, pattern: 'hex', size: 4 },
+      }
+      expect(validateDesign(saved)).toEqual({ ...saved, style: 'original' })
+      for (const component of ['halo', 'grille'] as const) {
+        const custom = {
+          ...saved,
+          [component]: { ...saved[component], mode: 'custom' },
+        }
+        expect(validateDesign(custom)).toEqual({ ...custom, style: 'custom' })
+      }
+    },
+  )
+
+  it('round-trips custom panel mode before a halo or grille is enabled', () => {
+    const custom = { ...DEFAULT_DESIGN, style: 'custom' as const }
+    expect(validateDesign(custom)).toEqual(custom)
+    vi.stubGlobal('window', { location: { search: '' } })
+    vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(custom) })
+    expect(readDesign()).toEqual(custom)
+    vi.stubGlobal('window', {
+      location: {
+        search: `?design=${encodeURIComponent(JSON.stringify(custom))}`,
+      },
+    })
+    expect(readDesign()).toEqual(custom)
+  })
+
+  it.each(['halo', 'grille'] as const)(
+    'selects custom panel mode for an active %s',
+    (component) => {
+      const custom = validateDesign({
+        ...DEFAULT_DESIGN,
+        [component]: { ...DEFAULT_DESIGN[component], mode: 'custom' },
+      })
+      expect(custom.style).toBe('custom')
+      expect(custom[component].mode).toBe('custom')
+    },
+  )
 
   it('round-trips custom handle settings through local storage and a shared URL', () => {
     const custom = validateDesign({
@@ -134,7 +182,7 @@ describe('saved and shared handle designs', () => {
     ).toEqual(DEFAULT_KNOB_SETTINGS)
   })
 
-  it('restores a shared grille alongside a custom handle and the saved factory style', () => {
+  it('restores a shared grille alongside a custom handle in custom panel mode', () => {
     const custom = validateDesign({
       ...DEFAULT_DESIGN,
       model: 'm',
@@ -163,7 +211,7 @@ describe('saved and shared handle designs', () => {
       },
     })
     expect(readDesign()).toEqual(custom)
-    expect(custom.style).toBe('2')
+    expect(custom.style).toBe('custom')
     expect(custom.handle.mode).toBe('custom')
     expect(custom.grille).toMatchObject({
       mode: 'custom',
@@ -200,6 +248,7 @@ describe('saved and shared handle designs', () => {
       cutRotation: 90,
       rimHeight: 2.4,
     })
+    expect(custom.style).toBe('custom')
     vi.stubGlobal('window', { location: { search: '' } })
     vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(custom) })
     expect(readDesign()).toEqual(custom)

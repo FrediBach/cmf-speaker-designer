@@ -148,13 +148,23 @@ test('generates a cut halo, retains shared settings, and exports it with a grill
   test.setTimeout(180_000)
   await page.goto('/')
   await expectReady(page)
-  await page.getByRole('button', { name: 'Halo', exact: true }).click()
+  await page.getByRole('tab', { name: 'Halo', exact: true }).click()
   await expect(
     page.getByRole('tab', { name: 'Halo', exact: true }),
   ).toHaveAttribute('aria-selected', 'true')
   await expect(
     page.getByRole('tab', { name: 'Halo', exact: true }),
   ).toBeFocused()
+  await expect(
+    page
+      .getByRole('group', { name: 'Halo generation mode' })
+      .getByRole('button'),
+  ).toHaveText(['Original', 'Custom'])
+  await page.screenshot({
+    path: testInfo.outputPath('halo-original-controls.png'),
+    fullPage: true,
+  })
+  await page.getByRole('button', { name: 'Custom halo', exact: true }).click()
   await expect(
     page.getByRole('button', { name: 'Custom halo', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true')
@@ -190,6 +200,7 @@ test('generates a cut halo, retains shared settings, and exports it with a grill
   await expect(page.getByRole('status')).toContainText('Design link copied.')
   const link = await page.evaluate(() => navigator.clipboard.readText())
   const shared = JSON.parse(new URL(link).searchParams.get('design')!)
+  expect(shared.style).toBe('custom')
   expect(shared.halo).toEqual({
     mode: 'custom',
     outwardAngle: 18,
@@ -377,12 +388,25 @@ test.describe('mobile halo controls', () => {
     deviceScaleFactor: 1,
   })
 
-  test('keeps every halo control reachable and restores the supplied halo or open panel', async ({
+  test('keeps every halo control reachable and restores the original panel without losing parameters', async ({
     page,
   }, testInfo) => {
     await page.goto('/')
     await expectReady(page)
-    await page.getByRole('button', { name: 'Halo', exact: true }).click()
+    await page.getByRole('tab', { name: 'Halo', exact: true }).click()
+    await expect(
+      page
+        .getByRole('group', { name: 'Halo generation mode' })
+        .getByRole('button'),
+    ).toHaveText(['Original', 'Custom'])
+    await expect(
+      page.getByRole('button', { name: 'Supplied halo', exact: true }),
+    ).toHaveCount(0)
+    await page.screenshot({
+      path: testInfo.outputPath('mobile-halo-original-controls.png'),
+      fullPage: true,
+    })
+    await page.getByRole('button', { name: 'Custom halo', exact: true }).click()
     await page.getByRole('button', { name: 'Rain hood', exact: true }).click()
     const rotation = page.getByRole('spinbutton', {
       name: 'Cut rotation in degrees',
@@ -461,24 +485,35 @@ test.describe('mobile halo controls', () => {
         exact: true,
       }),
     ).toHaveValue('0')
+    const depth = page.getByRole('spinbutton', {
+      name: 'Halo depth in millimeters',
+      exact: true,
+    })
+    await depth.fill('18')
     await page
-      .getByRole('button', { name: 'Supplied halo', exact: true })
+      .getByRole('button', { name: 'Original halo', exact: true })
       .click()
     await expectReady(page)
     await expect(
-      page.getByRole('button', { name: 'Supplied halo', exact: true }),
+      page.getByRole('button', { name: 'Original halo', exact: true }),
     ).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByRole('spinbutton')).toHaveCount(0)
-    await page.getByRole('button', { name: 'No halo', exact: true }).click()
+    await page.getByRole('button', { name: 'Custom halo', exact: true }).click()
+    await expect(depth).toHaveValue('18')
+
+    await page.getByRole('tab', { name: 'Front panel', exact: true }).click()
+    await expect(
+      page.getByRole('button', { name: 'Custom', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('button', { name: 'Original', exact: true }).click()
     await expectReady(page)
     await expect(page.locator('.preview-model')).toContainText('Original')
+    await page.getByRole('tab', { name: 'Halo', exact: true }).click()
+    await expect(
+      page.getByRole('button', { name: 'Original halo', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true')
     await page.getByRole('button', { name: 'Custom halo', exact: true }).click()
     await expectReady(page)
-    await expect(
-      page.getByRole('spinbutton', {
-        name: 'Halo depth in millimeters',
-        exact: true,
-      }),
-    ).toBeVisible()
+    await expect(depth).toHaveValue('18')
   })
 })

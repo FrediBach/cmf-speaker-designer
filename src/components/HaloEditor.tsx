@@ -14,10 +14,7 @@ import {
 interface Props {
   model: 's' | 'm'
   value: HaloSettings
-  suppliedHalo: boolean
   onChange: (value: HaloSettings) => void
-  onRemove: () => void
-  onRestoreSupplied: () => void
 }
 
 function HaloParameter({
@@ -204,14 +201,7 @@ function HaloDiagram({ value }: { value: HaloSettings }) {
   )
 }
 
-export function HaloEditor({
-  model,
-  value: input,
-  suppliedHalo,
-  onChange,
-  onRemove,
-  onRestoreSupplied,
-}: Props) {
+export function HaloEditor({ model, value: input, onChange }: Props) {
   const value = normalizeHaloSettings(input)
   const limits = getHaloLimits(value)
   const set = (patch: Partial<HaloSettings>) =>
@@ -255,19 +245,11 @@ export function HaloEditor({
         >
           <button
             type="button"
-            aria-label="No halo"
-            aria-pressed={value.mode === 'original' && !suppliedHalo}
-            onClick={onRemove}
+            aria-label="Original halo"
+            aria-pressed={value.mode === 'original'}
+            onClick={() => set({ mode: 'original' })}
           >
-            None
-          </button>
-          <button
-            type="button"
-            aria-label="Supplied halo"
-            aria-pressed={suppliedHalo}
-            onClick={onRestoreSupplied}
-          >
-            Supplied
+            Original
           </button>
           <button
             type="button"
@@ -288,11 +270,7 @@ export function HaloEditor({
               <ellipse cx="49" cy="36" rx="24" ry="21" />
             </svg>
           </div>
-          <h4>
-            {suppliedHalo
-              ? 'Supplied halo selected'
-              : 'No custom halo selected'}
-          </h4>
+          <h4>No custom halo selected</h4>
           <p>
             Adjust the outward angle, depth, and wall thickness. Tilt the front
             cut to create a streetlight-style cover.

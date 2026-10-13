@@ -18,6 +18,7 @@ import {
   normalizeHaloSettings,
   type HaloSettings,
 } from './halo-settings'
+import type { PanelStyle } from './panels'
 
 export const PALETTE = [
   { name: 'CMF orange', value: '#f45427' },
@@ -30,7 +31,7 @@ export const PALETTE = [
 
 export type Design = {
   model: 's' | 'm'
-  style: 'original' | '1' | '2' | '3'
+  style: PanelStyle
   panelColor: string
   knobColor: string
   relief: number
@@ -58,18 +59,23 @@ export function validateDesign(value: unknown): Design {
   const data =
     value && typeof value === 'object' ? (value as Partial<Design>) : {}
   const model = data.model === 'm' ? 'm' : 's'
+  const grille = normalizeGrilleSettings(data.grille ?? {})
+  const halo = normalizeHaloSettings(data.halo ?? {})
   return {
     model,
     knob: normalizeKnobSettings(data.knob ?? {}),
-    grille: normalizeGrilleSettings(data.grille ?? {}),
-    halo: normalizeHaloSettings(data.halo ?? {}),
+    grille,
+    halo,
     handle: normalizeHandleSettings(
       model,
       data.handle ?? getDefaultHandleSettings(model),
     ),
-    style: ['original', '1', '2', '3'].includes(data.style ?? '')
-      ? data.style!
-      : 'original',
+    style:
+      data.style === 'custom' ||
+      grille.mode === 'custom' ||
+      halo.mode === 'custom'
+        ? 'custom'
+        : 'original',
     panelColor: isColor(data.panelColor)
       ? data.panelColor
       : DEFAULT_DESIGN.panelColor,

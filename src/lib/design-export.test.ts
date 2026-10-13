@@ -101,7 +101,7 @@ describe('design export', () => {
         extendPattern: true,
       },
       // A custom grille always starts with the original panel source.
-      style: '3',
+      style: 'custom',
     }
     const panelBefore = panel.getAttribute('position').array.slice()
     const knobBefore = knob.getAttribute('position').array.slice()
@@ -143,14 +143,14 @@ describe('design export', () => {
   it('supports individual STL exports without a ZIP wrapper', () => {
     const panel = new BoxGeometry(85, 225, 29)
     const knob = new CylinderGeometry(10, 10, 12, 16)
-    const design: Design = { ...DEFAULT_DESIGN, model: 'm', style: '2' }
+    const design: Design = { ...DEFAULT_DESIGN, model: 'm', style: 'custom' }
     const panelFile = buildDesignExport({
       panel,
       knob,
       design,
       target: 'panel',
     })
-    expect(panelFile.filename).toBe('cmf-speaker-m-twin-contours.stl')
+    expect(panelFile.filename).toBe('cmf-speaker-m-original.stl')
     expect(panelFile.mimeType).toBe('model/stl')
     expect(new Uint8Array(panelFile.data)).toEqual(
       new Uint8Array(exportPanelStl(panel)),
@@ -171,7 +171,7 @@ describe('design export', () => {
     const knob = new CylinderGeometry(10, 10, 12, 16)
     const design = validateDesign({
       ...DEFAULT_DESIGN,
-      style: '1',
+      style: 'custom',
       halo: {
         mode: 'custom',
         outwardAngle: 20,

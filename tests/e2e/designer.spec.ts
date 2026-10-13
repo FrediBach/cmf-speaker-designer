@@ -240,9 +240,15 @@ for (const viewport of [
   })
 }
 
-test('renders WebGL and switches real panel designs, colors, and preview modes', async ({
+test('renders WebGL and switches parametric panel modes, colors, and preview modes', async ({
   page,
 }, testInfo) => {
+  const panelRequests: string[] = []
+  page.on('request', (request) => {
+    if (/cmf-speaker-[sm]-3d-printing-panel-.*\.stl/.test(request.url())) {
+      panelRequests.push(request.url())
+    }
+  })
   await page.goto('/')
   await expect(
     page.getByRole('heading', { name: 'Speaker designer' }),
@@ -270,18 +276,9 @@ test('renders WebGL and switches real panel designs, colors, and preview modes',
     fullPage: true,
   })
 
-  // These model-specific names correspond to the actual supplied S/M files.
   const variants = [
-    {
-      model: 'S',
-      height: '131',
-      styles: ['Original', 'Halo', 'Perforated', 'Slotted'],
-    },
-    {
-      model: 'M',
-      height: '225',
-      styles: ['Original', 'Halo', 'Twin contours', 'Perforated'],
-    },
+    { model: 'S', height: '131' },
+    { model: 'M', height: '225' },
   ]
   for (const variant of variants) {
     const modelButton = page.getByRole('button', {
@@ -289,21 +286,17 @@ test('renders WebGL and switches real panel designs, colors, and preview modes',
     })
     await modelButton.click()
     await expect(modelButton).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.locator('.style-options button')).toHaveText(
-      variant.styles,
-    )
-    for (const style of variant.styles) {
-      // Choosing Halo opens its generative editor; source styles stay in Front panel.
-      await page.getByRole('tab', { name: 'Front panel', exact: true }).click()
+    await expect(page.locator('.style-options button')).toHaveText([
+      'Original',
+      'Custom',
+    ])
+    for (const style of ['Original', 'Custom']) {
       const styleButton = page.getByRole('button', { name: style, exact: true })
       await styleButton.click()
-      if (style === 'Halo') {
-        await expect(
-          page.getByRole('button', { name: 'Custom halo', exact: true }),
-        ).toHaveAttribute('aria-pressed', 'true')
-      } else {
-        await expect(styleButton).toHaveAttribute('aria-pressed', 'true')
-      }
+      await expect(styleButton).toHaveAttribute('aria-pressed', 'true')
+      await expect(
+        page.getByRole('tab', { name: 'Front panel', exact: true }),
+      ).toHaveAttribute('aria-selected', 'true')
       await expectPanelReady(page)
       await expect(page.locator('.preview-model')).toContainText(
         `CMF Speaker ${variant.model}`,
@@ -313,7 +306,26 @@ test('renders WebGL and switches real panel designs, colors, and preview modes',
         `85 × ${variant.height} MM`,
       )
     }
+    await page.getByRole('tab', { name: 'Halo', exact: true }).click()
+    const haloModes = page.getByRole('group', { name: 'Halo generation mode' })
+    await expect(haloModes.getByRole('button')).toHaveText([
+      'Original',
+      'Custom',
+    ])
+    await expect(
+      page.getByRole('button', { name: 'Original halo', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('tab', { name: 'Grille', exact: true }).click()
+    await expect(
+      page.getByRole('button', { name: 'Original grille', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('tab', { name: 'Front panel', exact: true }).click()
   }
+  expect(panelRequests.some((url) => url.includes('cmf-speaker-s-'))).toBe(true)
+  expect(panelRequests.some((url) => url.includes('cmf-speaker-m-'))).toBe(true)
+  expect(panelRequests.every((url) => url.includes('-panel-original-'))).toBe(
+    true,
+  )
 
   await page
     .getByRole('button', { name: 'Front panel: Lagoon', exact: true })
@@ -347,7 +359,7 @@ test('renders WebGL and switches real panel designs, colors, and preview modes',
     page.getByRole('button', { name: /^Speaker M/ }),
   ).toHaveAttribute('aria-pressed', 'true')
   await expect(
-    page.getByRole('button', { name: 'Perforated', exact: true }),
+    page.getByRole('button', { name: 'Custom', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true')
   await expect(
     page.getByRole('button', { name: 'Front panel: Lagoon', exact: true }),
@@ -367,7 +379,7 @@ test('keyboard face depth produces a correctly named full-size binary STL downlo
   await page.goto('/')
   await expectPanelReady(page)
   await page.getByRole('button', { name: /^Speaker M/ }).click()
-  await page.getByRole('button', { name: 'Twin contours', exact: true }).click()
+  await page.getByRole('button', { name: 'Custom', exact: true }).click()
   await expectPanelReady(page)
 
   const depth = page.getByRole('slider', {
@@ -382,7 +394,7 @@ test('keyboard face depth produces a correctly named full-size binary STL downlo
   await page.getByRole('button', { name: 'Export STL', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
-  await expect(dialog).toContainText('Speaker M · Twin contours')
+  await expect(dialog).toContainText('Speaker M · Custom')
   await expect(dialog).toContainText('0.2 mm')
   await dialog
     .getByRole('group', { name: 'Export parts' })
@@ -393,13 +405,13 @@ test('keyboard face depth produces a correctly named full-size binary STL downlo
   await dialog.getByRole('button', { name: /^Download STL/ }).click()
   const download = await downloadStarted
   expect(download.suggestedFilename()).toBe(
-    'cmf-speaker-m-twin-contours-depth-0.2mm.stl',
+    'cmf-speaker-m-original-depth-0.2mm.stl',
   )
   const output = testInfo.outputPath(download.suggestedFilename())
   await download.saveAs(output)
   const binary = await readFile(output)
   const triangleCount = binary.readUInt32LE(80)
-  expect(triangleCount).toBe(233_048)
+  expect(triangleCount).toBe(200_022)
   expect(binary.byteLength).toBe(84 + triangleCount * 50)
 
   // Read the actual browser download independently of the app's STL exporter.
@@ -422,7 +434,7 @@ test('keyboard face depth produces a correctly named full-size binary STL downlo
   expect(nonFiniteCoordinates).toBe(0)
   expect(maximum[0] - minimum[0]).toBeCloseTo(84.9715, 3)
   expect(maximum[1] - minimum[1]).toBeCloseTo(224.9691, 3)
-  expect(maximum[2] - minimum[2]).toBeCloseTo(52.775, 3)
+  expect(maximum[2] - minimum[2]).toBeCloseTo(29.2, 3)
   expect(minimum[2]).toBeCloseTo(0, 5)
   await expect(dialog).not.toBeVisible()
   await expect(page.getByRole('status')).toContainText('STL downloaded.')
@@ -652,6 +664,20 @@ test.describe('mobile layout', () => {
     await page.goto('/')
     await expectPanelReady(page)
     await expectWorkspaceInViewport(page)
+    await expect(page.locator('.style-options button')).toHaveText([
+      'Original',
+      'Custom',
+    ])
+    const customPanel = page.getByRole('button', {
+      name: 'Custom',
+      exact: true,
+    })
+    await expect(customPanel).toBeInViewport({ ratio: 1 })
+    await customPanel.click()
+    await expect(customPanel).toHaveAttribute('aria-pressed', 'true')
+    await expect(
+      page.getByRole('tab', { name: 'Front panel', exact: true }),
+    ).toHaveAttribute('aria-selected', 'true')
     const viewport = await page.evaluate(() => ({
       content: document.documentElement.scrollWidth,
       viewport: document.documentElement.clientWidth,

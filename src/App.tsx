@@ -112,6 +112,10 @@ function App() {
       const next = { ...current, ...patch }
       return {
         ...next,
+        style:
+          next.halo.mode === 'custom' || next.grille.mode === 'custom'
+            ? 'custom'
+            : next.style,
         handle: normalizeHandleSettings(next.model, next.handle),
         grille: normalizeGrilleSettings(next.grille),
         halo: normalizeHaloSettings(next.halo),
@@ -122,7 +126,7 @@ function App() {
   const currentStyle = styles.find((item) => item.id === design.style)!
   const customHalo = design.halo.mode === 'custom'
   const customGrille = design.grille.mode === 'custom'
-  const sourceStyle = customHalo || customGrille ? 'original' : design.style
+  const sourceStyle = 'original'
   const grilleLabel = `${{ round: 'Round', hex: 'Hexagonal', slot: 'Slotted' }[design.grille.pattern]} grille`
   const haloLabel = design.model === 'm' ? 'Custom Halos' : 'Custom Halo'
   const panelLabel = customHalo
@@ -130,11 +134,7 @@ function App() {
     : customGrille
       ? grilleLabel
       : currentStyle.label
-  const suppliedHalo = !customHalo && !customGrille && design.style === '1'
-  const panelStyleSelected = (style: Design['style']) =>
-    style === '1'
-      ? customHalo || suppliedHalo
-      : !customHalo && !customGrille && design.style === style
+  const panelStyleSelected = (style: Design['style']) => design.style === style
   const {
     geometry,
     previewGeometry,
@@ -557,28 +557,19 @@ function App() {
                         key={style.id}
                         className={`style-option ${panelStyleSelected(style.id) ? 'selected' : ''}`}
                         onClick={() => {
-                          if (style.id === '1') {
-                            update({
-                              style: style.id,
-                              halo: { ...design.halo, mode: 'custom' },
-                            })
-                            setEditorTab('halo')
-                            document.getElementById('halo-tab')?.focus()
-                          } else {
+                          if (style.id === 'original') {
                             update({
                               style: style.id,
                               halo: { ...design.halo, mode: 'original' },
                               grille: { ...design.grille, mode: 'original' },
                             })
+                          } else {
+                            update({ style: style.id })
                           }
                         }}
                         aria-pressed={panelStyleSelected(style.id)}
                       >
-                        <PanelIcon
-                          model={design.model}
-                          style={style.id}
-                          generatedHalo={style.id === '1'}
-                        />
+                        <PanelIcon model={design.model} style={style.id} />
                         <span>{style.label}</span>
                         {panelStyleSelected(style.id) && (
                           <Check className="style-check" size={12} />
@@ -588,9 +579,9 @@ function App() {
                   </div>
                   <p className="style-description">
                     {customHalo
-                      ? `${haloLabel}${customGrille ? ' and grille' : ''} active. Open Halo to edit the profile, or choose another panel shape.`
+                      ? `${haloLabel}${customGrille ? ' and grille' : ''} active. Edit the profile in Halo, or choose Original to restore the open panel.`
                       : customGrille
-                        ? 'Custom grille active. Choose a shape to return to a supplied panel.'
+                        ? 'Custom grille active. Edit the pattern in Grille, or choose Original to restore the open panel.'
                         : currentStyle.description}
                   </p>
                 </section>
@@ -696,21 +687,7 @@ function App() {
                 <HaloEditor
                   model={design.model}
                   value={design.halo}
-                  suppliedHalo={suppliedHalo}
                   onChange={(halo) => update({ halo })}
-                  onRemove={() =>
-                    update({
-                      style: 'original',
-                      halo: { ...design.halo, mode: 'original' },
-                    })
-                  }
-                  onRestoreSupplied={() =>
-                    update({
-                      style: '1',
-                      halo: { ...design.halo, mode: 'original' },
-                      grille: { ...design.grille, mode: 'original' },
-                    })
-                  }
                 />
               </div>
               <div
@@ -925,11 +902,7 @@ function App() {
           </div>
           {exportTarget !== 'knob' && (
             <div className="download-summary">
-              <PanelIcon
-                model={design.model}
-                style={sourceStyle}
-                generatedHalo={customHalo}
-              />
+              <PanelIcon model={design.model} style={design.style} />
               <div>
                 <strong>
                   Speaker {design.model.toUpperCase()} · {panelLabel}

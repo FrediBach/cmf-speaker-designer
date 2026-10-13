@@ -30,7 +30,7 @@ export interface SpeakerPreviewProps {
   geometry: BufferGeometry | null
   error?: string | null
   model: 's' | 'm'
-  style: 'original' | '1' | '2' | '3'
+  style: 'original' | 'custom'
   panelColor: string
   knobColor: string
   knobGeometry: BufferGeometry | null

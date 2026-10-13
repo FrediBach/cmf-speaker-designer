@@ -22,15 +22,10 @@ import {
   type SpeakerModel,
 } from './panels'
 
-const cases: [SpeakerModel, PanelStyle][] = ['s', 'm'].flatMap((model) =>
-  ['original', '1', '2', '3'].map(
-    (style) =>
-      [model as SpeakerModel, style as PanelStyle] as [
-        SpeakerModel,
-        PanelStyle,
-      ],
-  ),
-)
+const cases: [SpeakerModel, PanelStyle][] = [
+  ['s', 'original'],
+  ['m', 'original'],
+]
 
 function readPanel(model: SpeakerModel, style: PanelStyle) {
   const data = readFileSync(
