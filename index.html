@@ -2,17 +2,86 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="canonical" href="https://cmfspeakerdesigner.com/" />
+    <link rel="stylesheet" href="/fallback.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f5f5ef" />
+    <meta name="application-name" content="CMF Speaker Designer" />
+    <meta name="apple-mobile-web-app-title" content="CMF Designer" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
     <meta
       name="description"
-      content="Customize CMF Speaker S and M front panels, grilles, handles, and colors. Preview in 3D and export a printable STL."
+      content="Design your own CMF Speaker S and M front panels, grilles, handles, and knobs. Customize colors, preview in 3D, and download STL files for 3D printing."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="CMF Speaker Designer" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:url" content="https://cmfspeakerdesigner.com/" />
+    <meta property="og:title" content="CMF Speaker Designer" />
+    <meta
+      property="og:description"
+      content="Make your speaker your own. Customize panels, grilles, handles, and knobs for CMF Speaker S and M, preview in 3D, and download printable STL files."
+    />
+    <meta
+      property="og:image"
+      content="https://cmfspeakerdesigner.com/og-image.png"
+    />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="CMF Speaker Designer with white, orange, black, and turquoise speakers. Customize. Preview. 3D print."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CMF Speaker Designer" />
+    <meta
+      name="twitter:description"
+      content="Customize your CMF Speaker S and M. Design panels, grilles, handles, and knobs, preview in 3D, and download printable STL files."
+    />
+    <meta
+      name="twitter:image"
+      content="https://cmfspeakerdesigner.com/og-image.png"
+    />
+    <meta
+      name="twitter:image:alt"
+      content="CMF Speaker Designer with white, orange, black, and turquoise speakers. Customize. Preview. 3D print."
     />
     <title>CMF Speaker Designer</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "CMF Speaker Designer",
+        "url": "https://cmfspeakerdesigner.com/",
+        "description": "Customize CMF Speaker S and M front panels, grilles, handles, and knobs. Preview your design in 3D and download printable STL files.",
+        "image": "https://cmfspeakerdesigner.com/og-image.png",
+        "applicationCategory": "DesignApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires JavaScript and WebAssembly. WebGL is used for 3D previews.",
+        "isAccessibleForFree": true,
+        "inLanguage": "en"
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <main class="static-page">
+        <span class="static-brand">CMF Speaker Designer</span>
+        <h1>Make your speaker your own.</h1>
+        <p>
+          Customize front panels, grilles, handles, knobs, and colors for CMF
+          Speaker S and M. Preview your design in 3D and download STL files for
+          3D printing.
+        </p>
+        <p>Enable JavaScript in your browser to open the designer.</p>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

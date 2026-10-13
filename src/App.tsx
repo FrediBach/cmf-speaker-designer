@@ -32,6 +32,7 @@ import { GrilleEditor } from '@/components/GrilleEditor'
 import { ColorPicker } from '@/components/ColorPicker'
 import { KnobEditor } from '@/components/KnobEditor'
 import { KnobIcon } from '@/components/KnobIcon'
+import { PreviewLoadBoundary } from '@/components/PreviewLoadBoundary'
 import { normalizeKnobSettings, KNOB_STYLES } from '@/lib/knob-settings'
 import { useKnobGeometry } from '@/lib/use-knob-geometry'
 import type { DesignExportTarget } from '@/lib/design-export'
@@ -323,30 +324,32 @@ function App() {
                 {design.model.toUpperCase()}—01
               </div>
               <div className="preview-stage">
-                <Suspense
-                  fallback={
-                    <div className="preview-loading">
-                      <LoaderCircle className="spin" size={22} />
-                      <span>Loading preview…</span>
-                    </div>
-                  }
-                >
-                  <SpeakerPreview
-                    geometry={previewGeometry}
-                    error={error}
-                    key={retryKey}
-                    model={design.model}
-                    style={sourceStyle}
-                    panelColor={design.panelColor}
-                    knobColor={design.knobColor}
-                    knobGeometry={previewKnobGeometry}
-                    knobStyle={design.knob.style}
-                    relief={design.relief}
-                    view={view}
-                    assembly={assembly}
-                    resetKey={resetKey}
-                  />
-                </Suspense>
+                <PreviewLoadBoundary>
+                  <Suspense
+                    fallback={
+                      <div className="preview-loading" role="status">
+                        <LoaderCircle className="spin" size={22} />
+                        <span>Loading preview…</span>
+                      </div>
+                    }
+                  >
+                    <SpeakerPreview
+                      geometry={previewGeometry}
+                      error={error}
+                      key={retryKey}
+                      model={design.model}
+                      style={sourceStyle}
+                      panelColor={design.panelColor}
+                      knobColor={design.knobColor}
+                      knobGeometry={previewKnobGeometry}
+                      knobStyle={design.knob.style}
+                      relief={design.relief}
+                      view={view}
+                      assembly={assembly}
+                      resetKey={resetKey}
+                    />
+                  </Suspense>
+                </PreviewLoadBoundary>
               </div>
               {(generating || knobGenerating) && previewGeometry && (
                 <div className="geometry-updating" role="status">

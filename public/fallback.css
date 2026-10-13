@@ -1,0 +1,33 @@
+.static-page {
+  box-sizing: border-box;
+  max-width: 680px;
+  margin: 12vh auto;
+  padding: 40px;
+  color: #252723;
+  background: #f5f5ef;
+  font-family: system-ui, sans-serif;
+  line-height: 1.6;
+  border-top: 4px solid #f45427;
+}
+.static-brand {
+  font-size: 14px;
+  font-weight: 700;
+}
+.static-page h1 {
+  font-size: clamp(28px, 6vw, 42px);
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+}
+.static-page a {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 12px 20px;
+  background: #f45427;
+  color: #20221d;
+  font-weight: 600;
+  text-decoration: none;
+}
+.static-page a:focus-visible {
+  outline: 3px solid #245fc2;
+  outline-offset: 4px;
+}

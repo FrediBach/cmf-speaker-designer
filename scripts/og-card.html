@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>CMF Speaker Designer — social card</title>
+    <style>
+      @font-face {
+        font-family: 'DM Sans';
+        src: url('{{DM_SANS_FONT}}') format('woff2');
+        font-style: normal;
+        font-weight: 100 1000;
+      }
+      @font-face {
+        font-family: 'Space Mono';
+        src: url('{{MONO_FONT}}') format('woff2');
+        font-style: normal;
+        font-weight: 400;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1200px;
+        height: 630px;
+        margin: 0;
+        overflow: hidden;
+      }
+      body {
+        background: #dadada;
+        color: #252723;
+        font-family: 'DM Sans', sans-serif;
+      }
+      main {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-left: 12px solid #f45427;
+      }
+      .photo {
+        position: absolute;
+        right: 0;
+        top: 0;
+        width: 650px;
+        height: 548px;
+        overflow: hidden;
+      }
+      .photo img {
+        position: absolute;
+        width: 1100px;
+        max-width: none;
+        left: -236px;
+        top: -11px;
+      }
+      .eyebrow {
+        position: absolute;
+        left: 52px;
+        top: 47px;
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        font-family: 'Space Mono', monospace;
+        font-size: 15px;
+        letter-spacing: 1.1px;
+      }
+      .dot {
+        display: inline-block;
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: #f45427;
+      }
+      h1 {
+        position: absolute;
+        left: 50px;
+        top: 111px;
+        margin: 0;
+        font-size: 83px;
+        line-height: 0.99;
+        font-weight: 650;
+        letter-spacing: -4.5px;
+      }
+      h1 span {
+        color: #f45427;
+      }
+      .description {
+        position: absolute;
+        left: 53px;
+        top: 397px;
+        margin: 0;
+        font-size: 24px;
+        font-weight: 450;
+        letter-spacing: -0.65px;
+      }
+      footer {
+        position: absolute;
+        left: 52px;
+        right: 52px;
+        bottom: 34px;
+        height: 61px;
+        border-top: 1px solid #bfc1b5;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        font-family: 'Space Mono', monospace;
+        font-size: 15px;
+      }
+      .arrow {
+        color: #f45427;
+        font-family: 'DM Sans', sans-serif;
+        font-size: 29px;
+        line-height: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="photo">
+        <img
+          src="{{SPEAKERS_IMAGE}}"
+          alt="White, orange, black, and turquoise CMF speakers"
+        />
+      </div>
+      <div class="eyebrow"><span class="dot"></span>MAKE IT YOURS.</div>
+      <h1><span>CMF</span><br />Speaker<br />Designer</h1>
+      <p class="description">Customize. Preview. 3D print.</p>
+      <footer>
+        <span>cmfspeakerdesigner.com</span><span class="arrow">↗</span>
+      </footer>
+    </main>
+  </body>
+</html>

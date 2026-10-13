@@ -153,3 +153,6 @@ test-results/
 playwright-report/
 
 .DS_Store
+
+# Local Vercel project settings
+.vercel/

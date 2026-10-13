@@ -18,6 +18,7 @@ npm run check    # TypeScript validation
 npm test         # Geometry and STL export checks
 npm run build    # Production files in dist/
 npm run preview  # Serve the production build locally
+npm run test:production # Build and run the full browser regression suite
 ```
 
 Browser regression checks use Playwright with a locally installed Google Chrome:
@@ -26,7 +27,7 @@ Browser regression checks use Playwright with a locally installed Google Chrome:
 npm run test:e2e
 ```
 
-The tests start Vite automatically when needed and cover the WebGL preview, model and style changes, saved colors, keyboard face-depth controls, generated handles and grilles, actual STL downloads, and a narrow mobile layout. Downloads are inspected independently for closed edges, one connected component, hole topology, clear passages through each opening, and solid backing behind face recesses. Screenshots, downloaded STLs, and failure traces are written to the ignored `test-results/` directory.
+The tests start Vite automatically when needed and cover the WebGL preview, model and style changes, saved colors, keyboard face-depth controls, generated handles and grilles, actual STL downloads, and a narrow mobile layout. Downloads are inspected independently for closed edges, one connected component, hole topology, clear passages through each opening, and solid backing behind face recesses. Screenshots, downloaded STLs, and failure traces are written to the ignored `test-results/` directory. GitHub Actions runs the unit checks and full production browser suite on Node.js 24 for pushes and pull requests, retaining browser artifacts when a run fails.
 
 To check the bundled geometry worker and WebAssembly module against a production build:
 
@@ -113,8 +114,31 @@ Models and the geometry generator are loaded on demand. Large STL resources and 
 
 ## Deploy to cmfspeakerdesigner.com
 
-Run `npm ci` followed by `npm run build`, then deploy the contents of `dist/` to a static web host. Configure that host's custom domain as `cmfspeakerdesigner.com`, follow its DNS instructions, and enable HTTPS. The current Vite configuration targets the domain root.
+Import this repository into Vercel and select **Node.js 24.x** in the project's build settings. [`vercel.json`](vercel.json) supplies the Vite preset, `npm ci` installation, `npm run build`, and `dist/` output directory. No environment variables, backend, or API keys are needed.
 
-Serve all generated assets, including the STL files, worker script, and `.wasm` module, and enable HTTP compression and caching through the host. The repository does not provision hosting or change DNS.
+Add **cmfspeakerdesigner.com** and **www.cmfspeakerdesigner.com** in the project's domain settings, follow the DNS records Vercel supplies, and wait for HTTPS certificates to be issued. The config redirects `www` permanently to `https://cmfspeakerdesigner.com`, preserving paths and shared-design query parameters. Metadata and the sitemap use the apex domain. Non-production hosts receive `X-Robots-Tag: noindex, nofollow`.
+
+Vite's content-hashed files under `/assets/`, including models, fonts, the geometry worker, and WebAssembly, can be cached for one year. HTML and files copied from `public/` revalidate on each use so metadata, icons, and crawler files update after deployment. All shared designs use query parameters on `/`; there is no catch-all rewrite, so missing assets and unknown paths return a real 404.
+
+The app includes canonical, Open Graph, Twitter card, and structured metadata; a 1200 × 630 social image at `/og-image.png`; `/robots.txt` and `/sitemap.xml`; and `/site.webmanifest` with standard and maskable app icons. A standalone `/404.html` provides a route back to the designer, and the main page has a readable JavaScript-disabled fallback. The manifest supports an installed app window; it does not add offline caching.
+
+The social image and raster icons are committed in `public/`, so deployment does not require a browser. To regenerate them after changing the brand assets or [`scripts/og-card.html`](scripts/og-card.html), run `npm run assets:generate` locally with Google Chrome installed. The script uses the existing product photography and SVG favicon. Set `PLAYWRIGHT_CHROMIUM_CHANNEL=chromium` to use an installed Playwright Chromium instead.
+
+The response headers restrict scripts and network requests to this origin, block framing, and disable unused device permissions. The Content Security Policy permits WebAssembly compilation for Manifold, local workers, and inline styles used by React/Radix. It does not permit inline executable scripts or JavaScript `eval`. Keep the Vercel Toolbar disabled for this project; its injected third-party scripts are outside this policy. If external services are added later, update the policy for those specific origins.
+
+Before promoting a deployment, run the local checks and production browser checks:
+
+```sh
+npm ci
+npm run check
+npm test
+npm run test:production
+```
+
+The production preview applies the global security headers from `vercel.json`, so the browser suite exercises the Content Security Policy, including the WebAssembly worker. The development server remains configured for Vite's development tooling.
+
+After deployment, confirm the custom domain and `www` redirect, `/og-image.png`, `/robots.txt`, `/sitemap.xml`, and `/site.webmanifest`. Open a shared design and generate/download a custom panel to exercise the deployed worker and `.wasm` asset. Check that unknown paths return HTTP 404, previews send `X-Robots-Tag: noindex, nofollow`, and production sends the expected security/cache headers. Vite's local preview does not emulate Vercel's host redirects, cache rules, conditional indexing headers, or 404 behavior; these domain smoke checks must be performed on the deployment even when the local suite passes. The [Vercel configuration reference](https://vercel.com/docs/project-configuration/vercel-json) documents these settings, and [Vercel's redirect guide](https://vercel.com/kb/guide/how-do-i-perform-vercel-redirects-based-on-query-strings) describes query-string preservation.
+
+Other static hosts can serve the complete `dist/` directory at the domain root. Apply equivalent HTTPS, redirect, header, and cache rules there. The repository does not provision hosting or change DNS.
 
 Application code is covered by the repository's [MIT license](LICENSE). The supplied product photography and model files retain their respective owners' rights.

@@ -1,0 +1,33 @@
+{
+  "id": "/",
+  "name": "CMF Speaker Designer",
+  "short_name": "CMF Designer",
+  "description": "Customize CMF Speaker S and M panels, grilles, handles, and knobs. Preview in 3D and download printable STL files.",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f5ef",
+  "theme_color": "#f5f5ef",
+  "categories": ["design", "utilities"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
