@@ -1,7 +1,8 @@
-import { BufferGeometry, Mesh, Vector3 } from 'three'
+import { BufferGeometry, Float32BufferAttribute, Mesh, Vector3 } from 'three'
 import { STLExporter } from 'three/addons/exporters/STLExporter.js'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 import { applyFaceDepth, MAX_FACE_DEPTH } from './face-depth'
+import { computePanelNormals } from './panel-normals'
 import type { HaloSettings } from './halo-settings'
 export { MAX_FACE_DEPTH } from './face-depth'
 
@@ -99,6 +100,7 @@ export async function loadPanelGeometry(
  * Add material ahead of the main face's inner surface, preserving every vertex
  * at or behind Z=.5 mm and the folded controls. A continuous, monotonic depth
  * map retains connectivity, openings, XY dimensions, and the attachment fit.
+ * Refine the depth transition before deforming so broad triangles stay planar.
  * This changes face depth, not the speaker's acoustic or mechanical design.
  */
 export function buildPanelGeometry(
@@ -116,11 +118,16 @@ export function buildPanelGeometry(
   const geometry = source.clone()
   geometry.userData = { model, style, addedFaceDepth: relief, units: 'mm' }
   if (relief > 0) {
-    const positions = geometry.getAttribute('position')
-    applyFaceDepth(positions.array, model, relief)
-    positions.needsUpdate = true
-    geometry.computeVertexNormals()
+    const positions = applyFaceDepth(
+      new Float32Array(source.getAttribute('position').array),
+      model,
+      relief,
+    )
+    geometry.setAttribute('position', new Float32BufferAttribute(positions, 3))
   }
+  // STL triangles have separate vertices. Blend their normals across curves,
+  // keeping the control fold and other sharp edges crisp without moving vertices.
+  computePanelNormals(geometry)
   geometry.computeBoundingBox()
   geometry.computeBoundingSphere()
   return geometry

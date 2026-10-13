@@ -49,7 +49,7 @@ export function createPanelEngine(wasmUrl?: string) {
         // Source arrays stay cached in the worker and must never be transferred or edited.
         positions = new Float32Array(original)
       }
-      applyFaceDepth(positions, model, relief)
+      positions = applyFaceDepth(positions, model, relief)
       if (grille.mode === 'custom') {
         if (style !== 'original')
           throw new Error('A custom grille needs the original open panel.')

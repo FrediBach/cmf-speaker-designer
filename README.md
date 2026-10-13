@@ -135,6 +135,8 @@ The default **Panel + knob** export is a ZIP containing two STLs and `design.jso
 - **Three.js, React Three Fiber, and Drei** provide mesh loading, material previews, lighting, and camera interaction.
 - **Manifold** performs solid Boolean operations in a WebAssembly worker, keeping handle, grille, and halo generation off the main UI thread.
 - `src/lib/panels.ts` owns source selection, model coordinates, face-depth transformations, and STL exports.
+- `src/lib/face-depth.ts` subdivides only triangles crossing the depth transition before deformation, keeping broad front surfaces planar and shared edges watertight in both the preview and STL.
+- `src/lib/panel-normals.ts` smooths curved surfaces while keeping flat faces uniformly shaded and sharp edges crisp.
 - `src/lib/handle-settings.ts` validates dependent handle dimensions and material constraints.
 - `src/lib/handle-geometry.ts` trims the source upper section and generates a connected handle with real cutouts; `handles.worker.ts` runs this kernel in the browser.
 - `src/lib/grille-settings.ts` constrains grille dimensions and defines the shared pattern layout; `grille-geometry.ts` joins perforated inserts and cuts blind decorative recesses.

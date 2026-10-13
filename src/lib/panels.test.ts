@@ -106,18 +106,29 @@ describe('official panel geometry and millimeter STL export', () => {
       const customized = buildPanelGeometry(source, model, style, 2)
       const positions = source.getAttribute('position')
       const modified = customized.getAttribute('position')
+      const modifiedVertices = new Set<string>()
+      for (let i = 0; i < modified.count; i += 1)
+        modifiedVertices.add(
+          `${modified.getX(i)},${modified.getY(i)},${modified.getZ(i)}`,
+        )
       let protectedVertices = 0
       let changedVertices = 0
       let invalidCoordinates = 0
       for (let i = 0; i < positions.count; i += 1) {
         const z = positions.getZ(i)
-        const nextZ = modified.getZ(i)
+        const y = positions.getY(i)
+        const t = Math.min(1, Math.max(0, (y - (model === 's' ? 16 : 54)) / 3))
+        const nextZ = Math.fround(
+          z +
+            2 *
+              Math.min(1, Math.max(0, (z - 0.5) / 3.5)) *
+              (1 - t * t * (3 - 2 * t)),
+        )
         const protectedVertex =
           z <= 0.5 || positions.getY(i) >= (model === 's' ? 19 : 57)
-        if (
-          positions.getX(i) !== modified.getX(i) ||
-          positions.getY(i) !== modified.getY(i)
-        )
+        // Refinement adds vertices, but every original point must retain its
+        // XY coordinate and the intended depth (including the mounting fit).
+        if (!modifiedVertices.has(`${positions.getX(i)},${y},${nextZ}`))
           invalidCoordinates += 1
         if (protectedVertex) {
           protectedVertices += 1
@@ -134,7 +145,9 @@ describe('official panel geometry and millimeter STL export', () => {
       expect(customStats.volume).toBeGreaterThan(originalStats.volume)
 
       const binary = exportPanelStl(customized)
-      expect(binary.byteLength).toBe(84 + triangleCount * 50)
+      const refinedTriangleCount = modified.count / 3
+      expect(refinedTriangleCount).toBeGreaterThan(triangleCount)
+      expect(binary.byteLength).toBe(84 + refinedTriangleCount * 50)
       const printed = new STLLoader().parse(binary)
       const printedDimensions = getPanelDimensions(printed)
       expect(printed.boundingBox!.min.z).toBeCloseTo(0, 5)

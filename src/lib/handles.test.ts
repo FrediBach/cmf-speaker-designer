@@ -103,6 +103,57 @@ function intersections(geometry: BufferGeometry, x: number, y: number) {
 
 describe('generative handles', () => {
   it.each(cases)(
+    'keeps the %s/%s front planar and watertight after adding handle and face depth',
+    async (model, style) => {
+      const original = readPanel(model, style)
+      const relief = 2
+      const geometry = await buildHandledPanelGeometry(
+        original,
+        model,
+        style,
+        relief,
+        {
+          ...getDefaultHandleSettings(model),
+          mode: 'custom',
+          height: 48,
+          cutout: 'slot',
+        },
+      )
+      const faceTop = model === 's' ? 19 : 57
+      let flatSamples = 0
+      // Sample the actual surface across the face, including the large triangles
+      // left by the handle boolean. Vertex normals alone can hide a warped face.
+      for (const x of [-38, -32, -24, -12, 0, 12, 24, 32, 38]) {
+        for (const belowTop of [4, 8, 16, 24, 40, 60]) {
+          const y = faceTop - belowTop
+          const front = intersections(original, x, y).at(-1)
+          if (front === undefined || Math.abs(front - 4) > 0.0001) continue
+          flatSamples += 1
+          const modifiedFront = intersections(geometry, x, y).at(-1)
+          expect(modifiedFront, `front surface at (${x}, ${y})`).toBeCloseTo(
+            4 + relief,
+            4,
+          )
+        }
+      }
+      expect(flatSamples).toBeGreaterThan(12)
+      expect(inspectTopology(geometry)).toEqual({
+        invalidEdges: 0,
+        components: 1,
+      })
+      const roundtrip = new STLLoader().parse(exportPanelStl(geometry))
+      expect(inspectTopology(roundtrip)).toEqual({
+        invalidEdges: 0,
+        components: 1,
+      })
+      roundtrip.dispose()
+      geometry.dispose()
+      original.dispose()
+    },
+    30_000,
+  )
+
+  it.each(cases)(
     'joins a genuinely perforated custom handle to %s/%s as one closed solid',
     async (model, style) => {
       const original = readPanel(model, style)

@@ -449,7 +449,8 @@ test('keyboard face depth produces a correctly named full-size binary STL downlo
   await download.saveAs(output)
   const binary = await readFile(output)
   const triangleCount = binary.readUInt32LE(80)
-  expect(triangleCount).toBe(200_022)
+  // Face-depth transitions are locally subdivided before deformation.
+  expect(triangleCount).toBeGreaterThan(200_022)
   expect(binary.byteLength).toBe(84 + triangleCount * 50)
 
   // Read the actual browser download independently of the app's STL exporter.

@@ -153,7 +153,6 @@ export async function buildHandledPanelGeometry(
     'position',
     new Float32BufferAttribute(result.positions, 3),
   )
-  handled.computeVertexNormals()
   const completed = buildPanelGeometry(handled, model, style, 0)
   handled.dispose()
   completed.userData.addedFaceDepth = relief
