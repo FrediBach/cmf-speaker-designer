@@ -270,13 +270,11 @@ function App() {
         Skip to design controls
       </a>
       <header className="site-header">
-        <a className="brand" href="#" aria-label="CMF Speaker Designer home">
-          <span className="brand-word">
-            cmf<span className="brand-dot">●</span>
-          </span>
-          <span className="brand-divider" />
+        <a className="brand" href="#" aria-label="CMF Speaker designer home">
           <h1 className="brand-title" id="page-title">
-            Speaker designer
+            <span className="brand-product">CMF Speaker</span>{' '}
+            <span className="brand-divider" aria-hidden="true" />
+            <span className="brand-descriptor">designer</span>
           </h1>
         </a>
         <span className="workspace-id" aria-hidden="true">

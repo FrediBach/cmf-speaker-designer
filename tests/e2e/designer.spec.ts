@@ -251,7 +251,7 @@ test('renders WebGL and switches parametric panel modes, colors, and preview mod
   })
   await page.goto('/')
   await expect(
-    page.getByRole('heading', { name: 'Speaker designer' }),
+    page.getByRole('heading', { name: 'CMF Speaker designer', exact: true }),
   ).toBeVisible()
   await expectPanelReady(page)
 

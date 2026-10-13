@@ -178,37 +178,31 @@ svg {
   border-bottom: 1px solid var(--border);
 }
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-.brand-word {
-  white-space: nowrap;
   flex-shrink: 0;
-  font-size: 38px;
-  font-weight: 800;
-  letter-spacing: -3px;
+}
+.brand-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0;
+  white-space: nowrap;
   line-height: 1;
 }
-.brand-dot {
-  color: var(--primary);
-  font-size: 10px;
-  vertical-align: top;
-  display: inline-block;
-  margin: 5px 0 0 5px;
-  letter-spacing: 0;
+.brand-product {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.9px;
 }
 .brand-divider {
   width: 1px;
-  height: 30px;
+  height: 26px;
   background: var(--border);
 }
-.brand-title {
-  white-space: nowrap;
+.brand-descriptor {
+  color: var(--muted-foreground);
   font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.5px;
-  margin: 0;
+  font-weight: 500;
+  letter-spacing: -0.3px;
 }
 .workspace-id {
   font: 12px var(--mono);
@@ -1826,14 +1820,14 @@ main {
     padding: 0 14px;
     gap: 12px;
   }
-  .brand {
+  .brand-title {
     gap: 12px;
   }
-  .brand-word {
-    font-size: 30px;
+  .brand-product {
+    font-size: 22px;
   }
-  .brand-title {
-    font-size: 16px;
+  .brand-descriptor {
+    font-size: 15px;
   }
   .brand-divider {
     height: 24px;
@@ -2062,6 +2056,22 @@ main {
   }
 }
 @media (max-width: 480px) {
+  .brand-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .brand-product {
+    font-size: 20px;
+    letter-spacing: -0.6px;
+  }
+  .brand-descriptor {
+    font-size: 12px;
+    letter-spacing: 0;
+  }
+  .brand-divider {
+    display: none;
+  }
   .appearance-option {
     gap: 7px;
     padding: 10px;
@@ -2074,15 +2084,6 @@ main {
   }
   .site-header {
     padding: 0 10px;
-  }
-  .brand {
-    gap: 9px;
-  }
-  .brand-title {
-    font-size: 14px;
-  }
-  .brand-divider {
-    display: none;
   }
   .site-header nav button {
     font-size: 12px;
