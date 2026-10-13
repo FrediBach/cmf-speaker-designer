@@ -76,7 +76,7 @@ test('generates a custom speaker grille with through-holes, blind face recesses,
       name: 'Recess depth in millimeters',
       exact: true,
     })
-    .fill('0.6')
+    .fill('3')
   await expectGeneratedPanelReady(page)
 
   await page.reload()
@@ -113,7 +113,10 @@ test('generates a custom speaker grille with through-holes, blind face recesses,
       name: 'Recess depth in millimeters',
       exact: true,
     }),
-  ).toHaveValue('0.6')
+  ).toHaveValue('3')
+  await expect(
+    page.getByRole('slider', { name: 'Recess depth', exact: true }),
+  ).toHaveAttribute('aria-valuemax', '3')
   await page.screenshot({
     path: testInfo.outputPath('custom-grille-and-handle.png'),
     fullPage: true,
@@ -169,17 +172,48 @@ test('generates a custom speaker grille with through-holes, blind face recesses,
     blindRecess,
     'An extended face recess must retain a rear wall',
   ).toHaveLength(2)
-  expect(blindRecess[0]).toBeCloseTo(0.6, 3)
+  expect(blindRecess[0]).toBeCloseTo(3, 3)
   expect(blindRecess[1]).toBeCloseTo(3.5, 3)
+  for (const [x, y] of [
+    [0, 6],
+    [-30, -24],
+    [0, -54],
+  ]) {
+    const transitionRecess = mesh.rayZ(x, y)
+    expect(
+      transitionRecess,
+      'The pattern must continue across the speaker rim as a blind recess',
+    ).toHaveLength(2)
+    expect(transitionRecess[0]).toBeCloseTo(3, 3)
+    expect(transitionRecess[1]).toBeCloseTo(3.5, 3)
+  }
   const untouchedWeb = mesh.rayZ(-33, 0)
   expect(untouchedWeb).toHaveLength(2)
   expect(untouchedWeb[0]).toBeCloseTo(0, 3)
   expect(untouchedWeb[1]).toBeCloseTo(3.5, 3)
-  expect(blindRecess[1] - blindRecess[0]).toBeGreaterThan(2.8)
+  expect(blindRecess[1] - blindRecess[0]).toBeCloseTo(0.5, 3)
   expect(
     mesh.rayZ(0, 60.98455),
     'The separately designed carry-loop opening must remain clear',
   ).toEqual([])
+
+  await page.locator('summary').filter({ hasText: 'Grille thickness' }).click()
+  await page
+    .getByRole('spinbutton', {
+      name: 'Grille thickness in millimeters',
+      exact: true,
+    })
+    .fill('2')
+  await expect(
+    page.getByRole('spinbutton', {
+      name: 'Recess depth in millimeters',
+      exact: true,
+    }),
+  ).toHaveValue('1.5')
+  await expect(
+    page.getByRole('slider', { name: 'Recess depth', exact: true }),
+  ).toHaveAttribute('aria-valuemax', '1.5')
+  await expectGeneratedPanelReady(page)
 
   await page.getByRole('button', { name: 'Hexagon', exact: true }).click()
   await expectGeneratedPanelReady(page)

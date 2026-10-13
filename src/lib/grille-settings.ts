@@ -26,14 +26,22 @@ export const DEFAULT_GRILLE_SETTINGS: GrilleSettings = {
   recessDepth: 0.6,
 }
 
+export const GRILLE_MIN_BACKING = 0.5
+
 export const GRILLE_LIMITS = {
   size: { min: 2, max: 10 },
   spacing: { min: 1.2, max: 6 },
   slotLength: { min: 4, max: 24 },
   rotation: { min: 0, max: 90 },
   thickness: { min: 2, max: 4 },
-  recessDepth: { min: 0.2, max: 1.2 },
+  recessDepth: { min: 0.2, max: 3 },
 } as const
+
+const maxRecessDepth = (thickness: number) =>
+  Math.min(
+    GRILLE_LIMITS.recessDepth.max,
+    Number((thickness - GRILLE_MIN_BACKING).toFixed(6)),
+  )
 
 const bounded = (value: unknown, fallback: number, min: number, max: number) =>
   typeof value === 'number' && Number.isFinite(value)
@@ -55,6 +63,10 @@ export function normalizeGrilleSettings(
     ]),
   ) as Pick<GrilleSettings, keyof typeof GRILLE_LIMITS>
   values.slotLength = Math.max(values.slotLength, values.size)
+  values.recessDepth = Math.min(
+    values.recessDepth,
+    maxRecessDepth(values.thickness),
+  )
   return {
     ...values,
     mode: input.mode === 'custom' ? 'custom' : 'original',
@@ -72,6 +84,10 @@ export function getGrilleLimits(input: Partial<GrilleSettings> = {}) {
   return {
     ...GRILLE_LIMITS,
     slotLength: { min: Math.max(4, settings.size), max: 24 },
+    recessDepth: {
+      min: GRILLE_LIMITS.recessDepth.min,
+      max: maxRecessDepth(settings.thickness),
+    },
   }
 }
 
@@ -94,7 +110,6 @@ export interface GrillePattern {
 
 export const GRILLE_INSERT_RADIUS = 33.1
 export const GRILLE_PERFORATION_RADIUS = 30.5
-export const GRILLE_RECESS_EXCLUSION_RADIUS = 34.1
 
 export function getGrilleOpenings(model: SpeakerModel): GrilleOpening[] {
   return (model === 's' ? [-23] : [15, -70]).map((y) => ({
@@ -127,22 +142,6 @@ function holeOutline(settings: GrilleSettings): [number, number][] {
     }
   }
   return points
-}
-
-function distanceToSegment(
-  x: number,
-  y: number,
-  a: [number, number],
-  b: [number, number],
-) {
-  const dx = b[0] - a[0],
-    dy = b[1] - a[1]
-  const length = dx * dx + dy * dy
-  const t =
-    length > 0
-      ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / length))
-      : 0
-  return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy)
 }
 
 /** Shared by the CAD kernel and the UI: all points are canonical millimeters. */
@@ -215,23 +214,7 @@ export function getGrillePattern(
         )
       ) {
         holes.push({ x, y, points, kind: 'through' })
-      } else if (
-        settings.extendPattern &&
-        openings.every(
-          (opening) =>
-            Math.hypot(x - opening.x, y - opening.y) >
-              GRILLE_RECESS_EXCLUSION_RADIUS &&
-            points.every(
-              (point, index) =>
-                distanceToSegment(
-                  opening.x,
-                  opening.y,
-                  point,
-                  points[(index + 1) % points.length],
-                ) >= GRILLE_RECESS_EXCLUSION_RADIUS,
-            ),
-        )
-      ) {
+      } else if (settings.extendPattern) {
         holes.push({ x, y, points, kind: 'recess' })
       }
     }

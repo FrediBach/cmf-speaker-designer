@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createGrilleEngine } from './grille-geometry'
 import {
   DEFAULT_GRILLE_SETTINGS,
+  getGrilleOpenings,
   normalizeGrilleSettings,
 } from './grille-settings'
 import { createHandleEngine } from './handle-geometry'
@@ -98,7 +99,7 @@ function hits(geometry: BufferGeometry, x: number, y: number) {
   return result
 }
 
-describe('real perforated grilles and shallow surrounding pattern', () => {
+describe('real perforated grilles and blind surrounding pattern', () => {
   let engine: Awaited<ReturnType<typeof createGrilleEngine>>
   beforeAll(async () => {
     engine = await createGrilleEngine()
@@ -109,13 +110,14 @@ describe('real perforated grilles and shallow surrounding pattern', () => {
     (['round', 'hex', 'slot'] as const).map((pattern) => ({ model, pattern })),
   )
   it.each(cases)(
-    '$model / $pattern is connected, closed, and has real speaker perforations',
+    '$model / $pattern is connected, closed, and perforated with 3 mm deep recesses',
     ({ model, pattern }) => {
       const source = readPanel(model)
       const settings = normalizeGrilleSettings({
         mode: 'custom',
         pattern,
         extendPattern: true,
+        recessDepth: 3,
         rotation: pattern === 'slot' ? 30 : 0,
       })
       const result = engine.build(model, settings, positionsOf(source)),
@@ -137,7 +139,22 @@ describe('real perforated grilles and shallow surrounding pattern', () => {
       expect(recess).toBeDefined()
       const recessHits = hits(geometry, recess.x, recess.y)
       expect(recessHits.at(-1)).toBeCloseTo(4 - settings.recessDepth, 3)
-      expect(recessHits.at(-1)! - recessHits[0]).toBeGreaterThan(2)
+      expect(recessHits.at(-1)! - recessHits[0]).toBeGreaterThanOrEqual(0.5)
+      const openings = getGrilleOpenings(model)
+      for (const opening of openings) {
+        const boundaryRecess = result.metadata.holes.find(
+          (hole) =>
+            hole.kind === 'recess' &&
+            Math.hypot(hole.x - opening.x, hole.y - opening.y) <
+              opening.radius - 0.5,
+        )!
+        expect(boundaryRecess).toBeDefined()
+        expect(hits(source, boundaryRecess.x, boundaryRecess.y)).toEqual([])
+        expect(hits(geometry, boundaryRecess.x, boundaryRecess.y)).toEqual([
+          4 - settings.thickness,
+          4 - settings.recessDepth,
+        ])
+      }
       for (const [x, y] of [
         [0.3, model === 's' ? 29.5 : 70],
         [35.75, model === 's' ? -53.81 : -97.53],
@@ -183,7 +200,7 @@ describe('real perforated grilles and shallow surrounding pattern', () => {
         spacing: 2,
         thickness: 2,
         extendPattern: true,
-        recessDepth: 1.2,
+        recessDepth: 1.5,
       })
       const result = engine.build('s', settings, positionsOf(deeper)),
         geometry = geometryOf(result.positions)
@@ -191,9 +208,39 @@ describe('real perforated grilles and shallow surrounding pattern', () => {
       expect(result.metadata.frontZ).toBeCloseTo(4 + relief, 4)
       expect(hits(geometry, 0, 0)).toEqual([])
       expect(hits(geometry, 3, 0)).toEqual([2 + relief, 4 + relief])
+      // These recesses fill the former blank ring, including one whose
+      // outline crosses from the grille insert onto the original panel.
+      for (const [x, y] of [
+        [0, 6],
+        [30, -24],
+        [0, -54],
+        [30, -12],
+      ]) {
+        expect(result.metadata.holes).toContainEqual({ x, y, kind: 'recess' })
+        expect(hits(deeper, x, y)).toEqual([])
+        const boundaryHits = hits(geometry, x, y)
+        expect(boundaryHits).toHaveLength(2)
+        expect(boundaryHits[0]).toBeCloseTo(4 + relief - settings.thickness, 4)
+        expect(boundaryHits[1]).toBeCloseTo(
+          4 + relief - settings.recessDepth,
+          4,
+        )
+        expect(boundaryHits[1] - boundaryHits[0]).toBeCloseTo(0.5, 4)
+      }
+      // Sample the same recess on the original face outside the insert:
+      // its floor follows the local face and preserves the existing rear.
+      const seamHits = hits(geometry, 31.5, -12)
+      const originalSeamHits = hits(deeper, 31.5, -12)
+      expect(originalSeamHits).toHaveLength(2)
+      expect(seamHits).toHaveLength(2)
+      expect(seamHits[0]).toBe(originalSeamHits[0])
+      expect(seamHits[1]).toBeCloseTo(
+        originalSeamHits[1] - settings.recessDepth,
+        3,
+      )
       expect(hits(geometry, 36, 0)[0]).toBe(0.5)
       expect(hits(geometry, 36, 0).at(-1)).toBeCloseTo(
-        hits(deeper, 36, 0).at(-1)! - 1.2,
+        hits(deeper, 36, 0).at(-1)! - settings.recessDepth,
         3,
       )
       expect(
@@ -212,7 +259,7 @@ describe('real perforated grilles and shallow surrounding pattern', () => {
   )
 
   it.each([
-    { size: 2, spacing: 1.2, thickness: 4, recessDepth: 1.2, rotation: 45 },
+    { size: 2, spacing: 1.2, thickness: 4, recessDepth: 3, rotation: 45 },
     { size: 10, spacing: 6, thickness: 2, recessDepth: 0.2, rotation: 90 },
   ])(
     'keeps extreme density and wall settings manifold: %j',

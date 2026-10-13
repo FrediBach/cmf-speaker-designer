@@ -5,6 +5,7 @@ import initializeManifold, {
 import {
   getGrillePattern,
   GRILLE_INSERT_RADIUS,
+  GRILLE_MIN_BACKING,
   normalizeGrilleSettings,
   type GrilleSettings,
 } from './grille-settings'
@@ -64,7 +65,7 @@ function equalPositions(a: Float32Array, b: Float32Array) {
  * Run after custom-handle generation and face-depth adjustment. Only the open
  * original front-panel shape is supported. Discs overlap the CAD aperture rims
  * positively; all new through-holes stay inside the original speaker openings.
- * Optional outer impressions stop well before the existing .5 mm rear surface.
+ * Optional face impressions retain solid backing across the grille and panel.
  */
 export async function createGrilleEngine(wasmUrl?: string) {
   const module = await initializeManifold(
@@ -153,14 +154,17 @@ export async function createGrilleEngine(wasmUrl?: string) {
           const recessProfiles = own(
             new module.CrossSection(recesses.map((hole) => hole.points)),
           )
-          // Follow the actual source face, including its tessellated face-depth
-          // transition, instead of assuming every front vertex is at maxZ.
-          // The original solid shifted back is an exact depth stop for each XY.
-          const recessExtrusion = own(recessProfiles.extrude(frontZ - 2 + 0.25))
-          const prism = own(recessExtrusion.translate([0, 0, 2]))
-          const depthStop = own(
-            cached.solid.translate([0, 0, -settings.recessDepth]),
+          // Follow the joined panel and grille face, including its tessellated
+          // face-depth transition. Using the joined solid also keeps recesses
+          // blind where the continuous pattern crosses the aperture rims.
+          // The source panel's rear face is at Z=0.5. Extend the cutter down
+          // to its remaining backing so deeper selected recesses cut fully.
+          const minimumFloorZ = 0.5 + GRILLE_MIN_BACKING
+          const recessExtrusion = own(
+            recessProfiles.extrude(frontZ - minimumFloorZ + 0.25),
           )
+          const prism = own(recessExtrusion.translate([0, 0, minimumFloorZ]))
+          const depthStop = own(result.translate([0, 0, -settings.recessDepth]))
           const cutter = own(prism.subtract(depthStop))
           result = own(result.subtract(cutter))
         }

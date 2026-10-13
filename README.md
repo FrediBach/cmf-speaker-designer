@@ -50,7 +50,7 @@ Controls use larger text and targets, high-contrast selected states, and visible
 - Switch between Speaker S and M.
 - Choose from the original front panel and the three supplied alternate designs.
 - Generate round, hexagonal, or slotted grilles with adjustable opening size, material spacing, arrangement, rotation, and thickness.
-- Continue the grille pattern onto the surrounding front face as shallow recesses, with solid material behind them.
+- Continue the grille pattern onto the surrounding front face as recesses up to 3 mm deep, with solid material behind them.
 - Preview front panel and volume knob colors in an interactive Three.js scene, including panel-only and exploded views.
 - Add up to 2 mm of face depth while retaining the original mounting region and overall face dimensions.
 - Generate a custom upper handle: adjust its height, width, and rounded corners, then choose a solid face or one to three circular or slotted openings.
@@ -62,7 +62,9 @@ The designer starts from the supplied front panel meshes. The **Original handle*
 
 The **Grille** tab generates a perforated grille over the original driver openings: one on S and both on M. Custom grilles use the original open panel as their base and can be combined with a custom handle and added face depth. Selecting **Original grille** restores the selected supplied panel style. Selecting a supplied front-panel shape also turns off the generated grille while retaining its settings.
 
-**Continue across the face** adds matching blind recesses outside the driver openings. These are real surface geometry in the STL, not a texture or additional through-holes. The surrounding rim, outside edges, control deck, and mounting regions are preserved. Preview and export share the same generated mesh, and grille dimensions are applied after added face depth so their selected thickness and recess depth stay in millimeters.
+**Continue across the face** continues the same pattern seamlessly from the through-holes into matching blind recesses across the front face, including along the driver opening rims. These are real surface geometry in the STL, with solid material behind each recess. The outside edges, control deck, and mounting regions are preserved. Preview and export share the same generated mesh, and grille dimensions are applied after added face depth so their selected thickness and recess depth stay in millimeters.
+
+Recess depth ranges from 0.2 to 3 mm and is limited to the grille thickness minus 0.5 mm to retain a solid floor. A 2 mm grille allows recesses up to 1.5 mm; the default 3.5 mm grille allows the full 3 mm. Reducing grille thickness also reduces the recess depth when needed.
 
 ## Source models and printing
 

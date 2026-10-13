@@ -386,12 +386,15 @@ export function GrilleEditor({ model, value, onChange }: Props) {
               <span>
                 <strong id={extensionLabelId}>Continue across the face</strong>
                 <small id={extensionDescriptionId}>
-                  Shallow recesses outside the speaker openings.
+                  Continue seamlessly into recesses across the face.
                 </small>
               </span>
             </label>
             {value.extendPattern &&
-              parameter('recessDepth', 'Recess depth', { step: 0.1 })}
+              parameter('recessDepth', 'Recess depth', {
+                step: 0.1,
+                description: `Up to ${Number(limits.recessDepth.max.toFixed(1))} mm with this grille thickness.`,
+              })}
           </section>
         </>
       )}
