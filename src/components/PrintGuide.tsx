@@ -65,10 +65,13 @@ export function PrintGuide({ open, onOpenChange, triggerRef }: Props) {
             <div>
               <h4>Slice at 100% scale</h4>
               <p>
-                Unzip a full design download to find separate panel and knob
-                STLs and your saved colors and settings. Import the STLs in
-                millimeters; each part is placed on the build plate. Review
-                overhangs and supports in your slicer before printing.
+                Choose STL in the export dialog for slicing. Unzip a full design
+                download to find separate panel and knob files and your saved
+                colors and settings. Import the STLs in millimeters; each part
+                is placed on the build plate. Review overhangs and supports in
+                your slicer before printing. Choose STP for faceted STEP
+                geometry in CAD applications; these files preserve the mesh
+                without parametric feature history.
               </p>
             </div>
           </li>

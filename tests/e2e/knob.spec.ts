@@ -24,7 +24,7 @@ const test = base.extend<{ appErrors: string[] }>({
 
 async function expectReady(page: Page) {
   await expect(
-    page.getByRole('button', { name: 'Export STL', exact: true }),
+    page.getByRole('button', { name: 'Export design', exact: true }),
   ).toBeEnabled()
   await expect(page.locator('[data-knob-ready]')).toHaveAttribute(
     'data-knob-ready',
@@ -46,7 +46,7 @@ async function expectFixedFitControls(page: Page) {
 
 async function downloadKnob(page: Page, testInfo: TestInfo, name: string) {
   await expectReady(page)
-  await page.getByRole('button', { name: 'Export STL', exact: true }).click()
+  await page.getByRole('button', { name: 'Export design', exact: true }).click()
   const dialog = page.getByRole('dialog', {
     name: 'Export design',
     exact: true,
@@ -122,6 +122,37 @@ function unzipStored(binary: Buffer) {
   }
   expect(central).toBe(end)
   return files
+}
+
+/** Inspect the downloaded STEP text without importing the application exporter. */
+function inspectFacetedStep(binary: Buffer) {
+  const source = binary.toString('utf8')
+  expect(source.startsWith('ISO-10303-21;')).toBe(true)
+  expect(source.trimEnd().endsWith('END-ISO-10303-21;')).toBe(true)
+  expect(source).toContain('ADVANCED_BREP_SHAPE_REPRESENTATION(')
+  expect(source).toContain('ADVANCED_FACE(')
+  expect(source).toContain('CLOSED_SHELL(')
+  expect(source).toMatch(/SI_UNIT\(\s*\.MILLI\.\s*,\s*\.METRE\.\s*\)/)
+  const minimum = [Infinity, Infinity, Infinity]
+  const maximum = [-Infinity, -Infinity, -Infinity]
+  let count = 0
+  for (const match of source.matchAll(
+    /CARTESIAN_POINT\('[^']*',\s*\(([^)]+)\)\)/g,
+  )) {
+    const point = match[1].split(',').map(Number)
+    if (
+      point.length !== 3 ||
+      point.some((coordinate) => !Number.isFinite(coordinate))
+    )
+      throw new Error('Malformed STEP Cartesian point')
+    for (let axis = 0; axis < 3; axis += 1) {
+      minimum[axis] = Math.min(minimum[axis], point[axis])
+      maximum[axis] = Math.max(maximum[axis], point[axis])
+    }
+    count += 1
+  }
+  expect(count).toBeGreaterThan(100)
+  return { minimum, maximum }
 }
 
 test('selects all five knobs and renders each in the focused preview', async ({
@@ -258,7 +289,7 @@ test('preserves upper grip settings and colors in saved links and the printable 
   await page.goto(link)
   await expectReady(page)
 
-  await page.getByRole('button', { name: 'Export STL', exact: true }).click()
+  await page.getByRole('button', { name: 'Export design', exact: true }).click()
   const dialog = page.getByRole('dialog', {
     name: 'Export design',
     exact: true,
@@ -292,7 +323,7 @@ test('preserves upper grip settings and colors in saved links and the printable 
   expect(knob.maximum[2]).toBeCloseTo(18, 3)
   expect(knob.maximum[0] - knob.minimum[0]).toBeCloseTo(18, 3)
 
-  await page.getByRole('button', { name: 'Export STL', exact: true }).click()
+  await page.getByRole('button', { name: 'Export design', exact: true }).click()
   await dialog
     .getByRole('group', { name: 'Export parts' })
     .getByRole('button', { name: 'Knob only', exact: true })
@@ -304,6 +335,96 @@ test('preserves upper grip settings and colors in saved links and the printable 
   const stlPath = testInfo.outputPath(stl.suggestedFilename())
   await stl.saveAs(stlPath)
   expect(await readFile(stlPath)).toEqual(knobBytes)
+})
+
+test('chooses STL or STP for individual parts and the design ZIP', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/')
+  await expectReady(page)
+  const trigger = page.getByRole('button', {
+    name: 'Export design',
+    exact: true,
+  })
+  await trigger.click()
+  const dialog = page.getByRole('dialog', {
+    name: 'Export design',
+    exact: true,
+  })
+  const formats = dialog.getByRole('group', { name: 'Export format' })
+  const stlFormat = formats.getByRole('button', { name: 'STL', exact: true })
+  const stpFormat = formats.getByRole('button', { name: 'STP', exact: true })
+  await expect(stlFormat).toHaveAttribute('aria-pressed', 'true')
+  await expect(stpFormat).toHaveAttribute('aria-pressed', 'false')
+  await stpFormat.focus()
+  await page.keyboard.press('Enter')
+  await expect(stpFormat).toHaveAttribute('aria-pressed', 'true')
+  await expect(stlFormat).toHaveAttribute('aria-pressed', 'false')
+  await expect(dialog).toContainText('Faceted STEP')
+  await dialog.screenshot({
+    path: testInfo.outputPath('step-export-dialog.png'),
+  })
+
+  const zipStarted = page.waitForEvent('download')
+  await dialog.getByRole('button', { name: /^Download ZIP/ }).click()
+  const zip = await zipStarted
+  expect(zip.suggestedFilename()).toBe('cmf-speaker-s-design-stp.zip')
+  const zipPath = testInfo.outputPath(zip.suggestedFilename())
+  await zip.saveAs(zipPath)
+  const entries = unzipStored(await readFile(zipPath))
+  expect(entries.size).toBe(3)
+  const settings = JSON.parse(entries.get('design.json')!.toString('utf8'))
+  expect(settings.export).toMatchObject({
+    format: 'stp',
+    units: 'mm',
+    geometryType: 'advanced-brep',
+    toleranceMm: 0.01,
+  })
+  expect(settings.export.files.panel).toMatch(/\.stp$/)
+  expect(settings.export.files.knob).toMatch(/\.stp$/)
+  const panel = inspectFacetedStep(entries.get(settings.export.files.panel)!)
+  const archivedKnob = inspectFacetedStep(
+    entries.get(settings.export.files.knob)!,
+  )
+  expect(panel.maximum[0] - panel.minimum[0]).toBeCloseTo(84.9715, 3)
+  expect(panel.minimum[2]).toBeCloseTo(0, 5)
+
+  await trigger.click()
+  await dialog
+    .getByRole('group', { name: 'Export parts' })
+    .getByRole('button', { name: 'Knob only', exact: true })
+    .click()
+  await stlFormat.click()
+  const stlStarted = page.waitForEvent('download')
+  await dialog.getByRole('button', { name: /^Download STL/ }).click()
+  const stl = await stlStarted
+  expect(stl.suggestedFilename()).toBe(
+    settings.export.files.knob.replace(/\.stp$/, '.stl'),
+  )
+  const stlPath = testInfo.outputPath(stl.suggestedFilename())
+  await stl.saveAs(stlPath)
+  const stlKnob = inspectBinaryStl(await readFile(stlPath))
+
+  await trigger.click()
+  await stpFormat.click()
+  const stpStarted = page.waitForEvent('download')
+  await dialog.getByRole('button', { name: /^Download STP/ }).click()
+  const stp = await stpStarted
+  expect(stp.suggestedFilename()).toBe(settings.export.files.knob)
+  const stpPath = testInfo.outputPath(stp.suggestedFilename())
+  await stp.saveAs(stpPath)
+  const directKnob = inspectFacetedStep(await readFile(stpPath))
+  for (let axis = 0; axis < 3; axis += 1) {
+    expect(
+      Math.abs(directKnob.minimum[axis] - stlKnob.minimum[axis]),
+    ).toBeLessThanOrEqual(settings.export.toleranceMm)
+    expect(
+      Math.abs(directKnob.maximum[axis] - stlKnob.maximum[axis]),
+    ).toBeLessThanOrEqual(settings.export.toleranceMm)
+    expect(directKnob.minimum[axis]).toBe(archivedKnob.minimum[axis])
+    expect(directKnob.maximum[axis]).toBe(archivedKnob.maximum[axis])
+  }
+  await expect(page.getByRole('status')).toContainText('STP downloaded.')
 })
 
 test('exports the final rapid edit and keeps knob controls usable on mobile', async ({
@@ -348,7 +469,7 @@ test('exports the final rapid edit and keeps knob controls usable on mobile', as
   await page.screenshot({
     path: testInfo.outputPath('mobile-knob-controls.png'),
   })
-  await page.getByRole('button', { name: 'Export STL', exact: true }).click()
+  await page.getByRole('button', { name: 'Export design', exact: true }).click()
   const dialog = page.getByRole('dialog', {
     name: 'Export design',
     exact: true,
@@ -357,6 +478,14 @@ test('exports the final rapid edit and keeps knob controls usable on mobile', as
     .getByRole('group', { name: 'Export parts' })
     .getByRole('button', { name: 'Knob only', exact: true })
     .click()
+  const formats = dialog.getByRole('group', { name: 'Export format' })
+  const stpFormat = formats.getByRole('button', { name: 'STP', exact: true })
+  await expect(stpFormat).toBeInViewport()
+  await stpFormat.click()
+  await expect(
+    dialog.getByRole('button', { name: /^Download STP/ }),
+  ).toBeVisible()
+  await formats.getByRole('button', { name: 'STL', exact: true }).click()
   const downloadButton = dialog.getByRole('button', { name: /^Download STL/ })
   await expect(downloadButton).toBeInViewport()
   const started = page.waitForEvent('download')

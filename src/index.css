@@ -2479,6 +2479,17 @@ main {
 .export-targets {
   margin: 20px 0 16px;
 }
+.export-formats {
+  margin-top: 20px;
+}
+.export-formats + .export-targets {
+  margin-top: 12px;
+}
+.export-formats button:disabled,
+.export-targets button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
 .export-targets button {
   min-width: 0;
   font-size: 13px;

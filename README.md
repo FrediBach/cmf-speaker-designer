@@ -16,7 +16,7 @@ Open the local URL printed by Vite. Other commands:
 ```sh
 npm run check    # TypeScript validation
 npm run doctor -- --verbose # React Doctor diagnostics
-npm test         # Geometry and STL export checks
+npm test         # Geometry, STL, and STEP export checks
 npm run build    # Production files in dist/
 npm run preview  # Serve the production build locally
 npm run test:production # Build and run the full browser regression suite
@@ -38,7 +38,7 @@ Browser regression checks use Playwright with a locally installed Google Chrome:
 npm run test:e2e
 ```
 
-The tests start Vite automatically when needed and cover the WebGL preview, model and style changes, saved colors, keyboard face-depth controls, generated handles, grilles, and halos, actual STL downloads, and a narrow mobile layout. Downloads are inspected independently for closed edges, one connected component, hole topology, clear passages through each opening, solid backing behind face recesses, and the projection of an angled halo cover. Screenshots, downloaded STLs, and failure traces are written to the ignored `test-results/` directory. GitHub Actions runs the unit checks and full production browser suite on Node.js 24 for pushes and pull requests, retaining browser artifacts when a run fails.
+The tests start Vite automatically when needed and cover the WebGL preview, model and style changes, saved colors, keyboard face-depth controls, generated handles, grilles, and halos, actual STL and STP downloads, and a narrow mobile layout. Downloads are inspected independently for closed edges, one connected component, hole topology, clear passages through each opening, solid backing behind face recesses, and the projection of an angled halo cover. STEP download checks verify the selected format, millimeter units, part bounds, and ZIP contents. Screenshots, downloaded files, and failure traces are written to the ignored `test-results/` directory. GitHub Actions runs the unit checks and full production browser suite on Node.js 24 for pushes and pull requests, retaining browser artifacts when a run fails.
 
 To check the bundled geometry worker and WebAssembly module against a production build:
 
@@ -61,7 +61,7 @@ Controls use larger text and targets, high-contrast selected states, and visible
 
 ## What the POC does
 
-Choose **Black** or **Gray** under **Speaker body**, next to the model selection. Gray approximates the body and side radiator faces of the white speaker variant; panel and knob colors remain independent. The body choice is saved locally, shared in design links, and recorded as `bodyColor` in the ZIP's `design.json`. Older designs default to black. The body is preview context only and is not exported as an STL.
+Choose **Black** or **Gray** under **Speaker body**, next to the model selection. Gray approximates the body and side radiator faces of the white speaker variant; panel and knob colors remain independent. The body choice is saved locally, shared in design links, and recorded as `bodyColor` in the ZIP's `design.json`. Older designs default to black. The body is preview context only and is not exported.
 
 - Switch between Speaker S and M.
 - Choose the original front panel or build a custom panel with parametric halos and grilles.
@@ -77,7 +77,7 @@ Choose **Black** or **Gray** under **Speaker body**, next to the model selection
 - Keep the original STL base diameter, collar, and socket fixed; shape the upper grip with height and inward taper.
 - Generate straight, spiral, or chevron flutes with adjustable count and depth, or choose the number of faces on a faceted grip.
 - Inspect the knob at full size in a dedicated preview, or see it mounted on either speaker.
-- Download panel and knob together as a ZIP with separate binary STLs in millimeters and a `design.json` containing settings and colors. Individual STL downloads are also available.
+- Choose binary **STL** or faceted **STP** (STEP) exports in millimeters. Download panel and knob together as a ZIP with separate part files and a `design.json` containing settings, colors, and export format, or download either part individually.
 
 The designer starts from each model's original front panel mesh. **Custom** selects an open panel ready to configure in the **Halo** and **Grille** tabs; it does not add either feature automatically. Selecting **Original** removes generated halos and grilles while retaining their parameters for later use. The **Original handle** option retains the source upper section. **Custom handle** removes that upper section above the control deck and joins a newly generated extension to the remaining panel; its openings are actual through-holes in the exported solid. Carry loop, Three dots, and Solid presets provide starting points. STL has no color or unit metadata: the exported coordinates are intended as millimeters. The ZIP records panel and knob colors in `design.json`. Choose the corresponding filament or material in your slicer. This POC does not include freeform drawing, text embossing, slicer integration, or multi-material exports.
 
@@ -128,7 +128,9 @@ The **Knob** tab selects Ring, Bar, Cross, Fluted, or Faceted. Ring, Bar, and Cr
 
 Selecting the Knob tab opens the close-up **Knob only** preview. Use **Speaker** or **Exploded** to inspect it alongside the panel. The base diameter, entire lower collar, mounting stem, and internal socket remain at their original STL dimensions. There is no diameter or rigid rotation control; old saved values for these are discarded when a design opens. Only the grip above the collar changes. Adjust its height and inward taper; Fluted grips offer Straight, Spiral, and Chevron paths with flute count and depth, while Faceted grips offer an adjustable face count. Generative details stay within the original outer diameter. Unmodified supplied styles retain their exact source geometry. The Heart from the larger collection has different mounting dimensions and is no longer offered; saved Heart selections open as Bar. Preview and export use the same mesh, with dimensions measured from it; each knob STL contains one part, with its lowest point at Z=0. Check fit, grip clearance, and printing supports with a test print.
 
-The default **Panel + knob** export is a ZIP containing two STLs and `design.json`. The parts remain separate so different filaments can be used. The JSON retains both color hex values and all design parameters; the app does not currently provide a file-import control. Choose **Panel only** or **Knob only** in the export dialog for a direct STL download.
+Choose **Export design**, then **STL** or **STP** under **Export format**. STL is selected by default. The default **Panel + knob** export is a ZIP containing two part files in the selected format and `design.json`. The parts remain separate so different filaments can be used. The JSON retains both color hex values, all design parameters, and the selected `export.format`; the app does not currently provide a file-import control. Choose **Panel only** or **Knob only** for a direct `.stl` or `.stp` download.
+
+STP exports use conventional AP214 advanced B-rep solids with explicit millimeter units and the same print orientation as STL. STEP preparation reduces excess mesh detail within a **0.01 mm surface tolerance**, preserves holes and separate shells, and combines coplanar triangles into shared planar faces. Curved surfaces remain faceted; the files do not reconstruct smooth CAD surfaces or contain parametric feature history. Preparation runs in a worker so the interface stays responsive. The ZIP records the STEP tolerance as `export.toleranceMm`. STL retains the full preview mesh. Neither export writes the preview colors into the part files; the ZIP retains them in `design.json`.
 
 ## Implementation
 
@@ -147,7 +149,10 @@ The default **Panel + knob** export is a ZIP containing two STLs and `design.jso
 - `src/lib/use-panel-geometry.ts` schedules geometry updates, retains the last preview during generation, and enables export when the current design is ready.
 - `src/lib/knob-settings.ts` validates knob styles and dimensions; `knobs.ts` extracts the source parts, preserves the mounting interface, and builds the preview/export geometry.
 - `src/lib/use-knob-geometry.ts` loads and updates knobs while preventing stale geometry from being exported.
-- `src/lib/design-export.ts` writes individual STLs or a ZIP with both parts and saved colors/settings.
+- `src/lib/design-export.ts` writes individual STL or STP files, or a ZIP with both parts and saved colors/settings.
+- `src/lib/step-export.ts` writes AP214 solids with shared edges and planar faces; `step-faces.ts` combines coplanar regions while retaining hole boundaries.
+- `src/lib/step-mesh.ts` prepares STEP geometry within the tolerance in `step-settings.ts`. `step-export-client.ts` and `step-export.worker.ts` keep preparation and serialization off the UI thread.
+- `src/lib/step-import.test.ts` independently imports complete panel and knob exports with OpenCascade, checking actual geometry rather than file text alone. `occt-import-js` is a development dependency only.
 - `src/lib/design.ts` validates shared and locally stored design settings.
 - `src/components/SpeakerPreview.tsx` renders the selected panel and the contextual speaker body.
 - `src/components/DesignerPreview.tsx`, `DesignControls.tsx`, and `PanelEditor.tsx` compose the preview and editing workspace; `ExportDialog.tsx` and `PrintGuide.tsx` own the dialogs.

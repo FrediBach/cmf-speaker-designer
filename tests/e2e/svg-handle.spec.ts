@@ -7,7 +7,7 @@ const triangle =
 
 async function ready(page: Page) {
   await expect(
-    page.getByRole('button', { name: 'Export STL', exact: true }),
+    page.getByRole('button', { name: 'Export design', exact: true }),
   ).toBeEnabled()
   await expect(
     page.getByText('3D preview unavailable', { exact: true }),
@@ -110,7 +110,7 @@ test('uploads, saves, restores and exports an SVG as a real handle cutout', asyn
   await expect(page.locator('.svg-upload-file')).toContainText('triangle.svg')
   await ready(page)
 
-  await page.getByRole('button', { name: 'Export STL', exact: true }).click()
+  await page.getByRole('button', { name: 'Export design', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toContainText('SVG cutout · triangle.svg')
   await dialog.getByRole('button', { name: 'Panel only', exact: true }).click()
@@ -147,7 +147,7 @@ test('uploads, saves, restores and exports an SVG as a real handle cutout', asyn
       .filter({ hasText: 'This SVG leaves floating islands' }),
   ).toBeVisible()
   await expect(
-    page.getByRole('button', { name: 'Export STL', exact: true }),
+    page.getByRole('button', { name: 'Export design', exact: true }),
   ).toBeDisabled()
   await upload(page)
   await ready(page)

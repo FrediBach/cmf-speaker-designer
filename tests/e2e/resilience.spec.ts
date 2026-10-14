@@ -12,7 +12,7 @@ test('keeps editing and export available when the preview chunk fails, then reco
 
   await expect(page.getByRole('alert')).toContainText('Preview could not load')
   const exportButton = page.getByRole('button', {
-    name: 'Export STL',
+    name: 'Export design',
     exact: true,
   })
   await expect(exportButton).toBeEnabled()

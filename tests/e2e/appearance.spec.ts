@@ -4,7 +4,7 @@ const appearanceKey = 'cmf-speaker-appearance-v1'
 
 async function expectPanelReady(page: Page) {
   await expect(
-    page.getByRole('button', { name: 'Export STL', exact: true }),
+    page.getByRole('button', { name: 'Export design', exact: true }),
   ).toBeEnabled()
   await expect(page.locator('.preview-stage canvas')).toBeVisible()
 }
@@ -22,7 +22,7 @@ async function expectWorkspaceInViewport(page: Page) {
   expect(dimensions.scrollY).toBe(0)
   await expect(page.locator('.preview-card')).toBeInViewport({ ratio: 1 })
   await expect(
-    page.getByRole('button', { name: 'Export STL', exact: true }),
+    page.getByRole('button', { name: 'Export design', exact: true }),
   ).toBeInViewport({ ratio: 1 })
 }
 
@@ -142,7 +142,7 @@ test('all appearance combinations remain readable and preserve the speaker desig
       await expectWorkspaceInViewport(page)
 
       const exportButton = page.getByRole('button', {
-        name: 'Export STL',
+        name: 'Export design',
         exact: true,
       })
       backgrounds.set(

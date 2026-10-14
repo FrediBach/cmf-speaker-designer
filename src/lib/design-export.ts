@@ -1,21 +1,30 @@
 import type { BufferGeometry } from 'three'
 import type { Design } from './design'
-import { exportKnobStl, knobFilename } from './knobs'
-import { exportPanelStl, haloFilenameSuffix, panelFilename } from './panels'
+import { exportKnobStl, knobFilename, prepareKnobExportGeometry } from './knobs'
+import {
+  exportPanelStl,
+  haloFilenameSuffix,
+  panelFilename,
+  preparePanelExportGeometry,
+} from './panels'
+import { exportStepFile } from './step-export-client'
+import { STEP_TOLERANCE_MM } from './step-settings'
 
 export type DesignExportTarget = 'both' | 'panel' | 'knob'
+export type DesignExportFormat = 'stl' | 'stp'
 
 export interface DesignExportInput {
   panel: BufferGeometry
   knob: BufferGeometry
   design: Design
   target: DesignExportTarget
+  format?: DesignExportFormat
 }
 
 export interface DesignExportFile {
   filename: string
   data: ArrayBuffer
-  mimeType: 'model/stl' | 'application/zip'
+  mimeType: 'model/stl' | 'model/step' | 'application/zip'
 }
 
 interface ArchiveEntry {
@@ -109,45 +118,77 @@ function selectedPanelFilename(design: Design): string {
   )
 }
 
-/** Exports the same finished meshes shown in the preview, as separate parts. */
-export function buildDesignExport({
+/** Exports separate printable parts, preparing CAD geometry only for STEP. */
+export async function buildDesignExport({
   panel,
   knob,
   design,
   target,
-}: DesignExportInput): DesignExportFile {
+  format = 'stl',
+}: DesignExportInput): Promise<DesignExportFile> {
+  const panelName = selectedPanelFilename(design).replace(
+    /\.stl$/,
+    `.${format}`,
+  )
+  const knobName = knobFilename(design.knob).replace(/\.stl$/, `.${format}`)
+  const mimeType = format === 'stp' ? 'model/step' : 'model/stl'
+  const serialize = async (
+    geometry: BufferGeometry,
+    part: 'panel' | 'knob',
+    name: string,
+  ) => {
+    if (format === 'stl')
+      return part === 'panel'
+        ? exportPanelStl(geometry)
+        : exportKnobStl(geometry)
+    const printable =
+      part === 'panel'
+        ? preparePanelExportGeometry(geometry)
+        : prepareKnobExportGeometry(geometry)
+    try {
+      return await exportStepFile(printable, name)
+    } finally {
+      printable.dispose()
+    }
+  }
   if (target === 'panel') {
     return {
-      filename: selectedPanelFilename(design),
-      data: exportPanelStl(panel),
-      mimeType: 'model/stl',
+      filename: panelName,
+      data: await serialize(panel, 'panel', panelName),
+      mimeType,
     }
   }
   if (target === 'knob') {
     return {
-      filename: knobFilename(design.knob),
-      data: exportKnobStl(knob),
-      mimeType: 'model/stl',
+      filename: knobName,
+      data: await serialize(knob, 'knob', knobName),
+      mimeType,
     }
   }
 
-  const panelName = selectedPanelFilename(design)
-  const knobName = knobFilename(design.knob)
   const settings = {
     ...design,
     export: {
       version: 1,
       units: 'mm',
+      format,
+      geometryType: format === 'stp' ? 'advanced-brep' : 'mesh',
+      ...(format === 'stp' ? { toleranceMm: STEP_TOLERANCE_MM } : {}),
       files: { panel: panelName, knob: knobName },
-      colorNote:
-        'STL files contain geometry only. Match panelColor and knobColor to filament or material colors in your slicer. bodyColor identifies the existing speaker body, which is preview context only.',
+      colorNote: `${format.toUpperCase()} files contain geometry only. Match panelColor and knobColor to filament or material colors in your slicer or CAD application. bodyColor identifies the existing speaker body, which is preview context only.`,
     },
   }
   return {
-    filename: `cmf-speaker-${design.model}-design.zip`,
+    filename: `cmf-speaker-${design.model}-design${format === 'stp' ? '-stp' : ''}.zip`,
     data: buildArchive([
-      { name: panelName, data: new Uint8Array(exportPanelStl(panel)) },
-      { name: knobName, data: new Uint8Array(exportKnobStl(knob)) },
+      {
+        name: panelName,
+        data: new Uint8Array(await serialize(panel, 'panel', panelName)),
+      },
+      {
+        name: knobName,
+        data: new Uint8Array(await serialize(knob, 'knob', knobName)),
+      },
       {
         name: 'design.json',
         data: encoder.encode(`${JSON.stringify(settings, null, 2)}\n`),
@@ -157,8 +198,10 @@ export function buildDesignExport({
   }
 }
 
-export function downloadDesignExport(input: DesignExportInput): void {
-  const file = buildDesignExport(input)
+export async function downloadDesignExport(
+  input: DesignExportInput,
+): Promise<void> {
+  const file = await buildDesignExport(input)
   const url = URL.createObjectURL(
     new Blob([file.data], { type: file.mimeType }),
   )

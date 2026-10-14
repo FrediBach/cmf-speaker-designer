@@ -21,7 +21,7 @@ const test = base.extend<{ appErrors: string[] }>({
 
 async function expectPanelReady(page: Page) {
   await expect(
-    page.getByRole('button', { name: 'Export STL', exact: true }),
+    page.getByRole('button', { name: 'Export design', exact: true }),
   ).toBeEnabled()
   await expect(page.locator('.preview-stage canvas')).toBeVisible()
   await expect(
@@ -45,7 +45,7 @@ async function expectWorkspaceInViewport(page: Page) {
   expect(dimensions.scrollY).toBe(0)
   await expect(page.locator('.preview-card')).toBeInViewport({ ratio: 1 })
   await expect(
-    page.getByRole('button', { name: 'Export STL', exact: true }),
+    page.getByRole('button', { name: 'Export design', exact: true }),
   ).toBeInViewport({ ratio: 1 })
 }
 
@@ -192,7 +192,7 @@ test.describe('workspace accessibility', () => {
     await expectWorkspaceInViewport(page)
     await expectPanelReady(page)
     const exportButton = page.getByRole('button', {
-      name: 'Export STL',
+      name: 'Export design',
       exact: true,
     })
     await exportButton.click()
@@ -429,7 +429,7 @@ test('keyboard face depth produces a correctly named full-size binary STL downlo
   await depth.press('ArrowRight')
   await expect(depth).toHaveAttribute('aria-valuenow', '0.2')
   await expectPanelReady(page)
-  await page.getByRole('button', { name: 'Export STL', exact: true }).click()
+  await page.getByRole('button', { name: 'Export design', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
   await expect(dialog).toContainText('Speaker M · Custom')
@@ -559,7 +559,9 @@ test('generates a connected custom handle with real round and slotted through-ho
 
   async function downloadHandle(label: string) {
     await expectPanelReady(page)
-    await page.getByRole('button', { name: 'Export STL', exact: true }).click()
+    await page
+      .getByRole('button', { name: 'Export design', exact: true })
+      .click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toContainText('Custom handle · 48 mm extension')
     await dialog
@@ -729,7 +731,9 @@ test.describe('mobile layout', () => {
     await expect(
       page.getByRole('button', { name: 'Front panel: Chalk', exact: true }),
     ).toHaveAttribute('aria-pressed', 'true')
-    await page.getByRole('button', { name: 'Export STL', exact: true }).click()
+    await page
+      .getByRole('button', { name: 'Export design', exact: true })
+      .click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
     await expect(
@@ -781,7 +785,9 @@ test.describe('mobile layout', () => {
       path: testInfo.outputPath('mobile-custom-handle.png'),
       fullPage: true,
     })
-    await page.getByRole('button', { name: 'Export STL', exact: true }).click()
+    await page
+      .getByRole('button', { name: 'Export design', exact: true })
+      .click()
     await expect(dialog).toContainText('Custom handle · 35 mm extension')
     const customDownload = dialog.getByRole('button', { name: /^Download ZIP/ })
     await customDownload.scrollIntoViewIfNeeded()

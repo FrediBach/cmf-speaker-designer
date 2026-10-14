@@ -320,10 +320,17 @@ export async function buildKnobGeometry(
   return customizeKnobGeometry(original, settings)
 }
 
-export function exportKnobStl(geometry: BufferGeometry): ArrayBuffer {
+export function prepareKnobExportGeometry(
+  geometry: BufferGeometry,
+): BufferGeometry {
   const printable = geometry.clone()
   printable.computeBoundingBox()
   printable.translate(0, 0, -printable.boundingBox!.min.z)
+  return printable
+}
+
+export function exportKnobStl(geometry: BufferGeometry): ArrayBuffer {
+  const printable = prepareKnobExportGeometry(geometry)
   const mesh = new Mesh(printable)
   mesh.updateMatrixWorld(true)
   const binary = new STLExporter().parse(mesh, { binary: true })

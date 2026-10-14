@@ -5,8 +5,12 @@ import { PanelIcon } from './PanelIcon'
 import { KnobIcon } from './KnobIcon'
 import { colorName, type Design } from '@/lib/design'
 import { getDesignSummary } from '@/lib/design-summary'
-import type { DesignExportTarget } from '@/lib/design-export'
+import type {
+  DesignExportFormat,
+  DesignExportTarget,
+} from '@/lib/design-export'
 import type { useDesignGeometry } from '@/lib/use-design-geometry'
+import { STEP_TOLERANCE_MM } from '@/lib/step-settings'
 import {
   Dialog,
   DialogContent,
@@ -33,6 +37,9 @@ export function ExportDialog({
 }: Props) {
   const [busy, setBusy] = useState(false)
   const [exportTarget, setExportTarget] = useState<DesignExportTarget>('both')
+  const [exportFormat, setExportFormat] = useState<DesignExportFormat>('stl')
+  const formatLabel = exportFormat.toUpperCase()
+  const geometryLabel = exportFormat === 'stp' ? 'Faceted STEP' : 'Binary STL'
   const { geometry, knobGeometry, panelWidth, panelHeight, knobDimensions } =
     meshes
   const { knobLabel } = getDesignSummary(design)
@@ -44,20 +51,25 @@ export function ExportDialog({
         requestAnimationFrame(() => resolve()),
       )
       const { downloadDesignExport } = await import('@/lib/design-export')
-      downloadDesignExport({
+      await downloadDesignExport({
         panel: geometry,
         knob: knobGeometry,
         design,
         target: exportTarget,
+        format: exportFormat,
       })
       onOpenChange(false)
       onNotify(
         exportTarget === 'both'
           ? 'Panel, knob, and design settings downloaded.'
-          : 'STL downloaded.',
+          : `${formatLabel} downloaded.`,
       )
     } catch {
-      onNotify('The download could not start. Please try again.')
+      onNotify(
+        exportFormat === 'stp'
+          ? 'The STP export could not be created. Try STL to download the mesh.'
+          : 'The download could not start. Please try again.',
+      )
     } finally {
       setBusy(false)
     }
@@ -79,12 +91,30 @@ export function ExportDialog({
         <div className="dialog-icon">
           <ArrowDownToLine size={23} />
         </div>
-        <span className="eyebrow">EXPORT / STL</span>
+        <span className="eyebrow">EXPORT / {formatLabel}</span>
         <DialogTitle>Export design</DialogTitle>
         <DialogDescription>
-          Full-size parts in millimeters. Open each STL in your slicer at 100%
-          scale.
+          {exportFormat === 'stp'
+            ? 'Full-size STEP parts in millimeters for your CAD application.'
+            : 'Full-size parts in millimeters. Open each STL in your slicer at 100% scale.'}
         </DialogDescription>
+        <div
+          className="handle-mode export-formats"
+          role="group"
+          aria-label="Export format"
+        >
+          {(['stl', 'stp'] as const).map((format) => (
+            <button
+              key={format}
+              aria-pressed={exportFormat === format}
+              className={exportFormat === format ? 'active' : ''}
+              disabled={busy}
+              onClick={() => setExportFormat(format)}
+            >
+              {format.toUpperCase()}
+            </button>
+          ))}
+        </div>
         <div
           className="handle-mode export-targets"
           role="group"
@@ -101,6 +131,7 @@ export function ExportDialog({
               key={target.id}
               aria-pressed={exportTarget === target.id}
               className={exportTarget === target.id ? 'active' : ''}
+              disabled={busy}
               onClick={() => setExportTarget(target.id)}
             >
               {target.label}
@@ -112,6 +143,7 @@ export function ExportDialog({
             design={design}
             panelWidth={panelWidth}
             panelHeight={panelHeight}
+            geometryLabel={geometryLabel}
           />
         )}
         {exportTarget !== 'panel' && (
@@ -120,7 +152,8 @@ export function ExportDialog({
             <div>
               <strong>{knobLabel} volume knob</strong>
               <span>
-                {knobDimensions ? `${knobDimensions} mm · ` : ''}Binary STL
+                {knobDimensions ? `${knobDimensions} mm · ` : ''}
+                {geometryLabel}
               </span>
               <span>{colorName(design.knobColor)} · Fits Speaker S & M</span>
             </div>
@@ -139,15 +172,15 @@ export function ExportDialog({
           </p>
           {exportTarget === 'both' && (
             <p>
-              <Check size={15} /> ZIP includes both STLs and design.json with
-              your colors and settings
+              <Check size={15} /> ZIP includes both {formatLabel} files and
+              design.json with your colors and settings
             </p>
           )}
         </div>
         <p className="export-caveat">
-          STL files don’t store colors. Match your selected colors with
-          filament. Review supports in your slicer and test-fit your first
-          print.
+          {exportFormat === 'stp'
+            ? `Faceted STEP with ${STEP_TOLERANCE_MM} mm surface tolerance, without smooth CAD surfaces or parametric feature history. ${exportTarget === 'both' ? 'Colors are saved in the ZIP’s design.json.' : 'Choose Panel + knob to include colors and settings in a ZIP.'}`
+            : 'STL files don’t store colors. Match your selected colors with filament. Review supports in your slicer and test-fit your first print.'}
         </p>
         <Button
           className="confirm-download"
@@ -163,7 +196,7 @@ export function ExportDialog({
             ? 'Preparing files…'
             : exportTarget === 'both'
               ? 'Download ZIP'
-              : 'Download STL'}
+              : `Download ${formatLabel}`}
           <span>Speaker {design.model.toUpperCase()}</span>
         </Button>
       </DialogContent>
@@ -185,10 +218,12 @@ function PanelExportSummary({
   design,
   panelWidth,
   panelHeight,
+  geometryLabel,
 }: {
   design: Design
   panelWidth: number
   panelHeight: number
+  geometryLabel: string
 }) {
   const { panelLabel, customHalo, haloLabel } = getDesignSummary(design)
   return (
@@ -202,7 +237,7 @@ function PanelExportSummary({
           {design.relief > 0
             ? `${design.relief.toFixed(1)} mm added face depth`
             : 'Standard face depth'}{' '}
-          · Binary STL
+          · {geometryLabel}
         </span>
         {design.handle.mode === 'custom' && (
           <span>

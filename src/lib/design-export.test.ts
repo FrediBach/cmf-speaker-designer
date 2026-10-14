@@ -1,10 +1,11 @@
-import { BoxGeometry, CylinderGeometry } from 'three'
+import { Box3, BoxGeometry, CylinderGeometry, Vector3 } from 'three'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_DESIGN, validateDesign, type Design } from './design'
 import { buildDesignExport } from './design-export'
 import { exportKnobStl, knobFilename } from './knobs'
 import { exportPanelStl } from './panels'
+import { STEP_TOLERANCE_MM } from './step-settings'
 
 const decoder = new TextDecoder()
 
@@ -74,8 +75,55 @@ function readArchive(buffer: ArrayBuffer) {
   return entries
 }
 
-describe('design export', () => {
-  it('packages separate printable parts and complete, reusable color settings', () => {
+/** Read only facet vertices, excluding the STEP representation's placement. */
+function readStepBounds(buffer: ArrayBuffer) {
+  const source = decoder.decode(buffer)
+  expect(source.trimStart()).toMatch(/^ISO-10303-21;/)
+  expect(source.trimEnd()).toMatch(/END-ISO-10303-21;$/)
+  expect(source).toMatch(/SI_UNIT\s*\(\s*\.MILLI\.\s*,\s*\.METRE\.\s*\)/)
+  expect(source).toContain('ADVANCED_BREP_SHAPE_REPRESENTATION')
+  expect(source).toContain('ADVANCED_FACE')
+  expect(source).toContain('CLOSED_SHELL')
+
+  const points = new Map<string, Vector3>()
+  for (const match of source.matchAll(
+    /#(\d+)\s*=\s*CARTESIAN_POINT\s*\(\s*'[^']*'\s*,\s*\(([^)]+)\)\s*\)/g,
+  )) {
+    const coordinates = match[2].split(',').map(Number)
+    expect(coordinates).toHaveLength(3)
+    expect(coordinates.every(Number.isFinite)).toBe(true)
+    points.set(
+      match[1],
+      new Vector3(...(coordinates as [number, number, number])),
+    )
+  }
+  const bounds = new Box3()
+  let vertexCount = 0
+  for (const vertex of source.matchAll(/VERTEX_POINT\('',#(\d+)\)/g)) {
+    const point = points.get(vertex[1])
+    expect(point).toBeDefined()
+    bounds.expandByPoint(point!)
+    vertexCount += 1
+  }
+  expect(vertexCount).toBeGreaterThan(0)
+  return bounds
+}
+
+function expectStepMatchesStl(step: ArrayBuffer, stl: ArrayBuffer) {
+  const actual = readStepBounds(step)
+  const geometry = new STLLoader().parse(stl)
+  geometry.computeBoundingBox()
+  const expected = geometry.boundingBox!
+  for (const axis of ['x', 'y', 'z'] as const) {
+    expect(actual.min[axis]).toBeCloseTo(expected.min[axis], 5)
+    expect(actual.max[axis]).toBeCloseTo(expected.max[axis], 5)
+  }
+  expect(actual.min.z).toBeCloseTo(0, 5)
+  geometry.dispose()
+}
+
+describe('design export', async () => {
+  it('packages separate printable parts and complete, reusable color settings', async () => {
     const panel = new BoxGeometry(85, 131, 24)
     const knob = new CylinderGeometry(10, 10, 12, 16)
     const design: Design = {
@@ -106,7 +154,12 @@ describe('design export', () => {
     }
     const panelBefore = panel.getAttribute('position').array.slice()
     const knobBefore = knob.getAttribute('position').array.slice()
-    const file = buildDesignExport({ panel, knob, design, target: 'both' })
+    const file = await buildDesignExport({
+      panel,
+      knob,
+      design,
+      target: 'both',
+    })
     expect(file.filename).toBe('cmf-speaker-s-design.zip')
     expect(file.mimeType).toBe('application/zip')
     const entries = readArchive(file.data)
@@ -142,11 +195,11 @@ describe('design export', () => {
     knob.dispose()
   })
 
-  it('supports individual STL exports without a ZIP wrapper', () => {
+  it('supports individual STL exports without a ZIP wrapper', async () => {
     const panel = new BoxGeometry(85, 225, 29)
     const knob = new CylinderGeometry(10, 10, 12, 16)
     const design: Design = { ...DEFAULT_DESIGN, model: 'm', style: 'custom' }
-    const panelFile = buildDesignExport({
+    const panelFile = await buildDesignExport({
       panel,
       knob,
       design,
@@ -158,7 +211,12 @@ describe('design export', () => {
       new Uint8Array(exportPanelStl(panel)),
     )
 
-    const knobFile = buildDesignExport({ panel, knob, design, target: 'knob' })
+    const knobFile = await buildDesignExport({
+      panel,
+      knob,
+      design,
+      target: 'knob',
+    })
     expect(knobFile.filename).toBe(knobFilename(design.knob))
     expect(knobFile.mimeType).toBe('model/stl')
     expect(new Uint8Array(knobFile.data)).toEqual(
@@ -168,7 +226,111 @@ describe('design export', () => {
     knob.dispose()
   })
 
-  it('names generated halos and retains every halo parameter in the archive', () => {
+  it('exports each selected part as STEP in millimeters with the same orientation as STL', async () => {
+    const panel = new BoxGeometry(85, 225, 29).translate(14, 6, 31)
+    const knob = new CylinderGeometry(10, 7, 12, 16).translate(7, -4, 23)
+    const design: Design = { ...DEFAULT_DESIGN, model: 'm', style: 'custom' }
+    const panelBefore = panel.getAttribute('position').array.slice()
+    const knobBefore = knob.getAttribute('position').array.slice()
+    const panelIndexBefore = panel.getIndex()!.array.slice()
+    const knobIndexBefore = knob.getIndex()!.array.slice()
+
+    const panelFile = await buildDesignExport({
+      panel,
+      knob,
+      design,
+      target: 'panel',
+      format: 'stp',
+    })
+    expect(panelFile.filename).toBe('cmf-speaker-m-original.stp')
+    expect(panelFile.mimeType).toBe('model/step')
+    expectStepMatchesStl(panelFile.data, exportPanelStl(panel))
+
+    const knobFile = await buildDesignExport({
+      panel,
+      knob,
+      design,
+      target: 'knob',
+      format: 'stp',
+    })
+    expect(knobFile.filename).toBe(
+      knobFilename(design.knob).replace(/\.stl$/, '.stp'),
+    )
+    expect(knobFile.mimeType).toBe('model/step')
+    expectStepMatchesStl(knobFile.data, exportKnobStl(knob))
+    expect(panel.getAttribute('position').array).toEqual(panelBefore)
+    expect(knob.getAttribute('position').array).toEqual(knobBefore)
+    expect(panel.getIndex()!.array).toEqual(panelIndexBefore)
+    expect(knob.getIndex()!.array).toEqual(knobIndexBefore)
+    panel.dispose()
+    knob.dispose()
+  })
+
+  it('packages STEP parts with their format, geometry type, and reusable settings', async () => {
+    const panel = new BoxGeometry(85, 131, 48)
+    const knob = new CylinderGeometry(10, 7, 12, 16)
+    const design = validateDesign({
+      ...DEFAULT_DESIGN,
+      bodyColor: 'gray',
+      panelColor: '#123456',
+      knobColor: '#abcdef',
+      style: 'custom',
+      relief: 1.2,
+      knob: { ...DEFAULT_DESIGN.knob, style: 'hex', facets: 8, height: 16 },
+      handle: { ...DEFAULT_DESIGN.handle, mode: 'custom', height: 32 },
+      grille: {
+        ...DEFAULT_DESIGN.grille,
+        mode: 'custom',
+        pattern: 'hex',
+        extendPattern: true,
+      },
+      halo: {
+        mode: 'custom',
+        outwardAngle: 20,
+        depth: 30,
+        thickness: 3.2,
+        cutAngle: 45,
+        cutRotation: 180,
+        rimHeight: 3,
+      },
+    })
+    const file = await buildDesignExport({
+      panel,
+      knob,
+      design,
+      target: 'both',
+      format: 'stp',
+    })
+    expect(file.filename).toBe('cmf-speaker-s-design-stp.zip')
+    expect(file.mimeType).toBe('application/zip')
+    const entries = readArchive(file.data)
+    const panelName =
+      'cmf-speaker-s-original-depth-1.2mm-handle-32.0mm-grille-hex-extended-halo-30.0mm-cut-45.0deg.stp'
+    const knobName = knobFilename(design.knob).replace(/\.stl$/, '.stp')
+    expect([...entries.keys()]).toEqual([panelName, knobName, 'design.json'])
+    expectStepMatchesStl(
+      entries.get(panelName)!.buffer as ArrayBuffer,
+      exportPanelStl(panel),
+    )
+    expectStepMatchesStl(
+      entries.get(knobName)!.buffer as ArrayBuffer,
+      exportKnobStl(knob),
+    )
+    const settings = JSON.parse(decoder.decode(entries.get('design.json')))
+    expect(settings).toMatchObject(design)
+    expect(settings.export).toMatchObject({
+      format: 'stp',
+      geometryType: 'advanced-brep',
+      toleranceMm: STEP_TOLERANCE_MM,
+      units: 'mm',
+      files: { panel: panelName, knob: knobName },
+    })
+    expect(validateDesign(settings)).toEqual(design)
+    panel.dispose()
+    knob.dispose()
+  })
+
+  it('names generated halos and retains every halo parameter in the archive', async () => {
     const panel = new BoxGeometry(85, 131, 48)
     const knob = new CylinderGeometry(10, 10, 12, 16)
     const design = validateDesign({
@@ -186,10 +348,11 @@ describe('design export', () => {
     })
     const filename = 'cmf-speaker-s-original-halo-30.0mm-cut-45.0deg.stl'
     expect(
-      buildDesignExport({ panel, knob, design, target: 'panel' }).filename,
+      (await buildDesignExport({ panel, knob, design, target: 'panel' }))
+        .filename,
     ).toBe(filename)
     const entries = readArchive(
-      buildDesignExport({ panel, knob, design, target: 'both' }).data,
+      (await buildDesignExport({ panel, knob, design, target: 'both' })).data,
     )
     expect(entries.get(filename)).toEqual(new Uint8Array(exportPanelStl(panel)))
     const restored = validateDesign(

@@ -14,7 +14,7 @@ async function expectDesign(page: Page, design: Design) {
 
 async function expectReady(page: Page) {
   await expect(
-    page.getByRole('button', { name: 'Export STL', exact: true }),
+    page.getByRole('button', { name: 'Export design', exact: true }),
   ).toBeEnabled()
   await expect(page.locator('.preview-stage canvas')).toBeVisible()
   await expect(
@@ -78,7 +78,9 @@ test('randomizes every design section, preserves either speaker model, and saves
     await expect(page.locator('.preview-model')).toContainText(
       `CMF Speaker ${model.toUpperCase()}`,
     )
-    await page.getByRole('button', { name: 'Export STL', exact: true }).click()
+    await page
+      .getByRole('button', { name: 'Export design', exact: true })
+      .click()
     const exportDialog = page.getByRole('dialog', {
       name: 'Export design',
       exact: true,

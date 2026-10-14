@@ -140,15 +140,22 @@ export function getPanelDimensions(geometry: BufferGeometry) {
 }
 
 /**
- * Binary STL contains only the panel, with the front toward the print bed.
+ * Prepare an owned panel mesh with the front toward the print bed.
  * The lowest point is Z=0; distances remain in mm. Slicer orientation, supports,
  * tolerances, and material still need checking for the selected printer.
  */
-export function exportPanelStl(geometry: BufferGeometry): ArrayBuffer {
+export function preparePanelExportGeometry(
+  geometry: BufferGeometry,
+): BufferGeometry {
   const printable = geometry.clone()
   printable.rotateY(Math.PI)
   printable.computeBoundingBox()
   printable.translate(0, 0, -printable.boundingBox!.min.z)
+  return printable
+}
+
+export function exportPanelStl(geometry: BufferGeometry): ArrayBuffer {
+  const printable = preparePanelExportGeometry(geometry)
   const mesh = new Mesh(printable)
   mesh.updateMatrixWorld(true)
   const binary = new STLExporter().parse(mesh, { binary: true })

@@ -23,7 +23,7 @@ const test = base.extend<{ appErrors: string[] }>({
 
 async function expectReady(page: Page) {
   await expect(
-    page.getByRole('button', { name: 'Export STL', exact: true }),
+    page.getByRole('button', { name: 'Export design', exact: true }),
   ).toBeEnabled({ timeout: 60_000 })
   await expect(page.locator('.preview-stage canvas')).toBeVisible()
   await expect(
@@ -33,7 +33,7 @@ async function expectReady(page: Page) {
 
 async function downloadPanel(page: Page, testInfo: TestInfo, label: string) {
   await expectReady(page)
-  await page.getByRole('button', { name: 'Export STL', exact: true }).click()
+  await page.getByRole('button', { name: 'Export design', exact: true }).click()
   const dialog = page.getByRole('dialog', {
     name: 'Export design',
     exact: true,
@@ -426,7 +426,7 @@ test.describe('mobile halo controls', () => {
     expect(viewport.contentHeight).toBeLessThanOrEqual(viewport.height + 1)
     await expect(page.locator('.preview-card')).toBeInViewport({ ratio: 1 })
     await expect(
-      page.getByRole('button', { name: 'Export STL', exact: true }),
+      page.getByRole('button', { name: 'Export design', exact: true }),
     ).toBeInViewport({ ratio: 1 })
     await page.screenshot({
       path: testInfo.outputPath('mobile-halo-controls.png'),

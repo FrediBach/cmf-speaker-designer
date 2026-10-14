@@ -259,7 +259,7 @@ export function DesignControls({
       <div className="export-section">
         <div className="export-spec">
           <span>
-            <Box size={13} /> STL FORMAT
+            <Box size={13} /> STL / STP
           </span>
           <span>1:1 SCALE · MM</span>
         </div>
@@ -279,7 +279,7 @@ export function DesignControls({
           ) : (
             <ArrowDownToLine size={18} />
           )}{' '}
-          Export STL <ArrowRight size={17} />
+          Export design <ArrowRight size={17} />
         </Button>
       </div>
     </aside>
