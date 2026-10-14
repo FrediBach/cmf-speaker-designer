@@ -23,6 +23,7 @@ export function PanelEditor({ design, update, onOpenGuide }: Props) {
   const { styles, currentStyle, customHalo, customGrille, haloLabel } =
     getDesignSummary(design)
   const panelStyleSelected = (style: Design['style']) => design.style === style
+  const panelExtensionCm = design.panelExtension / 10
   return (
     <>
       <section className="control-section">
@@ -110,9 +111,39 @@ export function PanelEditor({ design, update, onOpenGuide }: Props) {
           <span>+2 mm</span>
         </div>
       </section>
+      <section className="control-section">
+        <h3>
+          <span>04</span> Panel width
+        </h3>
+        <div className="control-label">
+          <span id="panel-extension-label">Side extension</span>
+          <span className="value-chip">
+            {panelExtensionCm.toFixed(2)} cm per side
+          </span>
+        </div>
+        <Slider
+          aria-labelledby="panel-extension-label"
+          aria-valuetext={`${panelExtensionCm.toFixed(2)} centimeters per side`}
+          value={[panelExtensionCm]}
+          min={0}
+          max={1}
+          step={0.01}
+          onValueChange={([extensionCm]) =>
+            update({ panelExtension: Math.round(extensionCm * 100) / 10 })
+          }
+        />
+        <div className="slider-labels">
+          <span>0 cm</span>
+          <span>1 cm</span>
+        </div>
+        <p className="subtle-note">
+          Extends the front and angled section on both sides. Set the handle
+          width in the Handle tab.
+        </p>
+      </section>
       <div className="looks-bar">
         <div className="looks-title">
-          <span className="section-index">04</span>
+          <span className="section-index">05</span>
           <span>Color presets</span>
         </div>
         <div className="looks">

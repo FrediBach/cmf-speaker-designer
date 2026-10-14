@@ -110,7 +110,12 @@ function selectedPanelFilename(design: Design): string {
     design.grille.mode === 'custom'
       ? `-grille-${design.grille.pattern}${design.grille.extendPattern ? '-extended' : ''}`
       : ''
-  return panelFilename(design.model, 'original', design.relief).replace(
+  return panelFilename(
+    design.model,
+    'original',
+    design.relief,
+    design.panelExtension,
+  ).replace(
     '.stl',
     `${handleSuffix}${grilleSuffix}${haloFilenameSuffix(design.halo)}.stl`,
   )

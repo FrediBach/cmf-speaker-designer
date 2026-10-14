@@ -2,6 +2,7 @@ import { createHandleEngine, type HandleMetadata } from './handle-geometry'
 import { createGrilleEngine, type GrilleMetadata } from './grille-geometry'
 import { createHaloEngine, type HaloMetadata } from './halo-geometry'
 import { applyFaceDepth } from './face-depth'
+import { applyPanelExtension } from './panel-extension'
 import type { HandleWorkerRequest } from './handles'
 
 export interface GeneratedPanel {
@@ -11,7 +12,7 @@ export interface GeneratedPanel {
   halo?: HaloMetadata
 }
 
-/** One worker pipeline keeps the handle, face depth, grille, and halo in the same solid. */
+/** One worker pipeline keeps all panel customizations in the same solid. */
 export function createPanelEngine(wasmUrl?: string) {
   const sources = new Map<string, Float32Array>()
   let handleEngine: ReturnType<typeof createHandleEngine> | undefined
@@ -22,13 +23,22 @@ export function createPanelEngine(wasmUrl?: string) {
     async build(
       request: Omit<HandleWorkerRequest, 'id'>,
     ): Promise<GeneratedPanel> {
-      const { model, style, settings, grille, halo, relief, source } = request
+      const {
+        model,
+        style,
+        settings,
+        grille,
+        halo,
+        relief,
+        panelExtension,
+        source,
+      } = request
       const key = `${model}:${style}`
       if (source) sources.set(key, source)
       const original = sources.get(key)
       if (!original)
         throw new Error('The source panel is missing. Please retry.')
-      let positions = original
+      let positions = applyPanelExtension(original, model, panelExtension)
       let handle: HandleMetadata | undefined
       let grilleMetadata: GrilleMetadata | undefined
       let haloMetadata: HaloMetadata | undefined
@@ -41,11 +51,12 @@ export function createPanelEngine(wasmUrl?: string) {
           model,
           style,
           settings,
-          original,
+          positions,
+          panelExtension,
         )
         positions = result.positions
         handle = result.metadata
-      } else {
+      } else if (positions === original) {
         // Source arrays stay cached in the worker and must never be transferred or edited.
         positions = new Float32Array(original)
       }

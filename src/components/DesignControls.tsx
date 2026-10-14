@@ -239,6 +239,7 @@ export function DesignControls({
           <HandleEditor
             model={design.model}
             value={design.handle}
+            panelExtension={design.panelExtension}
             onChange={(handle) => update({ handle })}
           />
         </div>

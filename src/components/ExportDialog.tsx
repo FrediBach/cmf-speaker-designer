@@ -239,10 +239,16 @@ function PanelExportSummary({
             : 'Standard face depth'}{' '}
           · {geometryLabel}
         </span>
+        {design.panelExtension > 0 && (
+          <span>
+            Side extension · {(design.panelExtension / 10).toFixed(2)} cm per
+            side
+          </span>
+        )}
         {design.handle.mode === 'custom' && (
           <span>
             Custom handle · {design.handle.height} mm extension ·{' '}
-            {handleCutoutSummary(design.handle)}
+            {design.handle.width} mm wide · {handleCutoutSummary(design.handle)}
             {design.handle.legoStuds ? ' · LEGO-compatible studs' : ''}
           </span>
         )}

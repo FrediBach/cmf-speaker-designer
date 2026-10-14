@@ -12,6 +12,38 @@ import type { SvgCutout } from './svg-cutout'
 
 afterEach(() => vi.unstubAllGlobals())
 
+describe('panel extension', () => {
+  it('keeps legacy designs at the original width and rejects malformed extensions', () => {
+    expect(DEFAULT_DESIGN.panelExtension).toBe(0)
+    for (const panelExtension of [undefined, null, '5', NaN, Infinity, {}]) {
+      expect(validateDesign({ panelExtension }).panelExtension).toBe(0)
+    }
+    expect(validateDesign({ model: 'm' }).panelExtension).toBe(0)
+  })
+
+  it.each([
+    [-1, 0],
+    [0, 0],
+    [3.74, 3.7],
+    [3.76, 3.8],
+    [10, 10],
+    [15, 10],
+  ])('normalizes %s mm to %s mm per side', (panelExtension, expected) => {
+    expect(validateDesign({ panelExtension }).panelExtension).toBe(expected)
+  })
+
+  it('restores extended panels from storage and shared URLs', () => {
+    const design = validateDesign({ ...DEFAULT_DESIGN, panelExtension: 7.5 })
+    vi.stubGlobal('window', { location: { search: '' } })
+    vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(design) })
+    expect(readDesign()).toEqual(design)
+    vi.stubGlobal('window', {
+      location: designShareUrl(design, 'https://example.com/designer/'),
+    })
+    expect(readDesign()).toEqual(design)
+  })
+})
+
 describe('saved and shared handle designs', () => {
   it('opens legacy links with the original handle for the selected speaker', () => {
     const oldDesign = {

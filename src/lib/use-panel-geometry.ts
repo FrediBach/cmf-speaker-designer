@@ -23,7 +23,7 @@ export function usePanelGeometry(
     message: string
   } | null>(null)
   const matches = source?.model === design.model && source?.style === 'original'
-  const key = `${matches ? source.geometry.uuid : 'loading'}:${design.model}:${design.style}:${design.relief}:${JSON.stringify(design.handle)}:${JSON.stringify(design.grille)}:${JSON.stringify(design.halo)}:${retryKey}`
+  const key = `${matches ? source.geometry.uuid : 'loading'}:${design.model}:${design.style}:${design.relief}:${design.panelExtension}:${JSON.stringify(design.handle)}:${JSON.stringify(design.grille)}:${JSON.stringify(design.halo)}:${retryKey}`
 
   useEffect(() => {
     if (!matches || !source) return
@@ -39,6 +39,7 @@ export function usePanelGeometry(
                 source.model,
                 source.style,
                 design.relief,
+                design.panelExtension,
               )
             : await (
                 await import('./handles')
@@ -50,6 +51,7 @@ export function usePanelGeometry(
                 design.handle,
                 design.grille,
                 design.halo,
+                design.panelExtension,
               )
         if (!active) {
           geometry.dispose()

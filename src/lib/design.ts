@@ -43,6 +43,7 @@ export type Design = {
   panelColor: string
   knobColor: string
   relief: number
+  panelExtension: number
   handle: HandleSettings
   grille: GrilleSettings
   halo: HaloSettings
@@ -55,6 +56,7 @@ export const DEFAULT_DESIGN: Design = {
   panelColor: '#f45427',
   knobColor: '#303538',
   relief: 0,
+  panelExtension: 0,
   handle: getDefaultHandleSettings('s'),
   grille: { ...DEFAULT_GRILLE_SETTINGS },
   halo: { ...DEFAULT_HALO_SETTINGS },
@@ -95,6 +97,11 @@ export function validateDesign(value: unknown): Design {
     relief:
       typeof data.relief === 'number' && Number.isFinite(data.relief)
         ? Math.round(Math.min(2, Math.max(0, data.relief)) * 10) / 10
+        : 0,
+    panelExtension:
+      typeof data.panelExtension === 'number' &&
+      Number.isFinite(data.panelExtension)
+        ? Math.round(Math.min(10, Math.max(0, data.panelExtension)) * 10) / 10
         : 0,
   }
 }

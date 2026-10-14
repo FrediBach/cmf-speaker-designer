@@ -32,6 +32,21 @@ const svgCutout = (): SvgCutout => ({
 })
 
 describe('design history', () => {
+  it('records panel extension changes and restores them with undo and redo', () => {
+    const start = initial()
+    const changed = designHistoryReducer(start, {
+      type: 'set',
+      update: (design) => ({ ...design, panelExtension: 7.5 }),
+    })
+    expect(changed.present.panelExtension).toBe(7.5)
+    expect(changed.past).toHaveLength(1)
+    const undone = designHistoryReducer(changed, { type: 'undo' })
+    expect(undone.present).toEqual(DEFAULT_DESIGN)
+    expect(designHistoryReducer(undone, { type: 'redo' }).present).toEqual(
+      changed.present,
+    )
+  })
+
   it('records the stud toggle independently and restores it with undo and redo', () => {
     const design = validateDesign({
       ...DEFAULT_DESIGN,

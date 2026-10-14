@@ -2,6 +2,7 @@ import { BufferGeometry, Float32BufferAttribute, Mesh, Vector3 } from 'three'
 import { STLExporter } from 'three/addons/exporters/STLExporter.js'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 import { applyFaceDepth, MAX_FACE_DEPTH } from './face-depth'
+import { applyPanelExtension } from './panel-extension'
 import { computePanelNormals } from './panel-normals'
 import type { HaloSettings } from './halo-settings'
 import type { HandleSettings } from './handle-settings'
@@ -98,17 +99,16 @@ export async function loadPanelGeometry(
 }
 
 /**
- * Add material ahead of the main face's inner surface, preserving every vertex
- * at or behind Z=.5 mm and the control deck. Carry the original rounded fold
- * forward to meet the thicker face, retaining openings, XY dimensions and fit.
- * Refine the bend before deforming so broad triangles stay planar.
- * This changes face depth, not the speaker's acoustic or mechanical design.
+ * Widen the front and angled control section and add face depth while retaining
+ * openings and mounting features. Refinement before deformation keeps broad
+ * triangles planar across the side extensions and rounded fold.
  */
 export function buildPanelGeometry(
   source: BufferGeometry,
   model: SpeakerModel,
   style: PanelStyle,
   relief = 0,
+  panelExtension = 0,
 ): BufferGeometry {
   if (!Number.isFinite(relief) || relief < 0 || relief > MAX_FACE_DEPTH) {
     throw new RangeError(
@@ -117,10 +117,20 @@ export function buildPanelGeometry(
   }
 
   const geometry = source.clone()
-  geometry.userData = { model, style, addedFaceDepth: relief, units: 'mm' }
-  if (relief > 0) {
+  geometry.userData = {
+    model,
+    style,
+    addedFaceDepth: relief,
+    panelExtension,
+    units: 'mm',
+  }
+  if (relief > 0 || panelExtension !== 0) {
     const positions = applyFaceDepth(
-      new Float32Array(source.getAttribute('position').array),
+      applyPanelExtension(
+        new Float32Array(source.getAttribute('position').array),
+        model,
+        panelExtension,
+      ),
       model,
       relief,
     )
@@ -172,9 +182,12 @@ export function panelFilename(
   model: SpeakerModel,
   _style: PanelStyle,
   addedDepth = 0,
+  panelExtension = 0,
 ): string {
   const suffix = addedDepth > 0 ? `-depth-${addedDepth.toFixed(1)}mm` : ''
-  return `cmf-speaker-${model}-original${suffix}.stl`
+  const extensionSuffix =
+    panelExtension > 0 ? `-sides-${panelExtension.toFixed(1)}mm` : ''
+  return `cmf-speaker-${model}-original${suffix}${extensionSuffix}.stl`
 }
 
 export function haloFilenameSuffix(settings?: HaloSettings): string {
@@ -204,7 +217,12 @@ export function downloadPanelStl(
     grille?.mode === 'custom'
       ? `-grille-${grille.pattern}${grille.extendPattern ? '-extended' : ''}`
       : ''
-  anchor.download = panelFilename(model, style, addedDepth).replace(
+  anchor.download = panelFilename(
+    model,
+    style,
+    addedDepth,
+    geometry.userData.panelExtension,
+  ).replace(
     '.stl',
     `${handleSuffix}${grilleSuffix}${haloFilenameSuffix(geometry.userData.halo?.settings)}.stl`,
   )

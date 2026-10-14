@@ -33,6 +33,7 @@ interface CachedBase {
   seamY: number
   backZ: number
   width: number
+  panelExtension: number
 }
 
 function capsule(width: number, height: number, x: number, y: number): Point[] {
@@ -94,11 +95,12 @@ export async function createHandleEngine(wasmUrl?: string) {
       style: PanelStyle,
       input: HandleSettings,
       source?: Float32Array,
+      panelExtension = 0,
     ): HandleResult {
       const settings = normalizeHandleSettings(model, input)
       const key = `${model}:${style}`
       let base = bases.get(key)
-      if (!base) {
+      if (!base || base.panelExtension !== panelExtension) {
         if (!source)
           throw new Error(
             'The original panel is missing. Please retry the design.',
@@ -123,7 +125,16 @@ export async function createHandleEngine(wasmUrl?: string) {
               'The original panel could not be prepared for a custom handle.',
             )
           }
-          base = { solid: lower, seamY, backZ: minZ, width: maxX - minX }
+          // Keep one base per model/style when the panel width changes, rather
+          // than retaining a solid for every position of the extension slider.
+          base?.solid.delete()
+          base = {
+            solid: lower,
+            seamY,
+            backZ: minZ,
+            width: maxX - minX,
+            panelExtension,
+          }
           bases.set(key, base)
         } finally {
           original.delete()

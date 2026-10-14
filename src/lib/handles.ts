@@ -17,6 +17,7 @@ export interface HandleWorkerRequest {
   grille: GrilleSettings
   halo: HaloSettings
   relief: number
+  panelExtension: number
   source?: Float32Array
 }
 export interface HandleWorkerResponse {
@@ -75,7 +76,7 @@ let testEngine:
   | undefined
 
 /**
- * Generate the handle, face depth, grille, and halo in a dedicated WASM worker.
+ * Generate the handle, side extension, face depth, grille, and halo in one worker.
  * Callers own the returned geometry; preview and STL export use this same mesh.
  * The original path clones the original mesh without any CSG or remeshing.
  */
@@ -87,6 +88,7 @@ export async function buildHandledPanelGeometry(
   input: HandleSettings,
   grilleInput?: GrilleSettings,
   haloInput?: HaloSettings,
+  panelExtension = 0,
 ): Promise<BufferGeometry> {
   const settings = normalizeHandleSettings(model, input)
   const grille = normalizeGrilleSettings(grilleInput)
@@ -96,7 +98,7 @@ export async function buildHandledPanelGeometry(
     grille.mode === 'original' &&
     halo.mode === 'original'
   )
-    return buildPanelGeometry(source, model, style, relief)
+    return buildPanelGeometry(source, model, style, relief, panelExtension)
 
   let result: GeneratedPanel
   if (typeof Worker === 'undefined') {
@@ -113,6 +115,7 @@ export async function buildHandledPanelGeometry(
       grille,
       halo,
       relief,
+      panelExtension,
       source: new Float32Array(source.getAttribute('position').array),
     })
   } else {
@@ -134,6 +137,7 @@ export async function buildHandledPanelGeometry(
             grille,
             halo,
             relief,
+            panelExtension,
             source: positions,
           } satisfies HandleWorkerRequest,
           positions ? [positions.buffer] : [],
@@ -156,6 +160,7 @@ export async function buildHandledPanelGeometry(
   const completed = buildPanelGeometry(handled, model, style, 0)
   handled.dispose()
   completed.userData.addedFaceDepth = relief
+  completed.userData.panelExtension = panelExtension
   if (result.handle) completed.userData.handle = result.handle
   if (result.grille) completed.userData.grille = result.grille
   if (result.halo) completed.userData.halo = result.halo

@@ -29,6 +29,7 @@ import { SVG_MAX_FILE_SIZE, type SvgCutout } from '@/lib/svg-cutout'
 interface Props {
   model: SpeakerModel
   value: HandleSettings
+  panelExtension: number
   onChange: (value: HandleSettings) => void
 }
 
@@ -205,13 +206,16 @@ function Parameter({
 function HandleDiagram({
   model,
   value,
+  panelExtension,
 }: {
   model: SpeakerModel
   value: HandleSettings
+  panelExtension: number
 }) {
   const h = value.height
   const w = value.width
-  const outline = getHandleOutline(model, value)
+  const baseWidth = 84.9715 + panelExtension * 2
+  const outline = getHandleOutline(model, value, baseWidth)
     .map(([x, y]) => `${x},${h / 2 - y}`)
     .join(' ')
   const holes = getHandleHoleCenters(model, value)
@@ -238,7 +242,7 @@ function HandleDiagram({
           fill="url(#handle-grid)"
         />
         <path
-          d={`M-42.5 ${h / 2}v5h85v-5`}
+          d={`M${-baseWidth / 2} ${h / 2}v5h${baseWidth}v-5`}
           stroke="var(--control-border)"
           fill="var(--muted)"
           strokeWidth=".6"
@@ -312,7 +316,12 @@ function HandleDiagram({
   )
 }
 
-export function HandleEditor({ model, value, onChange }: Props) {
+export function HandleEditor({
+  model,
+  value,
+  panelExtension,
+  onChange,
+}: Props) {
   const studsLabelId = useId()
   const studsDescriptionId = useId()
   const limits = getHandleLimits(model, value)
@@ -390,7 +399,11 @@ export function HandleEditor({ model, value, onChange }: Props) {
         </div>
       ) : (
         <>
-          <HandleDiagram model={model} value={value} />
+          <HandleDiagram
+            model={model}
+            value={value}
+            panelExtension={panelExtension}
+          />
           <div
             className="handle-presets"
             role="group"
@@ -458,6 +471,9 @@ export function HandleEditor({ model, value, onChange }: Props) {
             {parameter('height', 'Extension height')}
             {parameter('width', 'Handle width')}
             {parameter('cornerRadius', 'Corner radius', 0.5)}
+            <p className="subtle-note">
+              Handle width is independent of the panel’s side extension.
+            </p>
           </section>
           <section className="control-section handle-cutouts">
             <h3>
