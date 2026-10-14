@@ -85,6 +85,7 @@ export async function createGrilleEngine(wasmUrl?: string) {
       model: SpeakerModel,
       input: GrilleSettings,
       positions: Float32Array,
+      panelGap = 0,
     ): GrilleResult {
       const settings = normalizeGrilleSettings(input)
       let frontZ = -Infinity
@@ -96,13 +97,13 @@ export async function createGrilleEngine(wasmUrl?: string) {
           metadata: {
             settings,
             frontZ,
-            backZ: 0.5,
+            backZ: 0.5 + panelGap,
             throughHoleCount: 0,
             recessCount: 0,
             holes: [],
           },
         }
-      if (frontZ < 3.99 || frontZ > 6.01)
+      if (frontZ - panelGap < 3.99 || frontZ - panelGap > 6.01)
         throw new Error(
           'Custom grilles require the original open front-panel shape.',
         )
@@ -157,9 +158,9 @@ export async function createGrilleEngine(wasmUrl?: string) {
           // Follow the joined panel and grille face, including its tessellated
           // face-depth transition. Using the joined solid also keeps recesses
           // blind where the continuous pattern crosses the aperture rims.
-          // The source panel's rear face is at Z=0.5. Extend the cutter down
-          // to its remaining backing so deeper selected recesses cut fully.
-          const minimumFloorZ = 0.5 + GRILLE_MIN_BACKING
+          // The rear face starts at Z=0.5 plus the panel gap. Extend the cutter
+          // down to its remaining backing so deeper selected recesses cut fully.
+          const minimumFloorZ = 0.5 + panelGap + GRILLE_MIN_BACKING
           const recessExtrusion = own(
             recessProfiles.extrude(frontZ - minimumFloorZ + 0.25),
           )

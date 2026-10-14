@@ -44,6 +44,51 @@ describe('panel extension', () => {
   })
 })
 
+describe('panel gap', () => {
+  it('keeps legacy panels flush and rejects malformed gaps', () => {
+    expect(DEFAULT_DESIGN.panelGap).toBe(0)
+    for (const panelGap of [
+      undefined,
+      null,
+      '3',
+      true,
+      NaN,
+      Infinity,
+      -Infinity,
+      {},
+    ]) {
+      expect(validateDesign({ panelGap }).panelGap).toBe(0)
+    }
+    expect(validateDesign({ model: 'm' }).panelGap).toBe(0)
+  })
+
+  it.each([
+    [-1, 0],
+    [0, 0],
+    [1.24, 1.2],
+    [1.26, 1.3],
+    [5, 5],
+    [10, 5],
+  ])('normalizes a %s mm gap to %s mm', (panelGap, expected) => {
+    expect(validateDesign({ panelGap }).panelGap).toBe(expected)
+  })
+
+  it('restores panel spacing independently of side extension from storage and shared URLs', () => {
+    const design = validateDesign({
+      ...DEFAULT_DESIGN,
+      panelExtension: 7.5,
+      panelGap: 3.5,
+    })
+    vi.stubGlobal('window', { location: { search: '' } })
+    vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(design) })
+    expect(readDesign()).toEqual(design)
+    vi.stubGlobal('window', {
+      location: designShareUrl(design, 'https://example.com/designer/'),
+    })
+    expect(readDesign()).toEqual(design)
+  })
+})
+
 describe('saved and shared handle designs', () => {
   it('opens legacy links with the original handle for the selected speaker', () => {
     const oldDesign = {

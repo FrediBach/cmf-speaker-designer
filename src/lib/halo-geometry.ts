@@ -86,6 +86,7 @@ export async function createHaloEngine(wasmUrl?: string) {
       model: SpeakerModel,
       input: HaloSettings,
       positions: Float32Array,
+      panelGap = 0,
     ): HaloResult {
       const settings = normalizeHaloSettings(input)
       let baseZ = -Infinity
@@ -114,7 +115,7 @@ export async function createHaloEngine(wasmUrl?: string) {
       }
       if (settings.mode === 'original')
         return { positions: positions.slice(), metadata }
-      if (baseZ < 3.99 || baseZ > 6.01)
+      if (baseZ - panelGap < 3.99 || baseZ - panelGap > 6.01)
         throw new Error(
           'Custom halos require the original open front-panel shape.',
         )
@@ -142,8 +143,8 @@ export async function createHaloEngine(wasmUrl?: string) {
         const profile = own(
           new module.CrossSection([
             [
-              [innerRadius, 0.75],
-              [outerRadius, 0.75],
+              [innerRadius, 0.75 + panelGap],
+              [outerRadius, 0.75 + panelGap],
               [outerRadius, baseZ],
               [metadata.topOuterRadius, frontZ],
               [metadata.topInnerRadius, frontZ],

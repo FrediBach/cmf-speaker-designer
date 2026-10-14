@@ -40,12 +40,14 @@ export function PrintGuide({ open, onOpenChange, triggerRef }: Props) {
               <p>
                 Choose Speaker S or M and a panel shape. Added face depth
                 thickens the front while retaining the original mounting
-                features and folded controls. In the Halo tab, adjust the ring
-                profile and base rim, or tilt its front cut into a hood. Combine
-                it with your own opening pattern in the Grille tab. In the
-                Handle tab, generate a new upper extension and openings. In the
-                Knob tab, shape the upper grip while retaining the original base
-                and socket dimensions.
+                features and folded controls. Panel gap raises the front and
+                angled section with extended attachments and rear support posts;
+                the knob and button stay in recessed openings. In the Halo tab,
+                adjust the ring profile and base rim, or tilt its front cut into
+                a hood. Combine it with your own opening pattern in the Grille
+                tab. In the Handle tab, generate a new upper extension and
+                openings. In the Knob tab, shape the upper grip while retaining
+                the original base and socket dimensions.
               </p>
             </div>
           </li>
@@ -81,9 +83,10 @@ export function PrintGuide({ open, onOpenChange, triggerRef }: Props) {
               <h4>Test the first print</h4>
               <p>
                 Printer tolerances vary. Test the fit before making a full set.
-                Generated handles and custom face depth have not been physically
-                tested. Test strength before using a printed handle to carry a
-                speaker.
+                Generated handles, panel gaps, and custom face depth have not
+                been physically tested. Check that the attachments lock and the
+                controls move freely. Test strength before using a printed
+                handle to carry a speaker.
               </p>
             </div>
           </li>

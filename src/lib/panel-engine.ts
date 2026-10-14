@@ -3,6 +3,7 @@ import { createGrilleEngine, type GrilleMetadata } from './grille-geometry'
 import { createHaloEngine, type HaloMetadata } from './halo-geometry'
 import { applyFaceDepth } from './face-depth'
 import { applyPanelExtension } from './panel-extension'
+import { createPanelGapEngine, type PanelGapMetadata } from './panel-gap'
 import type { HandleWorkerRequest } from './handles'
 
 export interface GeneratedPanel {
@@ -10,6 +11,7 @@ export interface GeneratedPanel {
   handle?: HandleMetadata
   grille?: GrilleMetadata
   halo?: HaloMetadata
+  gap?: PanelGapMetadata
 }
 
 /** One worker pipeline keeps all panel customizations in the same solid. */
@@ -18,6 +20,7 @@ export function createPanelEngine(wasmUrl?: string) {
   let handleEngine: ReturnType<typeof createHandleEngine> | undefined
   let grilleEngine: ReturnType<typeof createGrilleEngine> | undefined
   let haloEngine: ReturnType<typeof createHaloEngine> | undefined
+  let gapEngine: ReturnType<typeof createPanelGapEngine> | undefined
 
   return {
     async build(
@@ -31,6 +34,7 @@ export function createPanelEngine(wasmUrl?: string) {
         halo,
         relief,
         panelExtension,
+        panelGap = 0,
         source,
       } = request
       const key = `${model}:${style}`
@@ -42,6 +46,7 @@ export function createPanelEngine(wasmUrl?: string) {
       let handle: HandleMetadata | undefined
       let grilleMetadata: GrilleMetadata | undefined
       let haloMetadata: HaloMetadata | undefined
+      let gapMetadata: PanelGapMetadata | undefined
       if (settings.mode === 'custom') {
         handleEngine ??= createHandleEngine(wasmUrl).catch((error) => {
           handleEngine = undefined
@@ -61,6 +66,36 @@ export function createPanelEngine(wasmUrl?: string) {
         positions = new Float32Array(original)
       }
       positions = applyFaceDepth(positions, model, relief)
+      if (panelGap !== 0) {
+        gapEngine ??= createPanelGapEngine(wasmUrl).catch((error) => {
+          gapEngine = undefined
+          throw error
+        })
+        const result = (await gapEngine).build(
+          model,
+          positions,
+          panelGap,
+          relief,
+        )
+        positions = result.positions
+        gapMetadata = result.metadata
+        if (handle) {
+          const [, offsetY, offsetZ] = gapMetadata.deckOffset
+          handle = {
+            ...handle,
+            seamY: handle.seamY + offsetY,
+            backZ: handle.backZ + offsetZ,
+            holeCenters: handle.holeCenters.map((hole) => ({
+              ...hole,
+              y: hole.y + offsetY,
+            })),
+            studCenters: handle.studCenters.map((stud) => ({
+              ...stud,
+              y: stud.y + offsetY,
+            })),
+          }
+        }
+      }
       if (grille.mode === 'custom') {
         if (style !== 'original')
           throw new Error('A custom grille needs the original open panel.')
@@ -68,7 +103,12 @@ export function createPanelEngine(wasmUrl?: string) {
           grilleEngine = undefined
           throw error
         })
-        const result = (await grilleEngine).build(model, grille, positions)
+        const result = (await grilleEngine).build(
+          model,
+          grille,
+          positions,
+          panelGap,
+        )
         positions = result.positions
         grilleMetadata = result.metadata
       }
@@ -79,19 +119,32 @@ export function createPanelEngine(wasmUrl?: string) {
           haloEngine = undefined
           throw error
         })
-        const result = (await haloEngine).build(model, halo, positions)
+        const result = (await haloEngine).build(
+          model,
+          halo,
+          positions,
+          panelGap,
+        )
         positions = result.positions
         haloMetadata = result.metadata
       }
-      return { positions, handle, grille: grilleMetadata, halo: haloMetadata }
+      return {
+        positions,
+        handle,
+        grille: grilleMetadata,
+        halo: haloMetadata,
+        gap: gapMetadata,
+      }
     },
     async dispose() {
       const handles = await handleEngine
       const grilles = await grilleEngine
       const halos = await haloEngine
+      const gaps = await gapEngine
       handles?.dispose()
       grilles?.dispose()
       halos?.dispose()
+      gaps?.dispose()
       sources.clear()
     },
   }

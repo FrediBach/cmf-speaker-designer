@@ -115,6 +115,7 @@ function selectedPanelFilename(design: Design): string {
     'original',
     design.relief,
     design.panelExtension,
+    design.panelGap,
   ).replace(
     '.stl',
     `${handleSuffix}${grilleSuffix}${haloFilenameSuffix(design.halo)}.stl`,

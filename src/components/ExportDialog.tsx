@@ -165,7 +165,10 @@ export function ExportDialog({
         )}
         <div className="download-notes">
           <p>
-            <Check size={15} /> Original mounting features retained
+            <Check size={15} />{' '}
+            {design.panelGap > 0
+              ? 'Extended attachments and rear support posts'
+              : 'Original mounting features retained'}
           </p>
           <p>
             <Check size={15} /> Separate parts, positioned on the build plate
@@ -243,6 +246,12 @@ function PanelExportSummary({
           <span>
             Side extension · {(design.panelExtension / 10).toFixed(2)} cm per
             side
+          </span>
+        )}
+        {design.panelGap > 0 && (
+          <span>
+            Panel gap · {(design.panelGap / 10).toFixed(2)} cm · Recessed
+            controls
           </span>
         )}
         {design.handle.mode === 'custom' && (

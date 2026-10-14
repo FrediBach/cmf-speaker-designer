@@ -24,6 +24,7 @@ export function PanelEditor({ design, update, onOpenGuide }: Props) {
     getDesignSummary(design)
   const panelStyleSelected = (style: Design['style']) => design.style === style
   const panelExtensionCm = design.panelExtension / 10
+  const panelGapCm = design.panelGap / 10
   return (
     <>
       <section className="control-section">
@@ -141,9 +142,37 @@ export function PanelEditor({ design, update, onOpenGuide }: Props) {
           width in the Handle tab.
         </p>
       </section>
+      <section className="control-section">
+        <h3>
+          <span>05</span> Panel spacing
+        </h3>
+        <div className="control-label">
+          <span id="panel-gap-label">Panel gap</span>
+          <span className="value-chip">{panelGapCm.toFixed(2)} cm</span>
+        </div>
+        <Slider
+          aria-labelledby="panel-gap-label"
+          aria-valuetext={`${panelGapCm.toFixed(2)} centimeters`}
+          value={[panelGapCm]}
+          min={0}
+          max={0.5}
+          step={0.01}
+          onValueChange={([gapCm]) =>
+            update({ panelGap: Math.round(gapCm * 100) / 10 })
+          }
+        />
+        <div className="slider-labels">
+          <span>0 cm</span>
+          <span>0.5 cm</span>
+        </div>
+        <p className="subtle-note">
+          Adds space behind the panel with extended attachments and rear support
+          posts. The knob and button stay in recessed openings.
+        </p>
+      </section>
       <div className="looks-bar">
         <div className="looks-title">
-          <span className="section-index">05</span>
+          <span className="section-index">06</span>
           <span>Color presets</span>
         </div>
         <div className="looks">

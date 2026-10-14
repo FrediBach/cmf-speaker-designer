@@ -88,6 +88,7 @@ function designsEqual(left: Design, right: Design) {
     left.knobColor === right.knobColor &&
     left.relief === right.relief &&
     left.panelExtension === right.panelExtension &&
+    left.panelGap === right.panelGap &&
     settingsEqual(leftHandle, rightHandle) &&
     svgCutoutsEqual(leftSvg, rightSvg) &&
     settingsEqual(left.grille, right.grille) &&

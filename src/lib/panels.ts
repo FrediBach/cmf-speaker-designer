@@ -122,6 +122,7 @@ export function buildPanelGeometry(
     style,
     addedFaceDepth: relief,
     panelExtension,
+    panelGap: 0,
     units: 'mm',
   }
   if (relief > 0 || panelExtension !== 0) {
@@ -183,11 +184,13 @@ export function panelFilename(
   _style: PanelStyle,
   addedDepth = 0,
   panelExtension = 0,
+  panelGap = 0,
 ): string {
   const suffix = addedDepth > 0 ? `-depth-${addedDepth.toFixed(1)}mm` : ''
   const extensionSuffix =
     panelExtension > 0 ? `-sides-${panelExtension.toFixed(1)}mm` : ''
-  return `cmf-speaker-${model}-original${suffix}${extensionSuffix}.stl`
+  const gapSuffix = panelGap > 0 ? `-gap-${panelGap.toFixed(1)}mm` : ''
+  return `cmf-speaker-${model}-original${suffix}${extensionSuffix}${gapSuffix}.stl`
 }
 
 export function haloFilenameSuffix(settings?: HaloSettings): string {
@@ -222,6 +225,7 @@ export function downloadPanelStl(
     style,
     addedDepth,
     geometry.userData.panelExtension,
+    geometry.userData.panelGap,
   ).replace(
     '.stl',
     `${handleSuffix}${grilleSuffix}${haloFilenameSuffix(geometry.userData.halo?.settings)}.stl`,

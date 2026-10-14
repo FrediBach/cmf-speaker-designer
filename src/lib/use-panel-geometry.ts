@@ -23,7 +23,7 @@ export function usePanelGeometry(
     message: string
   } | null>(null)
   const matches = source?.model === design.model && source?.style === 'original'
-  const key = `${matches ? source.geometry.uuid : 'loading'}:${design.model}:${design.style}:${design.relief}:${design.panelExtension}:${JSON.stringify(design.handle)}:${JSON.stringify(design.grille)}:${JSON.stringify(design.halo)}:${retryKey}`
+  const key = `${matches ? source.geometry.uuid : 'loading'}:${design.model}:${design.style}:${design.relief}:${design.panelExtension}:${design.panelGap}:${JSON.stringify(design.handle)}:${JSON.stringify(design.grille)}:${JSON.stringify(design.halo)}:${retryKey}`
 
   useEffect(() => {
     if (!matches || !source) return
@@ -33,7 +33,8 @@ export function usePanelGeometry(
         const geometry =
           design.handle.mode === 'original' &&
           design.grille.mode === 'original' &&
-          design.halo.mode === 'original'
+          design.halo.mode === 'original' &&
+          design.panelGap === 0
             ? buildPanelGeometry(
                 source.geometry,
                 source.model,
@@ -52,6 +53,7 @@ export function usePanelGeometry(
                 design.grille,
                 design.halo,
                 design.panelExtension,
+                design.panelGap,
               )
         if (!active) {
           geometry.dispose()
@@ -74,7 +76,8 @@ export function usePanelGeometry(
       generate,
       design.handle.mode === 'custom' ||
         design.grille.mode === 'custom' ||
-        design.halo.mode === 'custom'
+        design.halo.mode === 'custom' ||
+        design.panelGap > 0
         ? 180
         : 0,
     )

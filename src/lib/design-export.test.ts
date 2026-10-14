@@ -143,6 +143,7 @@ describe('design export', async () => {
       },
       relief: 1.2,
       panelExtension: 7.5,
+      panelGap: 3.5,
       handle: {
         ...DEFAULT_DESIGN.handle,
         mode: 'custom',
@@ -170,7 +171,7 @@ describe('design export', async () => {
     expect(file.mimeType).toBe('application/zip')
     const entries = readArchive(file.data)
     const panelName =
-      'cmf-speaker-s-original-depth-1.2mm-sides-7.5mm-handle-32.0mm-lego-studs-grille-hex-extended.stl'
+      'cmf-speaker-s-original-depth-1.2mm-sides-7.5mm-gap-3.5mm-handle-32.0mm-lego-studs-grille-hex-extended.stl'
     const knobName = knobFilename(design.knob)
     expect([...entries.keys()]).toEqual([panelName, knobName, 'design.json'])
     expect(entries.get(panelName)).toEqual(

@@ -32,6 +32,33 @@ const svgCutout = (): SvgCutout => ({
 })
 
 describe('design history', () => {
+  it('records panel gap independently of width and restores it with undo and redo', () => {
+    const design = validateDesign({ ...DEFAULT_DESIGN, panelExtension: 7.5 })
+    const start = createDesignHistory(design)
+    const changed = designHistoryReducer(start, {
+      type: 'set',
+      update: (current) => ({ ...current, panelGap: 3.5 }),
+    })
+    expect(changed.present).toEqual({ ...design, panelGap: 3.5 })
+    expect(changed.past).toHaveLength(1)
+    expect(
+      designHistoryReducer(changed, { type: 'set', update: changed.present }),
+    ).toBe(changed)
+    const undone = designHistoryReducer(changed, { type: 'undo' })
+    expect(undone.present).toEqual(design)
+    expect(designHistoryReducer(undone, { type: 'redo' }).present).toEqual(
+      changed.present,
+    )
+    const reset = designHistoryReducer(changed, {
+      type: 'set',
+      update: DEFAULT_DESIGN,
+    })
+    expect(reset.present.panelGap).toBe(0)
+    expect(designHistoryReducer(reset, { type: 'undo' }).present).toEqual(
+      changed.present,
+    )
+  })
+
   it('records panel extension changes and restores them with undo and redo', () => {
     const start = initial()
     const changed = designHistoryReducer(start, {
