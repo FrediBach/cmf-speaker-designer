@@ -38,6 +38,23 @@ interface Props {
   onChange: (value: HandleSettings) => void
 }
 
+function TopSlitsIcon({ size = 17, strokeWidth = 1.4 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 5v15h18V5h-4v9a1.5 1.5 0 0 1-3 0V5h-4v9a1.5 1.5 0 0 1-3 0V5Z" />
+    </svg>
+  )
+}
+
 function SvgUpload({
   value,
   onChange,
@@ -350,6 +367,7 @@ export function HandleEditor({
   const studsLabelId = useId()
   const studsDescriptionId = useId()
   const limits = getHandleLimits(model, value)
+  const isSlits = value.cutout === 'slits'
   const studCount = getHandleStudCenters(model, value, raceStripes).length
   const set = (patch: Partial<HandleSettings>) =>
     onChange(normalizeHandleSettings(model, { ...value, ...patch }))
@@ -478,6 +496,25 @@ export function HandleEditor({
               type="button"
               onClick={() =>
                 set({
+                  height: 35,
+                  width: 85,
+                  cornerRadius: 8,
+                  cutout: 'slits',
+                  holeCount: 5,
+                  holeWidth: 5,
+                  holeHeight: 23,
+                  holeGap: 8,
+                  offsetX: 0,
+                  offsetY: 0,
+                })
+              }
+            >
+              Hair
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                set({
                   height: 22,
                   width: 85,
                   cornerRadius: 10,
@@ -515,6 +552,7 @@ export function HandleEditor({
                   { id: 'none', label: 'None', Icon: Minus },
                   { id: 'circle', label: 'Round', Icon: Circle },
                   { id: 'slot', label: 'Slot', Icon: RectangleHorizontal },
+                  { id: 'slits', label: 'Top slits', Icon: TopSlitsIcon },
                   { id: 'svg', label: 'SVG', Icon: FileUp },
                 ] as const
               ).map(({ id, label, Icon }) => (
@@ -523,7 +561,21 @@ export function HandleEditor({
                   key={id}
                   aria-pressed={value.cutout === id}
                   className={value.cutout === id ? 'selected' : ''}
-                  onClick={() => set({ cutout: id })}
+                  onClick={() =>
+                    set(
+                      id === 'slits' && !isSlits
+                        ? {
+                            cutout: id,
+                            holeCount: 5,
+                            holeWidth: 5,
+                            holeHeight: Math.round(value.height * 0.65),
+                            holeGap: 8,
+                            offsetX: 0,
+                            offsetY: 0,
+                          }
+                        : { cutout: id },
+                    )
+                  }
                 >
                   <Icon size={17} strokeWidth={1.4} aria-hidden="true" />
                   {label}
@@ -565,16 +617,30 @@ export function HandleEditor({
                 )}
               </>
             )}
-            {(value.cutout === 'circle' || value.cutout === 'slot') && (
+            {(value.cutout === 'circle' ||
+              value.cutout === 'slot' ||
+              isSlits) && (
               <>
-                <div className="hole-count">
-                  <span>Number of holes</span>
-                  <div role="group" aria-label="Number of holes">
-                    {[1, 2, 3].map((count) => (
+                {isSlits && (
+                  <p className="subtle-note">
+                    Rounded slits open from the top to give the panel a
+                    hair-like silhouette.
+                  </p>
+                )}
+                <div className={`hole-count${isSlits ? ' slit-count' : ''}`}>
+                  <span>{isSlits ? 'Number of slits' : 'Number of holes'}</span>
+                  <div
+                    role="group"
+                    aria-label={isSlits ? 'Number of slits' : 'Number of holes'}
+                  >
+                    {Array.from(
+                      { length: limits.holeCount.max },
+                      (_, index) => index + 1,
+                    ).map((count) => (
                       <button
                         type="button"
                         key={count}
-                        aria-label={`${count} ${count === 1 ? 'hole' : 'holes'}`}
+                        aria-label={`${count} ${isSlits ? (count === 1 ? 'slit' : 'slits') : count === 1 ? 'hole' : 'holes'}`}
                         aria-pressed={value.holeCount === count}
                         className={value.holeCount === count ? 'selected' : ''}
                         onClick={() => set({ holeCount: count })}
@@ -586,19 +652,29 @@ export function HandleEditor({
                 </div>
                 {parameter(
                   'holeWidth',
-                  value.cutout === 'circle' ? 'Hole diameter' : 'Hole width',
+                  isSlits
+                    ? 'Slit width'
+                    : value.cutout === 'circle'
+                      ? 'Hole diameter'
+                      : 'Hole width',
                 )}
-                {value.cutout === 'slot' &&
-                  parameter('holeHeight', 'Hole height')}
+                {(value.cutout === 'slot' || isSlits) &&
+                  parameter(
+                    'holeHeight',
+                    isSlits ? 'Slit depth' : 'Hole height',
+                  )}
                 <details className="handle-placement">
                   <summary>
                     Position & spacing <span aria-hidden="true">+</span>
                   </summary>
                   <div>
                     {value.holeCount > 1 &&
-                      parameter('holeGap', 'Hole spacing')}
+                      parameter(
+                        'holeGap',
+                        isSlits ? 'Slit spacing' : 'Hole spacing',
+                      )}
                     {parameter('offsetX', 'Horizontal offset')}
-                    {parameter('offsetY', 'Vertical offset')}
+                    {!isSlits && parameter('offsetY', 'Vertical offset')}
                   </div>
                 </details>
               </>
@@ -641,7 +717,9 @@ export function HandleEditor({
           <p className="handle-footnote">
             {value.cutout === 'svg'
               ? 'Your SVG fits inside a 3 mm outer border. Use a stencil shape without floating islands, and leave enough material between its details.'
-              : 'Openings keep at least 3 mm of surrounding material. The control deck and mounting features stay in place.'}
+              : isSlits
+                ? 'Slits open at the top, with rounded bottoms and at least 3 mm of material between them and above the attachment shoulder.'
+                : 'Openings keep at least 3 mm of surrounding material. The control deck and mounting features stay in place.'}
           </p>
         </>
       )}

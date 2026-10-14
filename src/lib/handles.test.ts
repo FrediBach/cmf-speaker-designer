@@ -136,6 +136,67 @@ function expectSingleControlBend(
 
 describe('generative handles', () => {
   it.each(cases)(
+    'opens rounded hair slits through the top of %s/%s and exports one watertight solid',
+    async (model, style) => {
+      const original = readPanel(model, style)
+      const settings = normalizeHandleSettings(model, {
+        mode: 'custom',
+        height: 35,
+        width: 85,
+        cornerRadius: 8,
+        cutout: 'slits',
+        holeCount: 5,
+        holeWidth: 5,
+        holeHeight: 23,
+        holeGap: 8,
+        offsetX: 0,
+        offsetY: 0,
+      })
+      const geometry = await buildHandledPanelGeometry(
+        original,
+        model,
+        style,
+        0,
+        settings,
+      )
+      const seamY = geometry.userData.handle.seamY
+      const top = seamY + 35
+      const bottom = top - 23
+      expect(geometry.userData.handle.holeCenters).toEqual([])
+      for (const x of [-26, -13, 0, 13, 26]) {
+        // Every opening reaches the top and ends in a semicircle, with solid
+        // material beneath its tip and in the lower corners of its bounds.
+        for (const y of [top - 0.1, top - 10, bottom + 0.1])
+          expect(intersections(geometry, x, y)).toEqual([])
+        expect(intersections(geometry, x, bottom - 0.1)).toHaveLength(2)
+        expect(intersections(geometry, x + 2.25, bottom + 0.1)).toHaveLength(2)
+        expect(intersections(geometry, x + 2.25, bottom + 2.5)).toEqual([])
+        expect(intersections(geometry, x + 2.6, top - 10)).toHaveLength(2)
+      }
+      for (const x of [-19.5, -6.5, 6.5, 19.5])
+        expect(intersections(geometry, x, top - 0.1)).toHaveLength(2)
+      expect(inspectTopology(geometry)).toEqual({
+        invalidEdges: 0,
+        components: 1,
+      })
+      const roundtrip = new STLLoader().parse(exportPanelStl(geometry))
+      expect(inspectTopology(roundtrip)).toEqual({
+        invalidEdges: 0,
+        components: 1,
+      })
+      roundtrip.translate(0, 0, -geometry.boundingBox!.max.z)
+      roundtrip.rotateY(Math.PI)
+      expect(intersections(roundtrip, 0, top - 0.1)).toEqual([])
+      expect(intersections(roundtrip, 0, bottom + 0.1)).toEqual([])
+      expect(intersections(roundtrip, 2.25, bottom + 0.1)).toHaveLength(2)
+      roundtrip.dispose()
+      geometry.dispose()
+      original.dispose()
+    },
+    30_000,
+  )
+
+  it.each(cases)(
     'keeps maximum-size %s/%s studded handles connected with face depth, grille and halo',
     async (model, style) => {
       const original = readPanel(model, style)
@@ -199,7 +260,13 @@ describe('generative handles', () => {
     'adds dimensioned studs to %s/%s as one printable solid without closing cutouts',
     async (model, style) => {
       const original = readPanel(model, style)
-      for (const cutout of ['none', 'circle', 'slot', 'svg'] as const) {
+      for (const cutout of [
+        'none',
+        'circle',
+        'slot',
+        'slits',
+        'svg',
+      ] as const) {
         const settings = normalizeHandleSettings(model, {
           mode: 'custom',
           legoStuds: true,
@@ -278,6 +345,24 @@ describe('generative handles', () => {
           expect(
             intersections(geometry, hole.x, hole.y + hole.height / 2 - 0.1),
           ).toEqual([])
+        }
+        if (cutout === 'slits') {
+          for (let slit = 0; slit < settings.holeCount; slit += 1) {
+            const x =
+              settings.offsetX +
+              (slit - (settings.holeCount - 1) / 2) *
+                (settings.holeWidth + settings.holeGap)
+            expect(
+              intersections(geometry, x, seamY + settings.height - 0.1),
+            ).toEqual([])
+            expect(
+              intersections(
+                geometry,
+                x,
+                seamY + settings.height - settings.holeHeight + 0.1,
+              ),
+            ).toEqual([])
+          }
         }
         if (cutout === 'svg') {
           const y = seamY + (settings.height + 4) / 2 + settings.offsetY
@@ -663,7 +748,7 @@ describe('generative handles', () => {
 
   it.each(
     (['s', 'm'] as const).flatMap((model) =>
-      (['none', 'circle', 'slot', 'svg'] as const).map((cutout) => ({
+      (['none', 'circle', 'slot', 'slits', 'svg'] as const).map((cutout) => ({
         model,
         cutout,
       })),

@@ -213,6 +213,8 @@ function handleCutoutSummary(handle: Design['handle']) {
     return handle.svgCutout
       ? `SVG cutout · ${handle.svgCutout.name}`
       : 'Solid · no SVG uploaded'
+  if (handle.cutout === 'slits')
+    return `${handle.holeCount} top ${handle.holeCount === 1 ? 'slit' : 'slits'} · ${handle.holeHeight} mm deep`
   const shape = handle.cutout === 'circle' ? 'round' : 'slot'
   return `${handle.holeCount} ${shape} ${handle.holeCount === 1 ? 'hole' : 'holes'}`
 }

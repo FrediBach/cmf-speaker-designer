@@ -144,7 +144,13 @@ describe('printable custom handle settings', () => {
       for (const height of [16, 24, 70]) {
         for (const width of [60, 85, 110]) {
           for (const cornerRadius of [0, 16]) {
-            for (const cutout of ['none', 'circle', 'slot', 'svg'] as const) {
+            for (const cutout of [
+              'none',
+              'circle',
+              'slot',
+              'slits',
+              'svg',
+            ] as const) {
               for (const direction of [-1, 0, 1]) {
                 const settings = normalizeHandleSettings(model, {
                   mode: 'custom',
@@ -193,6 +199,25 @@ describe('printable custom handle settings', () => {
                       )
                       if (Math.hypot(dx, y - hole.y) <= hole.height / 2)
                         violations.push(`Stud covers opening: ${detail}`)
+                    }
+                    if (cutout === 'slits') {
+                      for (let slit = 0; slit < settings.holeCount; slit += 1) {
+                        const slitX =
+                          settings.offsetX +
+                          (slit - (settings.holeCount - 1) / 2) *
+                            (settings.holeWidth + settings.holeGap)
+                        const radius = settings.holeWidth / 2
+                        const dx = x - slitX
+                        const roundedCenterY =
+                          settings.height - settings.holeHeight + radius
+                        if (
+                          Math.abs(dx) < radius &&
+                          y >=
+                            roundedCenterY -
+                              Math.sqrt(radius * radius - dx * dx)
+                        )
+                          violations.push(`Stud covers top slit: ${detail}`)
+                      }
                     }
                     if (cutout === 'svg') {
                       const dx =
@@ -449,5 +474,102 @@ describe('printable custom handle settings', () => {
     }
     expect(cases).toBe(972)
     expect(violations).toEqual([])
+  })
+
+  it.each(['s', 'm'] as const)(
+    'keeps rounded top slits printable and control ranges valid after extreme %s edits',
+    (model) => {
+      for (const height of [16, 35, 70]) {
+        for (const width of [60, 85, 110]) {
+          for (const cornerRadius of [0, 8, 16]) {
+            for (const holeCount of [-10, 1, 5, 99]) {
+              for (const dimension of [-50, 100]) {
+                for (const direction of [-1, 0, 1]) {
+                  const handle = normalizeHandleSettings(model, {
+                    mode: 'custom',
+                    cutout: 'slits',
+                    height,
+                    width,
+                    cornerRadius,
+                    holeCount,
+                    holeWidth: dimension,
+                    holeHeight: dimension,
+                    holeGap: dimension,
+                    offsetX: direction * 100,
+                    offsetY: direction * 100,
+                  })
+                  expect(handle.cutout).toBe('slits')
+                  expect(handle.holeCount).toBeGreaterThanOrEqual(1)
+                  expect(handle.holeCount).toBeLessThanOrEqual(7)
+                  expect(Number.isInteger(handle.holeCount)).toBe(true)
+                  expect(handle.holeWidth).toBeGreaterThanOrEqual(3)
+                  expect(handle.holeGap).toBeGreaterThanOrEqual(3)
+                  expect(handle.holeHeight).toBeGreaterThanOrEqual(
+                    Math.max(3, handle.holeWidth / 2),
+                  )
+                  expect(
+                    handle.height - handle.holeHeight,
+                  ).toBeGreaterThanOrEqual(HANDLE_SHOULDER_HEIGHT + 3 - 1e-6)
+                  expect(handle.offsetY).toBe(0)
+                  const halfSpan =
+                    (handle.holeCount * handle.holeWidth +
+                      (handle.holeCount - 1) * handle.holeGap) /
+                    2
+                  expect(
+                    Math.abs(handle.offsetX) + halfSpan,
+                  ).toBeLessThanOrEqual(
+                    handle.width / 2 - handle.cornerRadius - 3 + 1e-6,
+                  )
+                  expect(getHandleHoleCenters(model, handle)).toEqual([])
+                  expect(getHandleSvgPaths(model, handle)).toEqual([])
+                  for (const [key, limit] of Object.entries(
+                    getHandleLimits(model, handle),
+                  )) {
+                    const value = handle[key as keyof HandleSettings] as number
+                    expect(
+                      Number.isFinite(limit.min) && Number.isFinite(limit.max),
+                    ).toBe(true)
+                    expect(limit.min).toBeLessThanOrEqual(limit.max)
+                    expect(value).toBeGreaterThanOrEqual(limit.min - 1e-6)
+                    expect(value).toBeLessThanOrEqual(limit.max + 1e-6)
+                  }
+                  expect(normalizeHandleSettings(model, handle)).toEqual(handle)
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+  )
+
+  it('retains all five hair slits through a JSON round trip and accepts seven when they fit', () => {
+    const input = {
+      mode: 'custom' as const,
+      cutout: 'slits' as const,
+      height: 35,
+      width: 85,
+      cornerRadius: 8,
+      holeCount: 5,
+      holeWidth: 5,
+      holeHeight: 23,
+      holeGap: 8,
+      offsetX: 0,
+      offsetY: 0,
+    }
+    for (const model of ['s', 'm'] as const) {
+      const handle = normalizeHandleSettings(model, input)
+      expect(handle).toMatchObject(input)
+      expect(
+        normalizeHandleSettings(model, JSON.parse(JSON.stringify(handle))),
+      ).toEqual(handle)
+      const seven = normalizeHandleSettings(model, {
+        ...input,
+        width: 110,
+        holeCount: 7,
+        holeGap: 3,
+      })
+      expect(seven.holeCount).toBe(7)
+    }
   })
 })

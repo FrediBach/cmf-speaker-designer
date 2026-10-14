@@ -1276,7 +1276,7 @@ main {
   box-shadow: inset 0 -2px var(--accent-ink);
 }
 .handle-cutout-options {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 .handle-cutout-options button {
   flex-direction: column;
@@ -1367,6 +1367,13 @@ main {
   border-radius: 3px;
   background: transparent;
   font: 14px var(--mono);
+}
+.slit-count {
+  align-items: stretch;
+  flex-direction: column;
+}
+.slit-count > div {
+  flex-wrap: wrap;
 }
 .handle-placement,
 .grille-details {

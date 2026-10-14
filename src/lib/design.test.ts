@@ -125,6 +125,34 @@ describe('panel gap', () => {
 })
 
 describe('saved and shared handle designs', () => {
+  it.each(['s', 'm'] as const)(
+    'restores five top-open hair slits from saved and shared %s designs',
+    (model) => {
+      const handle = {
+        mode: 'custom',
+        cutout: 'slits',
+        height: 35,
+        width: 85,
+        cornerRadius: 8,
+        holeCount: 5,
+        holeWidth: 5,
+        holeHeight: 23,
+        holeGap: 8,
+        offsetX: 0,
+        offsetY: 0,
+      }
+      const design = validateDesign({ ...DEFAULT_DESIGN, model, handle })
+      expect(design.handle).toMatchObject(handle)
+      vi.stubGlobal('window', { location: { search: '' } })
+      vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(design) })
+      expect(readDesign()).toEqual(design)
+      vi.stubGlobal('window', {
+        location: designShareUrl(design, 'https://example.com/designer/'),
+      })
+      expect(readDesign()).toEqual(design)
+    },
+  )
+
   it('opens legacy links with the original handle for the selected speaker', () => {
     const oldDesign = {
       model: 'm',

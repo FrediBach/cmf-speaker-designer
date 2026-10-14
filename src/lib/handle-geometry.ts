@@ -180,7 +180,7 @@ export async function createHandleEngine(wasmUrl?: string) {
                 'This SVG leaves floating islands in the handle. Add bridges to enclosed details or use a solid silhouette.',
               )
           }
-        } else if (settings.cutout !== 'none') {
+        } else if (settings.cutout !== 'none' && settings.cutout !== 'slits') {
           const holes: Point[][] = []
           for (const hole of getHandleHoleCenters(model, settings)) {
             holes.push(capsule(hole.width, hole.height, hole.x, hole.y))
