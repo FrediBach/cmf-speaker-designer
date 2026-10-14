@@ -243,6 +243,7 @@ function PanelExportSummary({
           <span>
             Custom handle · {design.handle.height} mm extension ·{' '}
             {handleCutoutSummary(design.handle)}
+            {design.handle.legoStuds ? ' · LEGO-compatible studs' : ''}
           </span>
         )}
         {design.grille.mode === 'custom' && (

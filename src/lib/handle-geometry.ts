@@ -5,7 +5,10 @@ import initializeManifold, {
 import {
   getHandleHoleCenters,
   getHandleOutline,
+  getHandleStudCenters,
   getHandleSvgPaths,
+  HANDLE_STUD_DIAMETER,
+  HANDLE_STUD_HEIGHT,
   HANDLE_THICKNESS,
   normalizeHandleSettings,
   type HandleSettings,
@@ -19,6 +22,7 @@ export interface HandleMetadata {
   backZ: number
   thickness: number
   holeCenters: { x: number; y: number; width: number; height: number }[]
+  studCenters: { x: number; y: number }[]
 }
 export interface HandleResult {
   positions: Float32Array
@@ -174,7 +178,31 @@ export async function createHandleEngine(wasmUrl?: string) {
         }
         const extrusion = own(section.extrude(HANDLE_THICKNESS))
         const extension = own(extrusion.translate([0, base.seamY, base.backZ]))
-        const united = own(base.solid.add(extension))
+        const studCenters = getHandleStudCenters(model, settings).map(
+          (center) => ({
+            x: center.x,
+            y: center.y + base.seamY,
+          }),
+        )
+        let united = own(base.solid.add(extension))
+        if (studCenters.length) {
+          // Embed each cylinder slightly into the face for a robust solid union.
+          const overlap = 0.25
+          const stud = own(
+            module.Manifold.cylinder(
+              HANDLE_STUD_HEIGHT + overlap,
+              HANDLE_STUD_DIAMETER / 2,
+              HANDLE_STUD_DIAMETER / 2,
+              64,
+            ),
+          )
+          const studs = studCenters.map(({ x, y }) =>
+            own(
+              stud.translate([x, y, base.backZ + HANDLE_THICKNESS - overlap]),
+            ),
+          )
+          united = own(module.Manifold.union([united, ...studs]))
+        }
         if (united.status() !== 'NoError' || united.isEmpty())
           throw new Error('This handle could not be joined to the panel.')
         // Boolean intersections can create sub-float-precision slivers. Remove
@@ -202,6 +230,7 @@ export async function createHandleEngine(wasmUrl?: string) {
             backZ: base.backZ,
             thickness: HANDLE_THICKNESS,
             holeCenters,
+            studCenters,
           },
         }
       } finally {

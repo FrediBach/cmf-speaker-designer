@@ -4,6 +4,7 @@ import { exportKnobStl, knobFilename, prepareKnobExportGeometry } from './knobs'
 import {
   exportPanelStl,
   haloFilenameSuffix,
+  handleFilenameSuffix,
   panelFilename,
   preparePanelExportGeometry,
 } from './panels'
@@ -104,10 +105,7 @@ function buildArchive(entries: ArchiveEntry[]): ArrayBuffer {
 }
 
 function selectedPanelFilename(design: Design): string {
-  const handleSuffix =
-    design.handle.mode === 'custom'
-      ? `-handle-${design.handle.height.toFixed(1)}mm`
-      : ''
+  const handleSuffix = handleFilenameSuffix(design.handle)
   const grilleSuffix =
     design.grille.mode === 'custom'
       ? `-grille-${design.grille.pattern}${design.grille.extendPattern ? '-extended' : ''}`

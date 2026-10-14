@@ -142,7 +142,12 @@ describe('design export', async () => {
         facets: 8,
       },
       relief: 1.2,
-      handle: { ...DEFAULT_DESIGN.handle, mode: 'custom', height: 32 },
+      handle: {
+        ...DEFAULT_DESIGN.handle,
+        mode: 'custom',
+        height: 32,
+        legoStuds: true,
+      },
       grille: {
         ...DEFAULT_DESIGN.grille,
         mode: 'custom',
@@ -164,7 +169,7 @@ describe('design export', async () => {
     expect(file.mimeType).toBe('application/zip')
     const entries = readArchive(file.data)
     const panelName =
-      'cmf-speaker-s-original-depth-1.2mm-handle-32.0mm-grille-hex-extended.stl'
+      'cmf-speaker-s-original-depth-1.2mm-handle-32.0mm-lego-studs-grille-hex-extended.stl'
     const knobName = knobFilename(design.knob)
     expect([...entries.keys()]).toEqual([panelName, knobName, 'design.json'])
     expect(entries.get(panelName)).toEqual(
@@ -174,6 +179,7 @@ describe('design export', async () => {
     const settings = JSON.parse(decoder.decode(entries.get('design.json')))
     expect(settings).toMatchObject(design)
     expect(settings.bodyColor).toBe('gray')
+    expect(settings.handle.legoStuds).toBe(true)
     expect(settings.knob).not.toHaveProperty('diameter')
     expect(settings.knob).not.toHaveProperty('rotation')
     expect(settings.export.units).toBe('mm')
@@ -277,7 +283,12 @@ describe('design export', async () => {
       style: 'custom',
       relief: 1.2,
       knob: { ...DEFAULT_DESIGN.knob, style: 'hex', facets: 8, height: 16 },
-      handle: { ...DEFAULT_DESIGN.handle, mode: 'custom', height: 32 },
+      handle: {
+        ...DEFAULT_DESIGN.handle,
+        mode: 'custom',
+        height: 32,
+        legoStuds: true,
+      },
       grille: {
         ...DEFAULT_DESIGN.grille,
         mode: 'custom',
@@ -305,7 +316,7 @@ describe('design export', async () => {
     expect(file.mimeType).toBe('application/zip')
     const entries = readArchive(file.data)
     const panelName =
-      'cmf-speaker-s-original-depth-1.2mm-handle-32.0mm-grille-hex-extended-halo-30.0mm-cut-45.0deg.stp'
+      'cmf-speaker-s-original-depth-1.2mm-handle-32.0mm-lego-studs-grille-hex-extended-halo-30.0mm-cut-45.0deg.stp'
     const knobName = knobFilename(design.knob).replace(/\.stl$/, '.stp')
     expect([...entries.keys()]).toEqual([panelName, knobName, 'design.json'])
     expectStepMatchesStl(
@@ -318,6 +329,7 @@ describe('design export', async () => {
     )
     const settings = JSON.parse(decoder.decode(entries.get('design.json')))
     expect(settings).toMatchObject(design)
+    expect(settings.handle.legoStuds).toBe(true)
     expect(settings.export).toMatchObject({
       format: 'stp',
       geometryType: 'advanced-brep',
@@ -329,6 +341,48 @@ describe('design export', async () => {
     panel.dispose()
     knob.dispose()
   })
+
+  it.each(['stl', 'stp'] as const)(
+    'names studs only on custom handles in %s exports and preserves disabled settings in ZIPs',
+    async (format) => {
+      const panel = new BoxGeometry(85, 131, 24)
+      const knob = new CylinderGeometry(10, 10, 12, 16)
+      for (const [mode, legoStuds, suffix] of [
+        ['custom', true, '-handle-32.0mm-lego-studs'],
+        ['custom', false, '-handle-32.0mm'],
+        ['original', true, ''],
+      ] as const) {
+        const design = validateDesign({
+          ...DEFAULT_DESIGN,
+          handle: { ...DEFAULT_DESIGN.handle, mode, height: 32, legoStuds },
+        })
+        const filename = `cmf-speaker-s-original${suffix}.${format}`
+        const file = await buildDesignExport({
+          panel,
+          knob,
+          design,
+          target: 'panel',
+          format,
+        })
+        expect(file.filename).toBe(filename)
+        const archive = await buildDesignExport({
+          panel,
+          knob,
+          design,
+          target: 'both',
+          format,
+        })
+        const entries = readArchive(archive.data)
+        expect(entries.has(filename)).toBe(true)
+        const settings = JSON.parse(decoder.decode(entries.get('design.json')))
+        expect(settings.handle).toEqual(design.handle)
+        expect(settings.export.files.panel).toBe(filename)
+        expect(validateDesign(settings)).toEqual(design)
+      }
+      panel.dispose()
+      knob.dispose()
+    },
+  )
 
   it('names generated halos and retains every halo parameter in the archive', async () => {
     const panel = new BoxGeometry(85, 131, 48)

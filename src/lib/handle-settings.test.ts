@@ -3,7 +3,11 @@ import {
   getDefaultHandleSettings,
   getHandleHoleCenters,
   getHandleLimits,
+  getHandleStudCenters,
   getHandleSvgPaths,
+  HANDLE_SHOULDER_HEIGHT,
+  HANDLE_STUD_DIAMETER,
+  HANDLE_STUD_PITCH,
   normalizeHandleSettings,
   type HandleSettings,
 } from './handle-settings'
@@ -72,6 +76,138 @@ describe('printable custom handle settings', () => {
     )
     expect(normalizeHandleSettings('m', invalid)).toEqual(
       normalizeHandleSettings('m'),
+    )
+  })
+
+  it('only enables studs for an explicit saved boolean and a custom handle', () => {
+    for (const model of ['s', 'm'] as const) {
+      expect(getDefaultHandleSettings(model).legoStuds).toBe(false)
+      for (const value of [undefined, null, false, 'true', 1, {}, []]) {
+        const settings = normalizeHandleSettings(model, {
+          mode: 'custom',
+          legoStuds: value as boolean,
+        })
+        expect(settings.legoStuds).toBe(false)
+        expect(getHandleStudCenters(model, settings)).toEqual([])
+      }
+      const settings = normalizeHandleSettings(model, {
+        mode: 'custom',
+        legoStuds: true,
+      })
+      expect(settings.legoStuds).toBe(true)
+      expect(getHandleStudCenters(model, settings).length).toBeGreaterThan(0)
+      expect(
+        normalizeHandleSettings(model, JSON.parse(JSON.stringify(settings))),
+      ).toEqual(settings)
+      expect(
+        getHandleStudCenters(model, { ...settings, mode: 'original' }),
+      ).toEqual([])
+      expect(getHandleLimits(model, settings)).not.toHaveProperty('legoStuds')
+    }
+  })
+
+  it.each(['s', 'm'] as const)(
+    'supports every stud footprint on an 8 mm grid across constrained %s handles',
+    (model) => {
+      const radius = HANDLE_STUD_DIAMETER / 2
+      const violations: string[] = []
+      for (const height of [16, 24, 70]) {
+        for (const width of [60, 85, 110]) {
+          for (const cornerRadius of [0, 16]) {
+            for (const cutout of ['none', 'circle', 'slot', 'svg'] as const) {
+              for (const direction of [-1, 0, 1]) {
+                const settings = normalizeHandleSettings(model, {
+                  mode: 'custom',
+                  legoStuds: true,
+                  height,
+                  width,
+                  cornerRadius,
+                  cutout,
+                  svgCutout: svgTriangle,
+                  holeCount: 3,
+                  holeWidth: 64,
+                  holeHeight: 30,
+                  holeGap: 20,
+                  offsetX: direction * 30,
+                  offsetY: direction * 24,
+                })
+                const centers = getHandleStudCenters(model, settings)
+                const holes = getHandleHoleCenters(model, settings)
+                for (const center of centers) {
+                  const detail = JSON.stringify({ settings, center })
+                  for (const axis of ['x', 'y'] as const) {
+                    const interval =
+                      (center[axis] - centers[0][axis]) / HANDLE_STUD_PITCH
+                    if (Math.abs(interval - Math.round(interval)) > 1e-8)
+                      violations.push(`Stud off ${axis} grid: ${detail}`)
+                  }
+                  for (let step = 0; step < 32; step += 1) {
+                    const angle = (step * Math.PI) / 16
+                    const x = center.x + Math.cos(angle) * radius
+                    const y = center.y + Math.sin(angle) * radius
+                    if (y <= HANDLE_SHOULDER_HEIGHT)
+                      violations.push(`Stud enters shoulder: ${detail}`)
+                    // Only the top corners are rounded on the actual outline.
+                    if (
+                      outerDistance(
+                        x,
+                        Math.max(y, settings.height / 2),
+                        settings,
+                      ) >= 0
+                    )
+                      violations.push(`Stud crosses outline: ${detail}`)
+                    for (const hole of holes) {
+                      const dx = Math.max(
+                        Math.abs(x - hole.x) - (hole.width - hole.height) / 2,
+                        0,
+                      )
+                      if (Math.hypot(dx, y - hole.y) <= hole.height / 2)
+                        violations.push(`Stud covers opening: ${detail}`)
+                    }
+                    if (cutout === 'svg') {
+                      const dx =
+                        Math.abs(x - settings.offsetX) - settings.holeWidth / 2
+                      const dy =
+                        Math.abs(
+                          y -
+                            (settings.height + HANDLE_SHOULDER_HEIGHT) / 2 -
+                            settings.offsetY,
+                        ) -
+                        settings.holeHeight / 2
+                      if (Math.max(dx, dy) <= 0)
+                        violations.push(`Stud covers SVG bounds: ${detail}`)
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      expect(violations).toEqual([])
+    },
+  )
+
+  it('uses the material outside rounded openings instead of excluding their whole bounding boxes', () => {
+    const settings = normalizeHandleSettings('s', {
+      mode: 'custom',
+      legoStuds: true,
+      height: 48,
+      cutout: 'circle',
+      holeWidth: 30,
+    })
+    const [hole] = getHandleHoleCenters('s', settings)
+    const inflatedHalf = hole.width / 2 + HANDLE_STUD_DIAMETER / 2
+    expect(
+      getHandleStudCenters('s', settings).some(
+        ({ x, y }) =>
+          Math.abs(x - hole.x) < inflatedHalf &&
+          Math.abs(y - hole.y) < inflatedHalf,
+      ),
+    ).toBe(true)
+    const noSvg = { ...settings, cutout: 'svg' as const, svgCutout: null }
+    expect(getHandleStudCenters('s', noSvg)).toEqual(
+      getHandleStudCenters('s', { ...noSvg, cutout: 'none' }),
     )
   })
 

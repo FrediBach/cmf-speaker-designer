@@ -4,6 +4,7 @@ import { normalizeSvgCutout, type SvgCutout } from './svg-cutout'
 export type HandleCutout = 'none' | 'circle' | 'slot' | 'svg'
 export interface HandleSettings {
   mode: 'original' | 'custom'
+  legoStuds: boolean
   height: number
   width: number
   cornerRadius: number
@@ -18,7 +19,7 @@ export interface HandleSettings {
 }
 export type HandleNumericKey = Exclude<
   keyof HandleSettings,
-  'mode' | 'cutout' | 'svgCutout'
+  'mode' | 'legoStuds' | 'cutout' | 'svgCutout'
 >
 export type HandleLimits = Record<
   HandleNumericKey,
@@ -28,8 +29,12 @@ export type HandleLimits = Record<
 export const HANDLE_THICKNESS = 4
 export const HANDLE_MIN_WEB = 3
 export const HANDLE_SHOULDER_HEIGHT = 4
+export const HANDLE_STUD_DIAMETER = 4.8
+export const HANDLE_STUD_HEIGHT = 1.8
+export const HANDLE_STUD_PITCH = 8
 export const DEFAULT_HANDLE_SETTINGS: HandleSettings = {
   mode: 'original',
+  legoStuds: false,
   height: 24,
   width: 85,
   cornerRadius: 3,
@@ -118,6 +123,7 @@ export function normalizeHandleSettings(
   const yRoom = Math.min(24, Math.max(0, (availableHeight - holeHeight) / 2))
   return {
     mode: input.mode === 'custom' ? 'custom' : 'original',
+    legoStuds: input.legoStuds === true,
     height,
     width,
     cornerRadius,
@@ -263,4 +269,87 @@ export function getHandleSvgPaths(
       ]),
     ),
   }))
+}
+
+/** Stud centers share one square grid on the front face, above the shoulder. */
+export function getHandleStudCenters(
+  model: SpeakerModel,
+  input: Partial<HandleSettings>,
+): { x: number; y: number }[] {
+  const settings = normalizeHandleSettings(model, input)
+  if (settings.mode !== 'custom' || !settings.legoStuds) return []
+
+  // A small margin keeps the whole footprint supported, including the faceted
+  // outline's rounded corners, and avoids tangent boolean intersections.
+  const clearance = HANDLE_STUD_DIAMETER / 2 + 0.25
+  const outline = getHandleOutline(model, settings)
+  const holes = getHandleHoleCenters(model, settings)
+  const centerY = (settings.height + HANDLE_SHOULDER_HEIGHT) / 2
+  const supported = (x: number, y: number) => {
+    if (y < HANDLE_SHOULDER_HEIGHT + clearance) return false
+    let inside = false
+    for (let index = 0; index < outline.length; index += 1) {
+      const [ax, ay] = outline[index]
+      const [bx, by] = outline[(index + 1) % outline.length]
+      if (ay > y !== by > y && x < ((bx - ax) * (y - ay)) / (by - ay) + ax)
+        inside = !inside
+      const dx = bx - ax
+      const dy = by - ay
+      const t = clamp(
+        ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy),
+        0,
+        1,
+      )
+      if (Math.hypot(x - ax - t * dx, y - ay - t * dy) < clearance) return false
+    }
+    if (!inside) return false
+
+    for (const hole of holes) {
+      // Distance to a capsule's straight center segment also handles circles.
+      const dx = Math.max(
+        Math.abs(x - hole.x) - (hole.width - hole.height) / 2,
+        0,
+      )
+      if (Math.hypot(dx, y - hole.y) < hole.height / 2 + clearance) return false
+    }
+    if (settings.cutout === 'svg' && settings.svgCutout) {
+      // Reserve the uploaded artwork's bounds, regardless of its fill rule or
+      // number of contours, so no stud can bridge any part of an SVG opening.
+      const dx = Math.max(
+        Math.abs(x - settings.offsetX) - settings.holeWidth / 2,
+        0,
+      )
+      const dy = Math.max(
+        Math.abs(y - centerY - settings.offsetY) - settings.holeHeight / 2,
+        0,
+      )
+      if (Math.hypot(dx, dy) < clearance) return false
+    }
+    return true
+  }
+
+  const columns =
+    Math.floor((settings.width - 2 * clearance) / HANDLE_STUD_PITCH) + 1
+  const rows =
+    Math.floor(
+      (settings.height - HANDLE_SHOULDER_HEIGHT - 2 * clearance) /
+        HANDLE_STUD_PITCH,
+    ) + 1
+  let best: { x: number; y: number }[] = []
+  // Both lattice phases are centered on the handle. Choose the one with most
+  // supported studs after accounting for the openings and rounded corners.
+  for (const columnCount of [columns, columns - 1]) {
+    for (const rowCount of [rows, rows - 1]) {
+      const centers: { x: number; y: number }[] = []
+      for (let row = 0; row < rowCount; row += 1) {
+        const y = centerY + (row - (rowCount - 1) / 2) * HANDLE_STUD_PITCH
+        for (let column = 0; column < columnCount; column += 1) {
+          const x = (column - (columnCount - 1) / 2) * HANDLE_STUD_PITCH
+          if (supported(x, y)) centers.push({ x, y })
+        }
+      }
+      if (centers.length > best.length) best = centers
+    }
+  }
+  return best
 }

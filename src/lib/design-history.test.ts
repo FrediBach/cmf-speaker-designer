@@ -32,6 +32,42 @@ const svgCutout = (): SvgCutout => ({
 })
 
 describe('design history', () => {
+  it('records the stud toggle independently and restores it with undo and redo', () => {
+    const design = validateDesign({
+      ...DEFAULT_DESIGN,
+      handle: { ...DEFAULT_DESIGN.handle, mode: 'custom' },
+    })
+    const start = createDesignHistory(design)
+    const enabled = designHistoryReducer(start, {
+      type: 'set',
+      update: (current) => ({
+        ...current,
+        handle: { ...current.handle, legoStuds: true },
+      }),
+    })
+    expect(enabled.present.handle.legoStuds).toBe(true)
+    expect(start.present.handle.legoStuds).toBe(false)
+    expect(enabled.past).toHaveLength(1)
+    expect(
+      designHistoryReducer(enabled, { type: 'set', update: enabled.present }),
+    ).toBe(enabled)
+    const undone = designHistoryReducer(enabled, { type: 'undo' })
+    expect(undone.present).toEqual(design)
+    const redone = designHistoryReducer(undone, { type: 'redo' })
+    expect(redone.present).toEqual(enabled.present)
+    const disabled = designHistoryReducer(redone, {
+      type: 'set',
+      update: (current) => ({
+        ...current,
+        handle: { ...current.handle, legoStuds: false },
+      }),
+    })
+    expect(disabled.present).toEqual(design)
+    expect(designHistoryReducer(disabled, { type: 'undo' }).present).toEqual(
+      enabled.present,
+    )
+  })
+
   it('records body-only changes and restores them with undo and redo', () => {
     const start = initial()
     const changed = designHistoryReducer(start, {

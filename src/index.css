@@ -1544,7 +1544,8 @@ main {
   color: var(--muted-foreground);
   margin: 0 0 6px;
 }
-.grille-extension-toggle {
+.grille-extension-toggle,
+.handle-studs-toggle {
   position: relative;
   display: flex;
   align-items: flex-start;
@@ -1554,17 +1555,20 @@ main {
   border-radius: 3px;
   cursor: pointer;
 }
-.grille-extension-toggle:has(input:checked) {
+.grille-extension-toggle:has(input:checked),
+.handle-studs-toggle:has(input:checked) {
   background: var(--accent-soft);
   border-color: var(--accent-ink);
 }
-.grille-extension-toggle input {
+.grille-extension-toggle input,
+.handle-studs-toggle input {
   position: absolute;
   opacity: 0;
   width: 1px;
   height: 1px;
 }
-.grille-checkbox {
+.grille-checkbox,
+.handle-checkbox {
   display: grid;
   place-items: center;
   width: 22px;
@@ -1575,26 +1579,36 @@ main {
   border-radius: 3px;
   background: var(--card);
 }
-.grille-extension-toggle input:checked + .grille-checkbox {
+.grille-extension-toggle input:checked + .grille-checkbox,
+.handle-studs-toggle input:checked + .handle-checkbox {
   background: var(--accent-ink);
   border-color: var(--accent-ink);
   color: var(--accent-on-ink);
 }
-.grille-extension-toggle input:focus-visible + .grille-checkbox {
+.grille-extension-toggle input:focus-visible + .grille-checkbox,
+.handle-studs-toggle input:focus-visible + .handle-checkbox {
   outline: 3px solid var(--ring);
   outline-offset: 3px;
 }
-.grille-extension-toggle strong {
+.grille-extension-toggle strong,
+.handle-studs-toggle strong {
   display: block;
   font-size: 15px;
   font-weight: 600;
 }
-.grille-extension-toggle small {
+.grille-extension-toggle small,
+.handle-studs-toggle small {
   display: block;
   font-size: 14px;
   line-height: 1.5;
   color: var(--muted-foreground);
   margin-top: 5px;
+}
+.handle-studs-detail {
+  margin: 10px 0 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 /* Appearance preferences are separate from the speaker design. */

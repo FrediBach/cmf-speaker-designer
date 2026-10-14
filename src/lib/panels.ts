@@ -4,6 +4,7 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 import { applyFaceDepth, MAX_FACE_DEPTH } from './face-depth'
 import { computePanelNormals } from './panel-normals'
 import type { HaloSettings } from './halo-settings'
+import type { HandleSettings } from './handle-settings'
 export { MAX_FACE_DEPTH } from './face-depth'
 
 import sOriginal from '../../resources/stl-files/cmf-speaker-s-3d-printing-panel-original-v1.stl?url'
@@ -181,6 +182,11 @@ export function haloFilenameSuffix(settings?: HaloSettings): string {
   return `-halo-${settings.depth.toFixed(1)}mm${settings.cutAngle > 0 ? `-cut-${settings.cutAngle.toFixed(1)}deg` : ''}`
 }
 
+export function handleFilenameSuffix(settings?: HandleSettings): string {
+  if (settings?.mode !== 'custom') return ''
+  return `-handle-${settings.height.toFixed(1)}mm${settings.legoStuds ? '-lego-studs' : ''}`
+}
+
 export function downloadPanelStl(
   geometry: BufferGeometry,
   model: SpeakerModel,
@@ -192,11 +198,8 @@ export function downloadPanelStl(
   )
   const anchor = document.createElement('a')
   anchor.href = url
-  const customHandle = geometry.userData.handle?.settings?.mode === 'custom'
   const grille = geometry.userData.grille?.settings
-  const handleSuffix = customHandle
-    ? `-handle-${Number(geometry.userData.handle.settings.height).toFixed(1)}mm`
-    : ''
+  const handleSuffix = handleFilenameSuffix(geometry.userData.handle?.settings)
   const grilleSuffix =
     grille?.mode === 'custom'
       ? `-grille-${grille.pattern}${grille.extendPattern ? '-extended' : ''}`

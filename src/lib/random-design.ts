@@ -44,6 +44,7 @@ export function randomizeDesign(
       holeGap: range(4, 12, 2),
       offsetX: range(-8, 8, 2),
       offsetY: range(-4, 4, 2),
+      legoStuds: pick([false, true]),
     },
     grille: {
       mode: grilleMode,

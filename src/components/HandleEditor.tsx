@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useNumericDraft } from '@/lib/use-numeric-draft'
 import {
   Circle,
+  Check,
   Minus,
   MoveHorizontal,
   RectangleHorizontal,
@@ -15,6 +16,10 @@ import {
   getHandleOutline,
   getHandleHoleCenters,
   getHandleSvgPaths,
+  getHandleStudCenters,
+  HANDLE_STUD_DIAMETER,
+  HANDLE_STUD_HEIGHT,
+  HANDLE_STUD_PITCH,
   normalizeHandleSettings,
   type HandleSettings,
 } from '@/lib/handle-settings'
@@ -211,6 +216,7 @@ function HandleDiagram({
     .join(' ')
   const holes = getHandleHoleCenters(model, value)
   const svgPaths = getHandleSvgPaths(model, value)
+  const studs = getHandleStudCenters(model, value)
   return (
     <div className="handle-diagram" aria-hidden="true">
       <svg viewBox="-72 -49 144 100">
@@ -271,6 +277,18 @@ function HandleDiagram({
             strokeWidth=".6"
           />
         ))}
+        {studs.map(({ x, y }) => (
+          <circle
+            key={`${x}:${y}`}
+            cx={x}
+            cy={h / 2 - y}
+            r={HANDLE_STUD_DIAMETER / 2}
+            fill="var(--accent-ink)"
+            fillOpacity=".2"
+            stroke="var(--accent-ink)"
+            strokeWidth=".5"
+          />
+        ))}
         <path
           d={`M${-w / 2} ${-h / 2 - 7}h${w}M${-w / 2} ${-h / 2 - 9}v4M${w / 2} ${-h / 2 - 9}v4`}
           stroke="var(--control-border)"
@@ -288,14 +306,17 @@ function HandleDiagram({
         </text>
       </svg>
       <span>
-        HANDLE DETAIL <span>4 MM THICK</span>
+        HANDLE DETAIL <span>4 MM {value.legoStuds ? 'BASE' : 'THICK'}</span>
       </span>
     </div>
   )
 }
 
 export function HandleEditor({ model, value, onChange }: Props) {
+  const studsLabelId = useId()
+  const studsDescriptionId = useId()
   const limits = getHandleLimits(model, value)
+  const studCount = getHandleStudCenters(model, value).length
   const set = (patch: Partial<HandleSettings>) =>
     onChange(normalizeHandleSettings(model, { ...value, ...patch }))
   const parameter = (
@@ -328,7 +349,7 @@ export function HandleEditor({ model, value, onChange }: Props) {
             <MoveHorizontal size={16} aria-hidden="true" /> Handle
           </h3>
         </div>
-        <p>Set the handle dimensions and cutouts.</p>
+        <p>Set the handle dimensions, cutouts, and surface studs.</p>
         <div
           className="handle-mode"
           role="group"
@@ -360,7 +381,8 @@ export function HandleEditor({ model, value, onChange }: Props) {
           </div>
           <h4>Original handle selected</h4>
           <p>
-            Use custom mode to adjust the size, rounded corners, and openings.
+            Adjust the size, rounded corners, and openings, or add
+            LEGO-compatible studs in custom mode.
           </p>
           <button type="button" onClick={() => set({ mode: 'custom' })}>
             Design your handle <MoveHorizontal size={16} aria-hidden="true" />
@@ -538,6 +560,37 @@ export function HandleEditor({ model, value, onChange }: Props) {
                   </div>
                 </details>
               </>
+            )}
+          </section>
+          <section className="control-section handle-studs">
+            <h3>
+              <span aria-hidden="true">03</span> Surface studs
+            </h3>
+            <label className="handle-studs-toggle">
+              <input
+                type="checkbox"
+                aria-labelledby={studsLabelId}
+                aria-describedby={studsDescriptionId}
+                checked={value.legoStuds}
+                onChange={(event) => set({ legoStuds: event.target.checked })}
+              />
+              <span className="handle-checkbox" aria-hidden="true">
+                {value.legoStuds && <Check size={11} strokeWidth={2.5} />}
+              </span>
+              <span>
+                <strong id={studsLabelId}>LEGO-compatible studs</strong>
+                <small id={studsDescriptionId}>
+                  Add studs to the front of the handle, avoiding edges and
+                  cutouts.
+                </small>
+              </span>
+            </label>
+            {value.legoStuds && (
+              <p className="handle-studs-detail" role="status">
+                {studCount > 0
+                  ? `${studCount} studs · ${HANDLE_STUD_DIAMETER} mm diameter · ${HANDLE_STUD_HEIGHT} mm high · ${HANDLE_STUD_PITCH} mm spacing`
+                  : 'No studs fit this shape. Enlarge the handle or reduce the cutout.'}
+              </p>
             )}
           </section>
           <p className="handle-footnote">

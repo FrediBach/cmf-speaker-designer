@@ -10,8 +10,13 @@ import {
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 import { describe, expect, it } from 'vitest'
 import { buildHandledPanelGeometry } from './handles'
+import { normalizeGrilleSettings } from './grille-settings'
+import { normalizeHaloSettings } from './halo-settings'
 import {
   getDefaultHandleSettings,
+  getHandleStudCenters,
+  HANDLE_STUD_DIAMETER,
+  HANDLE_STUD_HEIGHT,
   normalizeHandleSettings,
   type HandleSettings,
 } from './handle-settings'
@@ -130,6 +135,186 @@ function expectSingleControlBend(
 }
 
 describe('generative handles', () => {
+  it.each(cases)(
+    'keeps maximum-size %s/%s studded handles connected with face depth, grille and halo',
+    async (model, style) => {
+      const original = readPanel(model, style)
+      const settings = normalizeHandleSettings(model, {
+        mode: 'custom',
+        legoStuds: true,
+        height: 70,
+        width: 110,
+        cornerRadius: 16,
+        cutout: 'slot',
+        holeWidth: 64,
+        holeHeight: 30,
+        offsetX: 30,
+        offsetY: 24,
+      })
+      const geometry = await buildHandledPanelGeometry(
+        original,
+        model,
+        style,
+        2,
+        settings,
+        normalizeGrilleSettings({
+          mode: 'custom',
+          extendPattern: true,
+          recessDepth: 3,
+        }),
+        normalizeHaloSettings({ mode: 'custom', cutAngle: 30, depth: 28 }),
+      )
+      const { studCenters, backZ, thickness, holeCenters } =
+        geometry.userData.handle
+      expect(studCenters.length).toBeGreaterThan(40)
+      for (const center of [
+        studCenters[0],
+        studCenters[Math.floor(studCenters.length / 2)],
+        studCenters.at(-1),
+      ])
+        expect(intersections(geometry, center.x, center.y).at(-1)).toBeCloseTo(
+          backZ + thickness + HANDLE_STUD_HEIGHT,
+          4,
+        )
+      for (const hole of holeCenters)
+        expect(intersections(geometry, hole.x, hole.y)).toEqual([])
+      expect(geometry.userData.halo.baseZ).toBeCloseTo(6, 4)
+      expect(inspectTopology(geometry)).toEqual({
+        invalidEdges: 0,
+        components: 1,
+      })
+      const roundtrip = new STLLoader().parse(exportPanelStl(geometry))
+      expect(inspectTopology(roundtrip)).toEqual({
+        invalidEdges: 0,
+        components: 1,
+      })
+      roundtrip.dispose()
+      geometry.dispose()
+      original.dispose()
+    },
+    30_000,
+  )
+
+  it.each(cases)(
+    'adds dimensioned studs to %s/%s as one printable solid without closing cutouts',
+    async (model, style) => {
+      const original = readPanel(model, style)
+      for (const cutout of ['none', 'circle', 'slot', 'svg'] as const) {
+        const settings = normalizeHandleSettings(model, {
+          mode: 'custom',
+          legoStuds: true,
+          height: 48,
+          width: 96,
+          cornerRadius: 8,
+          cutout,
+          holeCount: 3,
+          holeWidth: 24,
+          holeHeight: 12,
+          holeGap: 8,
+          offsetX: 3,
+          offsetY: 2,
+          svgCutout: {
+            name: 'triangle.svg',
+            aspectRatio: 1.5,
+            paths: [
+              {
+                fillRule: 'nonzero',
+                contours: [
+                  [
+                    [-0.5, 0.5],
+                    [0.5, 0.5],
+                    [0, -0.5],
+                  ],
+                ],
+              },
+            ],
+          },
+        })
+        const geometry = await buildHandledPanelGeometry(
+          original,
+          model,
+          style,
+          2,
+          settings,
+        )
+        const { seamY, backZ, thickness, holeCenters, studCenters } =
+          geometry.userData.handle
+        const frontZ = backZ + thickness
+        expect(studCenters).toEqual(
+          getHandleStudCenters(model, settings).map(({ x, y }) => ({
+            x,
+            y: y + seamY,
+          })),
+        )
+        expect(studCenters.length).toBeGreaterThan(0)
+        for (const { x, y } of studCenters) {
+          expect(intersections(geometry, x, y)).toEqual([
+            Number(backZ.toFixed(4)),
+            Number((frontZ + HANDLE_STUD_HEIGHT).toFixed(4)),
+          ])
+        }
+        // Radial rays verify the actual diameter and the surrounding flat face.
+        const [first] = studCenters
+        for (let sample = 0; sample < 8; sample += 1) {
+          const angle = (sample * Math.PI) / 4
+          for (const delta of [-0.05, 0.05]) {
+            const radius = HANDLE_STUD_DIAMETER / 2 + delta
+            const top = intersections(
+              geometry,
+              first.x + Math.cos(angle) * radius,
+              first.y + Math.sin(angle) * radius,
+            ).at(-1)
+            expect(top).toBeCloseTo(
+              frontZ + (delta < 0 ? HANDLE_STUD_HEIGHT : 0),
+              4,
+            )
+          }
+        }
+        for (const hole of holeCenters) {
+          expect(intersections(geometry, hole.x, hole.y)).toEqual([])
+          expect(
+            intersections(geometry, hole.x + hole.width / 2 - 0.1, hole.y),
+          ).toEqual([])
+          expect(
+            intersections(geometry, hole.x, hole.y + hole.height / 2 - 0.1),
+          ).toEqual([])
+        }
+        if (cutout === 'svg') {
+          const y = seamY + (settings.height + 4) / 2 + settings.offsetY
+          expect(intersections(geometry, settings.offsetX, y)).toEqual([])
+          expect(
+            intersections(
+              geometry,
+              settings.offsetX + settings.holeWidth * 0.4,
+              y - settings.holeHeight * 0.4,
+            ),
+          ).toEqual([])
+        }
+        expect(inspectTopology(geometry)).toEqual({
+          invalidEdges: 0,
+          components: 1,
+        })
+        const roundtrip = new STLLoader().parse(exportPanelStl(geometry))
+        expect(inspectTopology(roundtrip)).toEqual({
+          invalidEdges: 0,
+          components: 1,
+        })
+        roundtrip.computeBoundingBox()
+        expect(roundtrip.boundingBox!.min.z).toBeCloseTo(0, 5)
+        roundtrip.translate(0, 0, -geometry.boundingBox!.max.z)
+        roundtrip.rotateY(Math.PI)
+        expect(intersections(roundtrip, first.x, first.y).at(-1)).toBeCloseTo(
+          frontZ + HANDLE_STUD_HEIGHT,
+          4,
+        )
+        roundtrip.dispose()
+        geometry.dispose()
+      }
+      original.dispose()
+    },
+    30_000,
+  )
+
   it.each(cases)(
     'cuts an uploaded SVG triangle through %s/%s and exports one watertight solid',
     async (model, style) => {
@@ -476,12 +661,20 @@ describe('generative handles', () => {
     30_000,
   )
 
-  it.each(['none', 'circle', 'slot', 'svg'] as const)(
-    'keeps constrained minimum-size %s designs connected',
-    async (cutout) => {
-      const original = readPanel('s', 'original')
-      const settings = normalizeHandleSettings('s', {
+  it.each(
+    (['s', 'm'] as const).flatMap((model) =>
+      (['none', 'circle', 'slot', 'svg'] as const).map((cutout) => ({
+        model,
+        cutout,
+      })),
+    ),
+  )(
+    'keeps constrained minimum-size $model/$cutout designs connected with studs',
+    async ({ model, cutout }) => {
+      const original = readPanel(model, 'original')
+      const settings = normalizeHandleSettings(model, {
         mode: 'custom',
+        legoStuds: true,
         height: 16,
         width: 60,
         cornerRadius: 16,
@@ -495,7 +688,7 @@ describe('generative handles', () => {
       })
       const geometry = await buildHandledPanelGeometry(
         original,
-        's',
+        model,
         'original',
         2,
         settings,
@@ -504,6 +697,12 @@ describe('generative handles', () => {
         invalidEdges: 0,
         components: 1,
       })
+      const roundtrip = new STLLoader().parse(exportPanelStl(geometry))
+      expect(inspectTopology(roundtrip)).toEqual({
+        invalidEdges: 0,
+        components: 1,
+      })
+      roundtrip.dispose()
       for (const center of geometry.userData.handle.holeCenters)
         expect(intersections(geometry, center.x, center.y)).toEqual([])
       if (cutout === 'none' || cutout === 'svg')
@@ -523,7 +722,7 @@ describe('generative handles', () => {
       's',
       'original',
       0,
-      getDefaultHandleSettings('s'),
+      { ...getDefaultHandleSettings('s'), legoStuds: true },
     )
     expect(untouched.getAttribute('position').array).toEqual(
       original.getAttribute('position').array,

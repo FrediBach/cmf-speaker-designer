@@ -24,7 +24,11 @@ describe('saved and shared handle designs', () => {
     const restored = validateDesign(oldDesign)
     expect(restored).toMatchObject({ ...oldDesign, style: 'original' })
     expect(restored.bodyColor).toBe('black')
-    expect(restored.handle).toMatchObject({ mode: 'original', height: 27 })
+    expect(restored.handle).toMatchObject({
+      mode: 'original',
+      height: 27,
+      legoStuds: false,
+    })
     expect(restored.grille.mode).toBe('original')
     expect(restored.halo).toEqual(DEFAULT_HALO_SETTINGS)
     expect(restored.knob).toEqual(DEFAULT_KNOB_SETTINGS)
@@ -111,36 +115,50 @@ describe('saved and shared handle designs', () => {
     },
   )
 
-  it('round-trips custom handle settings through local storage and a shared URL', () => {
-    const custom = validateDesign({
-      ...DEFAULT_DESIGN,
-      handle: {
-        mode: 'custom',
-        height: 48,
-        width: 96,
-        cornerRadius: 8,
-        cutout: 'circle',
-        holeCount: 3,
-        holeWidth: 12,
-        holeGap: 8,
-        offsetX: 6,
-        offsetY: 3,
-      },
-    })
-    vi.stubGlobal('window', { location: { search: '' } })
-    const getItem = vi.fn((key: string) =>
-      key === STORAGE_KEY ? JSON.stringify(custom) : null,
-    )
-    vi.stubGlobal('localStorage', { getItem })
-    expect(readDesign()).toEqual(custom)
+  it.each([false, true])(
+    'round-trips custom handle settings with studs %s through storage and a shared URL',
+    (legoStuds) => {
+      const custom = validateDesign({
+        ...DEFAULT_DESIGN,
+        handle: {
+          mode: 'custom',
+          legoStuds,
+          height: 48,
+          width: 96,
+          cornerRadius: 8,
+          cutout: 'circle',
+          holeCount: 3,
+          holeWidth: 12,
+          holeGap: 8,
+          offsetX: 6,
+          offsetY: 3,
+        },
+      })
+      expect(custom.handle.legoStuds).toBe(legoStuds)
+      vi.stubGlobal('window', { location: { search: '' } })
+      const getItem = vi.fn((key: string) =>
+        key === STORAGE_KEY ? JSON.stringify(custom) : null,
+      )
+      vi.stubGlobal('localStorage', { getItem })
+      expect(readDesign()).toEqual(custom)
 
-    const shared = { ...custom, handle: { ...custom.handle, height: 52 } }
-    vi.stubGlobal('window', {
-      location: {
-        search: `?design=${encodeURIComponent(JSON.stringify(shared))}`,
-      },
-    })
-    expect(readDesign()).toEqual(shared)
+      const shared = {
+        ...custom,
+        handle: { ...custom.handle, height: 52, legoStuds: !legoStuds },
+      }
+      const url = designShareUrl(shared, 'https://example.com/designer/')
+      vi.stubGlobal('window', { location: url })
+      expect(readDesign()).toEqual(shared)
+    },
+  )
+
+  it('keeps studs disabled in legacy handles and rejects non-boolean stored values', () => {
+    for (const legoStuds of [undefined, null, 'true', 'false', 0, 1, {}]) {
+      const saved = { handle: { mode: 'custom', legoStuds } }
+      vi.stubGlobal('window', { location: { search: '' } })
+      vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(saved) })
+      expect(readDesign().handle.legoStuds).toBe(false)
+    }
   })
 
   it('preserves uploaded SVG geometry and fill rules in saved and shared handles', () => {

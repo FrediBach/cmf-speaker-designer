@@ -344,7 +344,7 @@ describe('STEP solid export', () => {
   )
 
   it.each(['s', 'm'] as const)(
-    'exports a generated %s panel combining handle, depth, grille and halo',
+    'exports a generated %s panel combining handle studs, depth, grille and halo',
     async (model) => {
       const bytes = readFileSync(
         new URL(
@@ -365,6 +365,7 @@ describe('STEP solid export', () => {
         {
           ...getDefaultHandleSettings(model),
           mode: 'custom',
+          legoStuds: true,
           height: 48,
           cutout: 'circle',
           holeCount: 3,
