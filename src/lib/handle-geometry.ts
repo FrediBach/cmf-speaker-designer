@@ -186,8 +186,10 @@ export async function createHandleEngine(wasmUrl?: string) {
             holes.push(capsule(hole.width, hole.height, hole.x, hole.y))
             holeCenters.push({ ...hole, y: hole.y + base.seamY })
           }
-          const cutouts = own(new module.CrossSection(holes))
-          section = own(section.subtract(cutouts))
+          if (holes.length) {
+            const cutouts = own(new module.CrossSection(holes))
+            section = own(section.subtract(cutouts))
+          }
         }
         const extrusion = own(section.extrude(HANDLE_THICKNESS))
         const extension = own(extrusion.translate([0, base.seamY, base.backZ]))

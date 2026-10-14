@@ -1283,6 +1283,17 @@ main {
   gap: 5px;
   min-height: 60px;
 }
+.handle-top-shape {
+  margin-top: 20px;
+}
+.handle-top-options {
+  margin-top: 10px;
+}
+.handle-top-options button {
+  flex-direction: column;
+  gap: 5px;
+  min-height: 64px;
+}
 .svg-upload {
   position: relative;
   margin-top: 16px;

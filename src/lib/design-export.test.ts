@@ -392,18 +392,43 @@ describe('design export', async () => {
   })
 
   it.each(['stl', 'stp'] as const)(
-    'names studs only on custom handles in %s exports and preserves disabled settings in ZIPs',
+    'names active handle profiles and studs in %s exports and preserves their settings in ZIPs',
     async (format) => {
       const panel = new BoxGeometry(85, 131, 24)
       const knob = new CylinderGeometry(10, 10, 12, 16)
-      for (const [mode, legoStuds, suffix] of [
-        ['custom', true, '-handle-32.0mm-lego-studs'],
-        ['custom', false, '-handle-32.0mm'],
-        ['original', true, ''],
+      for (const [mode, legoStuds, topShape, topAngle, topCurve, suffix] of [
+        ['custom', true, 'straight', 0, 10, '-handle-32.0mm-lego-studs'],
+        ['custom', false, 'straight', 0, 10, '-handle-32.0mm'],
+        ['original', true, 'outward', 5, 5, ''],
+        ['custom', false, 'straight', 5, 10, '-handle-32.0mm-top-5.0deg'],
+        [
+          'custom',
+          false,
+          'outward',
+          5,
+          5,
+          '-handle-32.0mm-top-5.0deg-outward-5.0mm',
+        ],
+        [
+          'custom',
+          false,
+          'inward',
+          -5,
+          5,
+          '-handle-32.0mm-top--5.0deg-inward-5.0mm',
+        ],
       ] as const) {
         const design = validateDesign({
           ...DEFAULT_DESIGN,
-          handle: { ...DEFAULT_DESIGN.handle, mode, height: 32, legoStuds },
+          handle: {
+            ...DEFAULT_DESIGN.handle,
+            mode,
+            height: 32,
+            legoStuds,
+            topShape,
+            topAngle,
+            topCurve,
+          },
         })
         const filename = `cmf-speaker-s-original${suffix}.${format}`
         const file = await buildDesignExport({

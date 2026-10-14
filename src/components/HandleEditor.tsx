@@ -15,6 +15,7 @@ import {
   getHandleLimits,
   getHandleOutline,
   getHandleHoleCenters,
+  getHandleSlits,
   getHandleSvgPaths,
   getHandleStudCenters,
   HANDLE_STUD_DIAMETER,
@@ -22,6 +23,7 @@ import {
   HANDLE_STUD_PITCH,
   normalizeHandleSettings,
   type HandleSettings,
+  type HandleNumericKey,
 } from '@/lib/handle-settings'
 import type { SpeakerModel } from '@/lib/panels'
 import { SVG_MAX_FILE_SIZE, type SvgCutout } from '@/lib/svg-cutout'
@@ -51,6 +53,31 @@ function TopSlitsIcon({ size = 17, strokeWidth = 1.4 }) {
       aria-hidden="true"
     >
       <path d="M3 5v15h18V5h-4v9a1.5 1.5 0 0 1-3 0V5h-4v9a1.5 1.5 0 0 1-3 0V5Z" />
+    </svg>
+  )
+}
+
+function TopShapeIcon({ shape }: { shape: HandleSettings['topShape'] }) {
+  return (
+    <svg
+      width="28"
+      height="20"
+      viewBox="0 0 28 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path
+        d={
+          shape === 'outward'
+            ? 'M2 16V12Q14 -4 26 12V16'
+            : shape === 'inward'
+              ? 'M2 16V4Q14 20 26 4V16'
+              : 'M2 16V8H26V16'
+        }
+      />
     </svg>
   )
 }
@@ -162,6 +189,7 @@ function Parameter({
   min,
   max,
   step = 1,
+  unit = 'mm',
   onChange,
 }: {
   label: string
@@ -169,9 +197,11 @@ function Parameter({
   min: number
   max: number
   step?: number
+  unit?: 'mm' | '°'
   onChange: (value: number) => void
 }) {
   const [draft, setDraft] = useNumericDraft(value)
+  const unitLabel = unit === '°' ? 'degrees' : 'millimeters'
   const commit = () => {
     const numeric = Number(draft)
     const next =
@@ -187,7 +217,7 @@ function Parameter({
         <span className="parameter-name">{label}</span>
         <label className="dimension-input">
           <input
-            aria-label={`${label} in millimeters`}
+            aria-label={`${label} in ${unitLabel}`}
             type="number"
             inputMode="decimal"
             min={min}
@@ -208,12 +238,12 @@ function Parameter({
               }
             }}
           />
-          <span aria-hidden="true">mm</span>
+          <span aria-hidden="true">{unit}</span>
         </label>
       </div>
       <Slider
         aria-label={label}
-        aria-valuetext={`${Number(value.toFixed(2))} millimeters`}
+        aria-valuetext={`${Number(value.toFixed(2))} ${unitLabel}`}
         value={[value]}
         min={min}
         max={Math.max(min + step, max)}
@@ -369,27 +399,28 @@ export function HandleEditor({
   const limits = getHandleLimits(model, value)
   const isSlits = value.cutout === 'slits'
   const studCount = getHandleStudCenters(model, value, raceStripes).length
+  const cutoutCount = isSlits
+    ? getHandleSlits(model, value).length
+    : value.cutout === 'svg'
+      ? getHandleSvgPaths(model, value).length
+      : getHandleHoleCenters(model, value).length
+  const requestedCutouts =
+    value.cutout === 'none'
+      ? 0
+      : value.cutout === 'svg'
+        ? (value.svgCutout?.paths.length ?? 0)
+        : value.holeCount
+  const hiddenCutouts = requestedCutouts - cutoutCount
   const set = (patch: Partial<HandleSettings>) =>
     onChange(normalizeHandleSettings(model, { ...value, ...patch }))
-  const parameter = (
-    key:
-      | 'height'
-      | 'width'
-      | 'cornerRadius'
-      | 'holeWidth'
-      | 'holeHeight'
-      | 'holeGap'
-      | 'offsetX'
-      | 'offsetY',
-    label: string,
-    step = 1,
-  ) => (
+  const parameter = (key: HandleNumericKey, label: string, step = 1) => (
     <Parameter
       label={label}
       value={value[key]}
       min={limits[key].min}
       max={limits[key].max}
       step={step}
+      unit={key === 'topAngle' ? '°' : 'mm'}
       onChange={(next) => set({ [key]: next })}
     />
   )
@@ -401,7 +432,7 @@ export function HandleEditor({
             <MoveHorizontal size={16} aria-hidden="true" /> Handle
           </h3>
         </div>
-        <p>Set the handle dimensions, cutouts, and surface studs.</p>
+        <p>Shape the handle’s top, cutouts, and surface studs.</p>
         <div
           className="handle-mode"
           role="group"
@@ -433,8 +464,8 @@ export function HandleEditor({
           </div>
           <h4>Original handle selected</h4>
           <p>
-            Adjust the size, rounded corners, and openings, or add
-            LEGO-compatible studs in custom mode.
+            Adjust the size, top profile, and openings, or add LEGO-compatible
+            studs in custom mode.
           </p>
           <button type="button" onClick={() => set({ mode: 'custom' })}>
             Design your handle <MoveHorizontal size={16} aria-hidden="true" />
@@ -461,6 +492,9 @@ export function HandleEditor({
                   height: 35,
                   width: 85,
                   cornerRadius: 8,
+                  topAngle: 0,
+                  topShape: 'straight',
+                  topCurve: 10,
                   cutout: 'slot',
                   holeCount: 1,
                   holeWidth: 48,
@@ -480,6 +514,9 @@ export function HandleEditor({
                   height: 30,
                   width: 85,
                   cornerRadius: 4,
+                  topAngle: 0,
+                  topShape: 'straight',
+                  topCurve: 10,
                   cutout: 'circle',
                   holeCount: 3,
                   holeWidth: 15,
@@ -499,6 +536,9 @@ export function HandleEditor({
                   height: 35,
                   width: 85,
                   cornerRadius: 8,
+                  topAngle: 0,
+                  topShape: 'straight',
+                  topCurve: 10,
                   cutout: 'slits',
                   holeCount: 5,
                   holeWidth: 5,
@@ -518,6 +558,9 @@ export function HandleEditor({
                   height: 22,
                   width: 85,
                   cornerRadius: 10,
+                  topAngle: 0,
+                  topShape: 'straight',
+                  topCurve: 10,
                   cutout: 'none',
                   offsetX: 0,
                   offsetY: 0,
@@ -534,8 +577,44 @@ export function HandleEditor({
             {parameter('height', 'Extension height')}
             {parameter('width', 'Handle width')}
             {parameter('cornerRadius', 'Corner radius', 0.5)}
+            <div className="handle-top-shape">
+              <span className="parameter-name">Top shape</span>
+              <div
+                className="cutout-options handle-top-options"
+                role="group"
+                aria-label="Top shape"
+              >
+                {(
+                  [
+                    { id: 'straight', label: 'Straight', name: 'Straight' },
+                    {
+                      id: 'outward',
+                      label: 'Outwards',
+                      name: 'Rounded outwards',
+                    },
+                    { id: 'inward', label: 'Inwards', name: 'Rounded inwards' },
+                  ] as const
+                ).map(({ id, label, name }) => (
+                  <button
+                    type="button"
+                    key={id}
+                    aria-label={name}
+                    aria-pressed={value.topShape === id}
+                    className={value.topShape === id ? 'selected' : ''}
+                    onClick={() => set({ topShape: id })}
+                  >
+                    <TopShapeIcon shape={id} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {parameter('topAngle', 'Top angle', 0.5)}
+            {value.topShape !== 'straight' &&
+              parameter('topCurve', 'Curve depth', 0.5)}
             <p className="subtle-note">
-              Handle width is independent of the panel’s side extension.
+              Height sets the highest point. Positive angles raise the right
+              side. Width is independent of the panel’s side extension.
             </p>
           </section>
           <section className="control-section handle-cutouts">
@@ -623,7 +702,7 @@ export function HandleEditor({
               <>
                 {isSlits && (
                   <p className="subtle-note">
-                    Rounded slits open from the top to give the panel a
+                    Rounded slits follow the top profile to give the panel a
                     hair-like silhouette.
                   </p>
                 )}
@@ -678,6 +757,14 @@ export function HandleEditor({
                   </div>
                 </details>
               </>
+            )}
+            {hiddenCutouts > 0 && (
+              <p className="subtle-note" role="status">
+                {cutoutCount} of {requestedCutouts}{' '}
+                {isSlits ? 'slits' : 'cutouts'} fit this profile. Unsafe
+                openings are hidden individually and return when there is enough
+                room.
+              </p>
             )}
           </section>
           <section className="control-section handle-studs">

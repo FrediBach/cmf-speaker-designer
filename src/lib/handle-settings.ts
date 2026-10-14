@@ -6,12 +6,16 @@ import {
 } from './race-stripe-settings'
 
 export type HandleCutout = 'none' | 'circle' | 'slot' | 'slits' | 'svg'
+export type HandleTopShape = 'straight' | 'outward' | 'inward'
 export interface HandleSettings {
   mode: 'original' | 'custom'
   legoStuds: boolean
   height: number
   width: number
   cornerRadius: number
+  topAngle: number
+  topShape: HandleTopShape
+  topCurve: number
   cutout: HandleCutout
   svgCutout: SvgCutout | null
   holeCount: number
@@ -23,7 +27,7 @@ export interface HandleSettings {
 }
 export type HandleNumericKey = Exclude<
   keyof HandleSettings,
-  'mode' | 'legoStuds' | 'cutout' | 'svgCutout'
+  'mode' | 'legoStuds' | 'cutout' | 'svgCutout' | 'topShape'
 >
 export type HandleLimits = Record<
   HandleNumericKey,
@@ -42,6 +46,9 @@ export const DEFAULT_HANDLE_SETTINGS: HandleSettings = {
   height: 24,
   width: 85,
   cornerRadius: 3,
+  topAngle: 0,
+  topShape: 'straight',
+  topCurve: 10,
   cutout: 'slot',
   svgCutout: null,
   holeCount: 1,
@@ -61,10 +68,21 @@ const clamp = (value: number, min: number, max: number) =>
 const finite = (value: unknown, fallback: number) =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback
 
+function topLimits(height: number, width: number, radius: number, angle = 0) {
+  const room = height - HANDLE_SHOULDER_HEIGHT - HANDLE_MIN_WEB - radius
+  return {
+    angle: Math.min(45, (Math.atan(room / width) * 180) / Math.PI),
+    curve: Math.max(
+      0,
+      Math.min(30, room - width * Math.abs(Math.tan((angle * Math.PI) / 180))),
+    ),
+  }
+}
+
 /**
- * Fit all openings into a conservative rectangle inside the rounded silhouette.
- * It leaves >=3 mm material around openings and between adjacent openings.
- * Top-open slits keep the same side and bottom web, with rounded bottoms.
+ * Bound requested openings to the flat handle's conservative interior, keeping
+ * their spacing and dimensions stable when the top profile changes. Geometry
+ * helpers omit individual openings that cannot retain a 3 mm web in that profile.
  * The bottom 4 mm is a shoulder joining the original-width attachment collar.
  */
 export function normalizeHandleSettings(
@@ -78,6 +96,21 @@ export function normalizeHandleSettings(
     finite(input.cornerRadius, defaults.cornerRadius),
     0,
     Math.min(16, (width - 30) / 2, (height - 4) / 2),
+  )
+  const maxAngle = topLimits(height, width, cornerRadius).angle
+  const topAngle = clamp(
+    finite(input.topAngle, defaults.topAngle),
+    -maxAngle,
+    maxAngle,
+  )
+  const topShape =
+    input.topShape === 'outward' || input.topShape === 'inward'
+      ? input.topShape
+      : 'straight'
+  const topCurve = clamp(
+    finite(input.topCurve, defaults.topCurve),
+    0,
+    topLimits(height, width, cornerRadius, topAngle).curve,
   )
   const cutout =
     input.cutout === 'none' ||
@@ -149,6 +182,9 @@ export function normalizeHandleSettings(
     height,
     width,
     cornerRadius,
+    topAngle,
+    topShape,
+    topCurve,
     cutout,
     svgCutout,
     holeCount,
@@ -201,6 +237,21 @@ export function getHandleLimits(
       min: 0,
       max: Math.min(16, (settings.width - 30) / 2, (settings.height - 4) / 2),
     },
+    topAngle: {
+      min: -topLimits(settings.height, settings.width, settings.cornerRadius)
+        .angle,
+      max: topLimits(settings.height, settings.width, settings.cornerRadius)
+        .angle,
+    },
+    topCurve: {
+      min: 0,
+      max: topLimits(
+        settings.height,
+        settings.width,
+        settings.cornerRadius,
+        settings.topAngle,
+      ).curve,
+    },
     holeCount: {
       min: 1,
       max:
@@ -236,24 +287,154 @@ export function getHandleLimits(
   }
 }
 
-function handleSlits(settings: HandleSettings) {
-  if (settings.cutout !== 'slits') return []
-  return Array.from({ length: settings.holeCount }, (_, index) => ({
-    x:
-      settings.offsetX +
-      (index - (settings.holeCount - 1) / 2) *
-        (settings.holeWidth + settings.holeGap),
-    width: settings.holeWidth,
-    depth: settings.holeHeight,
-  }))
+type Point = [number, number]
+
+/** The top is sampled from right to left; its highest vertex defines height. */
+function topEdge(settings: HandleSettings): Point[] {
+  const half = settings.width / 2
+  const radius = settings.cornerRadius
+  const slope = Math.tan((settings.topAngle * Math.PI) / 180)
+  const bow =
+    settings.topShape === 'straight'
+      ? 0
+      : settings.topCurve * (settings.topShape === 'outward' ? 1 : -1)
+  const elevation = (x: number) => slope * x + bow * (1 - (x / half) ** 2)
+  const points: Point[] = []
+  if (radius > 0) {
+    for (let step = 0; step <= 16; step += 1) {
+      const angle = (step * Math.PI) / 32
+      const x = half - radius + radius * Math.cos(angle)
+      points.push([x, elevation(x) - radius + radius * Math.sin(angle)])
+    }
+  } else points.push([half, elevation(half)])
+  const segments = bow === 0 ? 1 : 96
+  for (let step = 1; step <= segments; step += 1) {
+    const x = (half - radius) * (1 - (2 * step) / segments)
+    points.push([x, elevation(x)])
+  }
+  if (radius > 0) {
+    for (let step = 1; step <= 16; step += 1) {
+      const angle = Math.PI / 2 + (step * Math.PI) / 32
+      const x = -half + radius + radius * Math.cos(angle)
+      points.push([x, elevation(x) - radius + radius * Math.sin(angle)])
+    }
+  }
+  const highest = Math.max(...points.map(([, y]) => y))
+  return points.map(([x, y]) => [x, settings.height + y - highest])
 }
 
-/** Slits open at the top edge; depth includes their semicircular bottom. */
+function topYAt(top: Point[], x: number) {
+  const boundedX = clamp(x, top[top.length - 1][0], top[0][0])
+  for (let index = 1; index < top.length; index += 1) {
+    const [ax, ay] = top[index - 1]
+    const [bx, by] = top[index]
+    if (ax === bx) continue
+    if (boundedX >= bx) return ay + ((boundedX - ax) * (by - ay)) / (bx - ax)
+  }
+  return top[top.length - 1][1]
+}
+
+/** Actual faceted silhouette height at X, before cutting any open slits. */
+export function getHandleTopY(
+  model: SpeakerModel,
+  input: Partial<HandleSettings>,
+  x: number,
+) {
+  return topYAt(topEdge(normalizeHandleSettings(model, input)), x)
+}
+
+export interface HandleSlit {
+  x: number
+  width: number
+  depth: number
+  topY: number
+  bottomY: number
+  leftTopY: number
+  rightTopY: number
+}
+
+function handleSlits(
+  settings: HandleSettings,
+  top = topEdge(settings),
+): HandleSlit[] {
+  if (settings.cutout !== 'slits') return []
+  return Array.from({ length: settings.holeCount }, (_, index) => {
+    const x =
+      settings.offsetX +
+      (index - (settings.holeCount - 1) / 2) *
+        (settings.holeWidth + settings.holeGap)
+    const topY = topYAt(top, x)
+    return {
+      x,
+      width: settings.holeWidth,
+      depth: settings.holeHeight,
+      topY,
+      bottomY: topY - settings.holeHeight,
+      leftTopY: topYAt(top, x - settings.holeWidth / 2),
+      rightTopY: topYAt(top, x + settings.holeWidth / 2),
+    }
+  }).filter((slit) => {
+    if (slit.bottomY < HANDLE_SHOULDER_HEIGHT + HANDLE_MIN_WEB - 1e-8)
+      return false
+    // Keep the entire semicircular bottom below the local top. This also
+    // prevents a shallow slit crossing back through a steep or concave top.
+    const left = slit.x - slit.width / 2
+    const right = slit.x + slit.width / 2
+    const lowestTop = Math.min(
+      slit.leftTopY,
+      slit.rightTopY,
+      ...top.filter(([x]) => x > left && x < right).map(([, y]) => y),
+    )
+    return lowestTop >= slit.bottomY + slit.width / 2 - 1e-8
+  })
+}
+
+/** Accepted slits follow the local top; depth includes their rounded bottom. */
 export function getHandleSlits(
   model: SpeakerModel,
   input: Partial<HandleSettings>,
-): { x: number; width: number; depth: number }[] {
+): HandleSlit[] {
   return handleSlits(normalizeHandleSettings(model, input))
+}
+
+function handleOutline(settings: HandleSettings, baseWidth = 84.9715): Point[] {
+  const half = settings.width / 2
+  const top = topEdge(settings)
+  const points: Point[] = [
+    [-baseWidth / 2, -0.25],
+    [baseWidth / 2, -0.25],
+    [baseWidth / 2, 0],
+    [half, HANDLE_SHOULDER_HEIGHT],
+  ]
+  const append = (point: Point) => {
+    const previous = points[points.length - 1]
+    if (Math.hypot(point[0] - previous[0], point[1] - previous[1]) > 1e-10)
+      points.push(point)
+  }
+  let topIndex = 0
+  for (const slit of handleSlits(settings, top).reverse()) {
+    const radius = slit.width / 2
+    const right = slit.x + radius
+    const left = slit.x - radius
+    while (topIndex < top.length && top[topIndex][0] > right)
+      append(top[topIndex++])
+    append([right, slit.rightTopY])
+    const centerY = slit.bottomY + radius
+    append([right, centerY])
+    for (let step = 1; step <= 32; step += 1) {
+      const angle = (-step * Math.PI) / 32
+      append([
+        slit.x + Math.cos(angle) * radius,
+        centerY + Math.sin(angle) * radius,
+      ])
+    }
+    append([left, slit.leftTopY])
+    while (topIndex < top.length && top[topIndex][0] >= left) topIndex += 1
+  }
+  while (topIndex < top.length) append(top[topIndex++])
+  append([-half, HANDLE_SHOULDER_HEIGHT])
+  append([-baseWidth / 2, 0])
+  return points
 }
 
 /** Profile coordinates are relative to the join with the existing control deck. */
@@ -261,68 +442,71 @@ export function getHandleOutline(
   model: SpeakerModel,
   input: Partial<HandleSettings>,
   baseWidth = 84.9715,
-): [number, number][] {
-  const settings = normalizeHandleSettings(model, input)
-  const half = settings.width / 2
-  const radius = settings.cornerRadius
-  const top = settings.height
-  const points: [number, number][] = [
-    [-baseWidth / 2, -0.25],
-    [baseWidth / 2, -0.25],
-    [baseWidth / 2, 0],
-    [half, HANDLE_SHOULDER_HEIGHT],
-  ]
-  const appendTopEdge = (leftX: number) => {
-    for (const slit of handleSlits(settings).reverse()) {
-      const slitRadius = slit.width / 2
-      const centerY = top - slit.depth + slitRadius
-      points.push([slit.x + slitRadius, top])
-      if (slit.depth > slitRadius) points.push([slit.x + slitRadius, centerY])
-      for (let step = 1; step <= 32; step += 1) {
-        const angle = (-step * Math.PI) / 32
-        points.push([
-          slit.x + Math.cos(angle) * slitRadius,
-          centerY + Math.sin(angle) * slitRadius,
-        ])
-      }
-      if (slit.depth > slitRadius) points.push([slit.x - slitRadius, top])
-    }
-    points.push([leftX, top])
-  }
-  if (radius > 0) {
-    points.push([half, top - radius])
-    for (const [cx, start] of [
-      [half - radius, 0],
-      [-half + radius, 90],
-    ]) {
-      for (let step = 1; step <= 16; step += 1) {
-        const angle = ((start + (step * 90) / 16) * Math.PI) / 180
-        points.push([
-          cx + Math.cos(angle) * radius,
-          top - radius + Math.sin(angle) * radius,
-        ])
-      }
-      if (start === 0) appendTopEdge(-half + radius)
-    }
-  } else {
-    points.push([half, top])
-    appendTopEdge(-half)
-  }
-  points.push([-half, HANDLE_SHOULDER_HEIGHT], [-baseWidth / 2, 0])
-  return points
+): Point[] {
+  return handleOutline(normalizeHandleSettings(model, input), baseWidth)
 }
 
-export function getHandleHoleCenters(
-  model: SpeakerModel,
-  input: Partial<HandleSettings>,
-) {
-  const settings = normalizeHandleSettings(model, input)
-  if (
-    settings.cutout === 'none' ||
-    settings.cutout === 'svg' ||
-    settings.cutout === 'slits'
+function pointInside([x, y]: Point, polygon: Point[]) {
+  let inside = false
+  for (let index = 0; index < polygon.length; index += 1) {
+    const [ax, ay] = polygon[index]
+    const [bx, by] = polygon[(index + 1) % polygon.length]
+    if (ay > y !== by > y && x < ((bx - ax) * (y - ay)) / (by - ay) + ax)
+      inside = !inside
+  }
+  return inside
+}
+
+function pointSegmentDistance(point: Point, a: Point, b: Point) {
+  const dx = b[0] - a[0]
+  const dy = b[1] - a[1]
+  const lengthSquared = dx * dx + dy * dy
+  const t =
+    lengthSquared === 0
+      ? 0
+      : clamp(
+          ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / lengthSquared,
+          0,
+          1,
+        )
+  return Math.hypot(point[0] - a[0] - t * dx, point[1] - a[1] - t * dy)
+}
+
+function segmentDistance(a: Point, b: Point, c: Point, d: Point) {
+  const cross = (p: Point, q: Point, r: Point) =>
+    (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+  const abC = cross(a, b, c)
+  const abD = cross(a, b, d)
+  const cdA = cross(c, d, a)
+  const cdB = cross(c, d, b)
+  if (abC * abD < 0 && cdA * cdB < 0) return 0
+  return Math.min(
+    pointSegmentDistance(a, c, d),
+    pointSegmentDistance(b, c, d),
+    pointSegmentDistance(c, a, b),
+    pointSegmentDistance(d, a, b),
   )
-    return []
+}
+
+function supportedSegment(
+  a: Point,
+  b: Point,
+  outline: Point[],
+  clearance: number,
+) {
+  if (!pointInside(a, outline) || !pointInside(b, outline)) return false
+  return outline.every(
+    (point, index) =>
+      segmentDistance(a, b, point, outline[(index + 1) % outline.length]) >=
+      clearance - 1e-8,
+  )
+}
+
+function handleHoles(
+  settings: HandleSettings,
+  outline = handleOutline(settings),
+) {
+  if (settings.cutout !== 'circle' && settings.cutout !== 'slot') return []
   return Array.from({ length: settings.holeCount }, (_, index) => ({
     x:
       settings.offsetX +
@@ -332,27 +516,68 @@ export function getHandleHoleCenters(
     width: settings.holeWidth,
     height:
       settings.cutout === 'circle' ? settings.holeWidth : settings.holeHeight,
-  }))
+  })).filter((hole) => {
+    const radius = hole.height / 2
+    const halfSegment = (hole.width - hole.height) / 2
+    return (
+      hole.y - radius >= HANDLE_SHOULDER_HEIGHT + HANDLE_MIN_WEB - 1e-8 &&
+      supportedSegment(
+        [hole.x - halfSegment, hole.y],
+        [hole.x + halfSegment, hole.y],
+        outline,
+        radius + HANDLE_MIN_WEB,
+      )
+    )
+  })
 }
 
-/** SVG's downward Y axis is flipped into the handle's upward profile axis. */
+/** Requested openings keep their positions; unsafe ones are omitted individually. */
+export function getHandleHoleCenters(
+  model: SpeakerModel,
+  input: Partial<HandleSettings>,
+) {
+  return handleHoles(normalizeHandleSettings(model, input))
+}
+
+function handleSvgPaths(
+  settings: HandleSettings,
+  outline = handleOutline(settings),
+): SvgCutout['paths'] {
+  if (settings.cutout !== 'svg' || !settings.svgCutout) return []
+  const centerY =
+    settings.height / 2 + HANDLE_SHOULDER_HEIGHT / 2 + settings.offsetY
+  return settings.svgCutout.paths
+    .map((path) => ({
+      fillRule: path.fillRule,
+      contours: path.contours.map((contour) =>
+        contour.map(([x, y]): Point => [
+          settings.offsetX + x * settings.holeWidth,
+          centerY - y * settings.holeHeight,
+        ]),
+      ),
+    }))
+    .filter((path) =>
+      path.contours.every((contour) =>
+        contour.every(
+          (point, index) =>
+            point[1] >= HANDLE_SHOULDER_HEIGHT + HANDLE_MIN_WEB - 1e-8 &&
+            supportedSegment(
+              point,
+              contour[(index + 1) % contour.length],
+              outline,
+              HANDLE_MIN_WEB,
+            ),
+        ),
+      ),
+    )
+}
+
+/** SVG's downward Y axis is flipped; only complete, supported paths are cut. */
 export function getHandleSvgPaths(
   model: SpeakerModel,
   input: Partial<HandleSettings>,
 ): SvgCutout['paths'] {
-  const settings = normalizeHandleSettings(model, input)
-  if (settings.cutout !== 'svg' || !settings.svgCutout) return []
-  const centerY =
-    settings.height / 2 + HANDLE_SHOULDER_HEIGHT / 2 + settings.offsetY
-  return settings.svgCutout.paths.map((path) => ({
-    fillRule: path.fillRule,
-    contours: path.contours.map((contour) =>
-      contour.map(([x, y]) => [
-        settings.offsetX + x * settings.holeWidth,
-        centerY - y * settings.holeHeight,
-      ]),
-    ),
-  }))
+  return handleSvgPaths(normalizeHandleSettings(model, input))
 }
 
 /** Stud centers share one square grid on the front face, above the shoulder. */
@@ -368,8 +593,17 @@ export function getHandleStudCenters(
   // outline's rounded corners, and avoids tangent boolean intersections.
   const clearance = HANDLE_STUD_DIAMETER / 2 + 0.25
   const stripes = getRaceStripeIntervals(raceStripes)
-  const outline = getHandleOutline(model, settings)
-  const holes = getHandleHoleCenters(model, settings)
+  const outline = handleOutline(settings)
+  const holes = handleHoles(settings, outline)
+  const svgBounds = handleSvgPaths(settings, outline).map((path) => {
+    const points = path.contours.flat()
+    return {
+      minX: Math.min(...points.map(([x]) => x)),
+      maxX: Math.max(...points.map(([x]) => x)),
+      minY: Math.min(...points.map(([, y]) => y)),
+      maxY: Math.max(...points.map(([, y]) => y)),
+    }
+  })
   const centerY = (settings.height + HANDLE_SHOULDER_HEIGHT) / 2
   const supported = (x: number, y: number) => {
     if (
@@ -404,17 +638,11 @@ export function getHandleStudCenters(
       )
       if (Math.hypot(dx, y - hole.y) < hole.height / 2 + clearance) return false
     }
-    if (settings.cutout === 'svg' && settings.svgCutout) {
-      // Reserve the uploaded artwork's bounds, regardless of its fill rule or
-      // number of contours, so no stud can bridge any part of an SVG opening.
-      const dx = Math.max(
-        Math.abs(x - settings.offsetX) - settings.holeWidth / 2,
-        0,
-      )
-      const dy = Math.max(
-        Math.abs(y - centerY - settings.offsetY) - settings.holeHeight / 2,
-        0,
-      )
+    for (const bounds of svgBounds) {
+      // Reserve each accepted path's bounds so studs cannot bridge any of its
+      // contours. A path omitted for safety no longer excludes nearby studs.
+      const dx = Math.max(bounds.minX - x, x - bounds.maxX, 0)
+      const dy = Math.max(bounds.minY - y, y - bounds.maxY, 0)
       if (Math.hypot(dx, dy) < clearance) return false
     }
     return true

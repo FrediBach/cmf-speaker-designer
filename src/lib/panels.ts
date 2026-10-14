@@ -200,7 +200,13 @@ export function haloFilenameSuffix(settings?: HaloSettings): string {
 
 export function handleFilenameSuffix(settings?: HandleSettings): string {
   if (settings?.mode !== 'custom') return ''
-  return `-handle-${settings.height.toFixed(1)}mm${settings.legoStuds ? '-lego-studs' : ''}`
+  const angle =
+    settings.topAngle !== 0 ? `-top-${settings.topAngle.toFixed(1)}deg` : ''
+  const curve =
+    settings.topShape !== 'straight'
+      ? `-${settings.topShape}-${settings.topCurve.toFixed(1)}mm`
+      : ''
+  return `-handle-${settings.height.toFixed(1)}mm${angle}${curve}${settings.legoStuds ? '-lego-studs' : ''}`
 }
 
 export function downloadPanelStl(

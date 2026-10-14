@@ -5,6 +5,12 @@ import { PanelIcon } from './PanelIcon'
 import { KnobIcon } from './KnobIcon'
 import { colorName, type Design } from '@/lib/design'
 import { getDesignSummary } from '@/lib/design-summary'
+import {
+  getHandleHoleCenters,
+  getHandleSlits,
+  getHandleStudCenters,
+  getHandleSvgPaths,
+} from '@/lib/handle-settings'
 import type {
   DesignExportFormat,
   DesignExportTarget,
@@ -207,16 +213,35 @@ export function ExportDialog({
   )
 }
 
-function handleCutoutSummary(handle: Design['handle']) {
+function handleCutoutSummary({ model, handle }: Design) {
   if (handle.cutout === 'none') return 'Solid'
-  if (handle.cutout === 'svg')
-    return handle.svgCutout
-      ? `SVG cutout · ${handle.svgCutout.name}`
-      : 'Solid · no SVG uploaded'
+  if (handle.cutout === 'svg') {
+    if (!handle.svgCutout) return 'Solid · no SVG uploaded'
+    const count = getHandleSvgPaths(model, handle).length
+    if (!count) return 'Solid · SVG cutout omitted'
+    const total = handle.svgCutout.paths.length
+    return `SVG cutout · ${handle.svgCutout.name}${count < total ? ` · ${count} of ${total} shapes` : ''}`
+  }
+  const count =
+    handle.cutout === 'slits'
+      ? getHandleSlits(model, handle).length
+      : getHandleHoleCenters(model, handle).length
+  const amount =
+    count === handle.holeCount ? `${count}` : `${count} of ${handle.holeCount}`
   if (handle.cutout === 'slits')
-    return `${handle.holeCount} top ${handle.holeCount === 1 ? 'slit' : 'slits'} · ${handle.holeHeight} mm deep`
+    return `${amount} top ${handle.holeCount === 1 ? 'slit' : 'slits'} · ${handle.holeHeight} mm deep`
   const shape = handle.cutout === 'circle' ? 'round' : 'slot'
-  return `${handle.holeCount} ${shape} ${handle.holeCount === 1 ? 'hole' : 'holes'}`
+  return `${amount} ${shape} ${handle.holeCount === 1 ? 'hole' : 'holes'}`
+}
+
+function handleTopSummary(handle: Design['handle']) {
+  if (handle.topShape === 'straight' && handle.topAngle === 0) return ''
+  const shape = {
+    straight: 'Straight',
+    outward: 'Outward rounded',
+    inward: 'Inward rounded',
+  }[handle.topShape]
+  return ` · ${shape} top · ${Number(handle.topAngle.toFixed(2))}° angle${handle.topShape !== 'straight' ? ` · ${Number(handle.topCurve.toFixed(2))} mm curve` : ''}`
 }
 
 function PanelExportSummary({
@@ -259,8 +284,17 @@ function PanelExportSummary({
         {design.handle.mode === 'custom' && (
           <span>
             Custom handle · {design.handle.height} mm extension ·{' '}
-            {design.handle.width} mm wide · {handleCutoutSummary(design.handle)}
-            {design.handle.legoStuds ? ' · LEGO-compatible studs' : ''}
+            {design.handle.width} mm wide
+            {handleTopSummary(design.handle)} · {handleCutoutSummary(design)}
+            {design.handle.legoStuds
+              ? getHandleStudCenters(
+                  design.model,
+                  design.handle,
+                  design.raceStripes,
+                ).length
+                ? ' · LEGO-compatible studs'
+                : ' · LEGO-compatible studs omitted'
+              : ''}
           </span>
         )}
         {design.grille.mode === 'custom' && (

@@ -125,6 +125,69 @@ describe('panel gap', () => {
 })
 
 describe('saved and shared handle designs', () => {
+  it.each(['straight', 'outward', 'inward'] as const)(
+    'restores the %s top profile and retained hair settings through storage and shared links',
+    (topShape) => {
+      const design = validateDesign({
+        ...DEFAULT_DESIGN,
+        model: 'm',
+        handle: {
+          ...DEFAULT_DESIGN.handle,
+          mode: 'custom',
+          height: 56,
+          width: 90,
+          topAngle: -12,
+          topShape,
+          topCurve: 9,
+          cutout: 'slits',
+          holeCount: 5,
+          holeWidth: 5,
+          holeHeight: 23,
+          holeGap: 8,
+          legoStuds: true,
+        },
+      })
+      expect(design.handle).toMatchObject({
+        topAngle: -12,
+        topShape,
+        topCurve: 9,
+        holeCount: 5,
+        legoStuds: true,
+      })
+      vi.stubGlobal('window', { location: { search: '' } })
+      vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(design) })
+      expect(readDesign()).toEqual(design)
+      vi.stubGlobal('window', {
+        location: designShareUrl(design, 'https://example.com/designer/'),
+      })
+      expect(readDesign()).toEqual(design)
+
+      const original = validateDesign({
+        ...design,
+        handle: { ...design.handle, mode: 'original' },
+      })
+      expect(original.handle).toEqual({ ...design.handle, mode: 'original' })
+    },
+  )
+
+  it('restores legacy and malformed top settings as a flat straight top', () => {
+    for (const value of [undefined, null, 'invalid', true, {}, NaN, Infinity]) {
+      const restored = validateDesign({
+        handle: {
+          mode: 'custom',
+          topShape: value,
+          topAngle: value,
+          topCurve: value,
+        },
+      })
+      expect(restored.handle).toMatchObject({
+        topShape: 'straight',
+        topAngle: 0,
+        topCurve: 10,
+      })
+    }
+  })
+
   it.each(['s', 'm'] as const)(
     'restores five top-open hair slits from saved and shared %s designs',
     (model) => {
@@ -168,6 +231,9 @@ describe('saved and shared handle designs', () => {
       mode: 'original',
       height: 27,
       legoStuds: false,
+      topAngle: 0,
+      topShape: 'straight',
+      topCurve: 10,
     })
     expect(restored.grille.mode).toBe('original')
     expect(restored.halo).toEqual(DEFAULT_HALO_SETTINGS)
