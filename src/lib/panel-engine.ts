@@ -5,6 +5,10 @@ import { applyFaceDepth } from './face-depth'
 import { applyPanelExtension } from './panel-extension'
 import { createPanelGapEngine, type PanelGapMetadata } from './panel-gap'
 import type { HandleWorkerRequest } from './handles'
+import {
+  createRaceStripeEngine,
+  type RaceStripeMetadata,
+} from './race-stripe-geometry'
 
 export interface GeneratedPanel {
   positions: Float32Array
@@ -12,6 +16,7 @@ export interface GeneratedPanel {
   grille?: GrilleMetadata
   halo?: HaloMetadata
   gap?: PanelGapMetadata
+  raceStripes?: RaceStripeMetadata
 }
 
 /** One worker pipeline keeps all panel customizations in the same solid. */
@@ -21,6 +26,7 @@ export function createPanelEngine(wasmUrl?: string) {
   let grilleEngine: ReturnType<typeof createGrilleEngine> | undefined
   let haloEngine: ReturnType<typeof createHaloEngine> | undefined
   let gapEngine: ReturnType<typeof createPanelGapEngine> | undefined
+  let stripeEngine: ReturnType<typeof createRaceStripeEngine> | undefined
 
   return {
     async build(
@@ -35,6 +41,7 @@ export function createPanelEngine(wasmUrl?: string) {
         relief,
         panelExtension,
         panelGap = 0,
+        raceStripes,
         source,
       } = request
       const key = `${model}:${style}`
@@ -47,6 +54,7 @@ export function createPanelEngine(wasmUrl?: string) {
       let grilleMetadata: GrilleMetadata | undefined
       let haloMetadata: HaloMetadata | undefined
       let gapMetadata: PanelGapMetadata | undefined
+      let stripeMetadata: RaceStripeMetadata | undefined
       if (settings.mode === 'custom') {
         handleEngine ??= createHandleEngine(wasmUrl).catch((error) => {
           handleEngine = undefined
@@ -58,6 +66,7 @@ export function createPanelEngine(wasmUrl?: string) {
           settings,
           positions,
           panelExtension,
+          raceStripes,
         )
         positions = result.positions
         handle = result.metadata
@@ -108,9 +117,25 @@ export function createPanelEngine(wasmUrl?: string) {
           grille,
           positions,
           panelGap,
+          raceStripes,
         )
         positions = result.positions
         grilleMetadata = result.metadata
+      }
+      if (raceStripes?.enabled) {
+        stripeEngine ??= createRaceStripeEngine(wasmUrl).catch((error) => {
+          stripeEngine = undefined
+          throw error
+        })
+        const result = (await stripeEngine).build(
+          model,
+          raceStripes,
+          positions,
+          relief,
+          panelGap,
+        )
+        positions = result.positions
+        stripeMetadata = result.metadata
       }
       if (halo.mode === 'custom') {
         if (style !== 'original')
@@ -134,6 +159,7 @@ export function createPanelEngine(wasmUrl?: string) {
         grille: grilleMetadata,
         halo: haloMetadata,
         gap: gapMetadata,
+        raceStripes: stripeMetadata,
       }
     },
     async dispose() {
@@ -141,10 +167,12 @@ export function createPanelEngine(wasmUrl?: string) {
       const grilles = await grilleEngine
       const halos = await haloEngine
       const gaps = await gapEngine
+      const stripes = await stripeEngine
       handles?.dispose()
       grilles?.dispose()
       halos?.dispose()
       gaps?.dispose()
+      stripes?.dispose()
       sources.clear()
     },
   }

@@ -9,10 +9,15 @@ import {
   type GrilleSettings,
 } from '@/lib/grille-settings'
 import type { SpeakerModel } from '@/lib/panels'
+import {
+  getRaceStripeIntervals,
+  type RaceStripeSettings,
+} from '@/lib/race-stripe-settings'
 
 interface Props {
   model: SpeakerModel
   value: GrilleSettings
+  raceStripes: RaceStripeSettings
   onChange: (value: GrilleSettings) => void
 }
 
@@ -135,12 +140,17 @@ function PatternMark({
 function GrilleDiagram({
   model,
   value,
+  raceStripes,
 }: {
   model: SpeakerModel
   value: GrilleSettings
+  raceStripes: RaceStripeSettings
 }) {
   const clipId = useId()
-  const pattern = useMemo(() => getGrillePattern(model, value), [model, value])
+  const pattern = useMemo(
+    () => getGrillePattern(model, value, raceStripes),
+    [model, value, raceStripes],
+  )
   const opening = pattern.openings[0]
   const left = opening.x - 42
   const top = -opening.y - 42
@@ -166,6 +176,16 @@ function GrilleDiagram({
             stroke="var(--accent-ink)"
             strokeWidth=".35"
           />
+          {getRaceStripeIntervals(raceStripes).map(({ minX, maxX }) => (
+            <rect
+              key={minX}
+              x={minX}
+              y={top}
+              width={maxX - minX}
+              height={84}
+              fill="var(--diagram-recess)"
+            />
+          ))}
           {visibleHoles.map((hole, index) => (
             <polygon
               key={index}
@@ -212,7 +232,7 @@ function GrilleDiagram({
   )
 }
 
-export function GrilleEditor({ model, value, onChange }: Props) {
+export function GrilleEditor({ model, value, raceStripes, onChange }: Props) {
   const extensionLabelId = useId()
   const extensionDescriptionId = useId()
   const limits = getGrilleLimits(value)
@@ -282,7 +302,11 @@ export function GrilleEditor({ model, value, onChange }: Props) {
         </div>
       ) : (
         <>
-          <GrilleDiagram model={model} value={value} />
+          <GrilleDiagram
+            model={model}
+            value={value}
+            raceStripes={raceStripes}
+          />
           <section className="control-section">
             <h3>
               <span aria-hidden="true">01</span> Opening shape

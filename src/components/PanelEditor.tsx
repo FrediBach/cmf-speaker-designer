@@ -5,6 +5,7 @@ import { PanelIcon } from './PanelIcon'
 import { ColorPicker } from './ColorPicker'
 import type { Design } from '@/lib/design'
 import { getDesignSummary } from '@/lib/design-summary'
+import { RaceStripeEditor } from './RaceStripeEditor'
 
 const looks = [
   { name: 'The original', panelColor: '#f45427', knobColor: '#303538' },
@@ -42,6 +43,7 @@ export function PanelEditor({ design, update, onOpenGuide }: Props) {
                     style: style.id,
                     halo: { ...design.halo, mode: 'original' },
                     grille: { ...design.grille, mode: 'original' },
+                    raceStripes: { ...design.raceStripes, enabled: false },
                   })
                 } else {
                   update({ style: style.id })
@@ -62,7 +64,9 @@ export function PanelEditor({ design, update, onOpenGuide }: Props) {
             ? `${haloLabel}${customGrille ? ' and grille' : ''} active. Edit the profile in Halo, or choose Original to restore the open panel.`
             : customGrille
               ? 'Custom grille active. Edit the pattern in Grille, or choose Original to restore the open panel.'
-              : currentStyle.description}
+              : design.raceStripes.enabled
+                ? 'Recessed race stripes active. Edit their width and spacing below, or choose Original to restore the open panel.'
+                : currentStyle.description}
         </p>
       </section>
       <section className="control-section">
@@ -170,9 +174,13 @@ export function PanelEditor({ design, update, onOpenGuide }: Props) {
           posts. The knob and button stay in recessed openings.
         </p>
       </section>
+      <RaceStripeEditor
+        value={design.raceStripes}
+        onChange={(raceStripes) => update({ raceStripes })}
+      />
       <div className="looks-bar">
         <div className="looks-title">
-          <span className="section-index">06</span>
+          <span className="section-index">07</span>
           <span>Color presets</span>
         </div>
         <div className="looks">

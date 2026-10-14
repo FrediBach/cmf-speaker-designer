@@ -19,6 +19,11 @@ import {
   type HaloSettings,
 } from './halo-settings'
 import type { PanelStyle } from './panels'
+import {
+  DEFAULT_RACE_STRIPE_SETTINGS,
+  normalizeRaceStripeSettings,
+  type RaceStripeSettings,
+} from './race-stripe-settings'
 
 export const PALETTE = [
   { name: 'CMF orange', value: '#f45427' },
@@ -48,6 +53,7 @@ export type Design = {
   handle: HandleSettings
   grille: GrilleSettings
   halo: HaloSettings
+  raceStripes: RaceStripeSettings
   knob: KnobSettings
 }
 export const DEFAULT_DESIGN: Design = {
@@ -62,6 +68,7 @@ export const DEFAULT_DESIGN: Design = {
   handle: getDefaultHandleSettings('s'),
   grille: { ...DEFAULT_GRILLE_SETTINGS },
   halo: { ...DEFAULT_HALO_SETTINGS },
+  raceStripes: { ...DEFAULT_RACE_STRIPE_SETTINGS },
   knob: { ...DEFAULT_KNOB_SETTINGS },
 }
 export const STORAGE_KEY = 'cmf-speaker-design-v1'
@@ -74,12 +81,14 @@ export function validateDesign(value: unknown): Design {
   const model = data.model === 'm' ? 'm' : 's'
   const grille = normalizeGrilleSettings(data.grille ?? {})
   const halo = normalizeHaloSettings(data.halo ?? {})
+  const raceStripes = normalizeRaceStripeSettings(data.raceStripes ?? {})
   return {
     model,
     bodyColor: data.bodyColor === 'gray' ? 'gray' : 'black',
     knob: normalizeKnobSettings(data.knob ?? {}),
     grille,
     halo,
+    raceStripes,
     handle: normalizeHandleSettings(
       model,
       data.handle ?? getDefaultHandleSettings(model),
@@ -87,7 +96,8 @@ export function validateDesign(value: unknown): Design {
     style:
       data.style === 'custom' ||
       grille.mode === 'custom' ||
-      halo.mode === 'custom'
+      halo.mode === 'custom' ||
+      raceStripes.enabled
         ? 'custom'
         : 'original',
     panelColor: isColor(data.panelColor)

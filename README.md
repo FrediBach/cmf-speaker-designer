@@ -74,6 +74,7 @@ Choose **Black** or **Gray** under **Speaker body**, next to the model selection
 - Add a 0–0.5 cm panel gap with extended attachment necks and cylindrical rear supports on the front and angled section. The knob and button remain at their original height in recessed openings.
 - Generate a custom upper handle: adjust its height, width, and rounded corners, then choose a solid face, one to three circular or slotted openings, or an uploaded SVG cutout.
 - Add LEGO-compatible studs to the custom handle's front face.
+- Recess one to three centered vertical race stripes into the panel, with adjustable stripe width and gap. Studs and decorative face recesses leave the stripes clear.
 - Change hole size, spacing, and position, with dependent dimensions constrained to leave at least 3 mm of surrounding material.
 - Keep your current design locally and copy a link to share a configuration.
 - Select the supplied ring, bar, and cross volume knobs, or generate fluted and faceted grips.
@@ -93,6 +94,14 @@ The **Grille** tab generates a perforated grille over the original driver openin
 **Continue across the face** continues the same pattern seamlessly from the through-holes into matching blind recesses across the front face, including along the driver opening rims. These are real surface geometry in the STL, with solid material behind each recess. The outside edges, control deck, and mounting regions are preserved. Preview and export share the same generated mesh, and grille dimensions are applied after added face depth so their selected thickness and recess depth stay in millimeters.
 
 Recess depth ranges from 0.2 to 3 mm and is limited to the grille thickness minus 0.5 mm to retain a solid floor. A 2 mm grille allows recesses up to 1.5 mm; the default 3.5 mm grille allows the full 3 mm. Reducing grille thickness also reduces the recess depth when needed.
+
+## Recessed race stripes
+
+In **Front panel → Race stripes**, enable **Recessed race stripes** and choose one to three stripes. The centered vertical grooves run from top to bottom wherever the panel has material, recessed 0.8 mm into the surface. They are part of the printable geometry and use the panel's material and color.
+
+**Stripe width** and **Stripe gap** each range from 1 to 20 mm. Their limits adjust together to keep the complete group within 54 mm, leaving room at the sides of the narrowest handle. Gap is inactive for one stripe. Changing the count can reduce the width to keep the group inside these limits.
+
+LEGO-compatible studs leave clearance around each stripe. Decorative grille recesses skip the stripe bands, while driver and grille openings remain open. Halos, control seats, and mounting geometry are preserved. Stripes follow added face depth, side extension, and panel spacing and appear in the shared preview and STL/STP exports. Settings are retained in saved designs, shared links, undo/redo, and the ZIP's `design.json`. Selecting **Original** in Panel shape turns stripes off while keeping their dimensions for later use.
 
 ## Generative halo
 
@@ -150,6 +159,7 @@ STP exports use conventional AP214 advanced B-rep solids with explicit millimete
 - `src/lib/handle-geometry.ts` trims the source upper section and generates a connected handle with real cutouts; `handles.worker.ts` runs this kernel in the browser.
 - `src/lib/grille-settings.ts` constrains grille dimensions and defines the shared pattern layout; `grille-geometry.ts` joins perforated inserts and cuts blind decorative recesses.
 - `src/lib/halo-settings.ts` constrains halo dimensions; `halo-geometry.ts` generates a flared annular wall, trims it with the selected cutting plane, and joins it to the panel.
+- `src/lib/race-stripe-settings.ts` validates centered stripe dimensions and shares their intervals with stud placement; `race-stripe-geometry.ts` cuts the recessed bands into the panel.
 - `src/lib/panel-engine.ts` combines handle generation, the shared face-depth transformation, grille generation, and halo generation in order inside the worker.
 - `src/lib/use-panel-geometry.ts` schedules geometry updates, retains the last preview during generation, and enables export when the current design is ready.
 - `src/lib/knob-settings.ts` validates knob styles and dimensions; `knobs.ts` extracts the source parts, preserves the mounting interface, and builds the preview/export geometry.

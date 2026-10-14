@@ -123,6 +123,53 @@ function expectStepMatchesStl(step: ArrayBuffer, stl: ArrayBuffer) {
 }
 
 describe('design export', async () => {
+  it.each(['stl', 'stp'] as const)(
+    'names enabled race stripes in %s exports and retains all stripe settings in ZIPs',
+    async (format) => {
+      const panel = new BoxGeometry(85, 131, 24)
+      const knob = new CylinderGeometry(10, 10, 12, 16)
+      try {
+        for (const [enabled, count, suffix] of [
+          [true, 1, '-race-stripes-1x8.0mm'],
+          [true, 3, '-race-stripes-3x8.0mm-gap-5.0mm'],
+          [false, 3, ''],
+        ] as const) {
+          const design = validateDesign({
+            ...DEFAULT_DESIGN,
+            raceStripes: { enabled, count, width: 8, gap: 5 },
+          })
+          const filename = `cmf-speaker-s-original${suffix}.${format}`
+          const file = await buildDesignExport({
+            panel,
+            knob,
+            design,
+            target: 'panel',
+            format,
+          })
+          expect(file.filename).toBe(filename)
+          const archive = await buildDesignExport({
+            panel,
+            knob,
+            design,
+            target: 'both',
+            format,
+          })
+          const entries = readArchive(archive.data)
+          expect(entries.has(filename)).toBe(true)
+          const settings = JSON.parse(
+            decoder.decode(entries.get('design.json')),
+          )
+          expect(settings.raceStripes).toEqual(design.raceStripes)
+          expect(settings.export.files.panel).toBe(filename)
+          expect(validateDesign(settings)).toEqual(design)
+        }
+      } finally {
+        panel.dispose()
+        knob.dispose()
+      }
+    },
+  )
+
   it('packages separate printable parts and complete, reusable color settings', async () => {
     const panel = new BoxGeometry(85, 131, 24)
     const knob = new CylinderGeometry(10, 10, 12, 16)

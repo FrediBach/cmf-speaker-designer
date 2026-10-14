@@ -10,6 +10,7 @@ import {
   type GrilleSettings,
 } from './grille-settings'
 import type { SpeakerModel } from './panels'
+import type { RaceStripeSettings } from './race-stripe-settings'
 
 export interface GrilleMetadata {
   settings: GrilleSettings
@@ -86,6 +87,7 @@ export async function createGrilleEngine(wasmUrl?: string) {
       input: GrilleSettings,
       positions: Float32Array,
       panelGap = 0,
+      raceStripes?: RaceStripeSettings,
     ): GrilleResult {
       const settings = normalizeGrilleSettings(input)
       let frontZ = -Infinity
@@ -128,7 +130,7 @@ export async function createGrilleEngine(wasmUrl?: string) {
         return value
       }
       try {
-        const pattern = getGrillePattern(model, settings)
+        const pattern = getGrillePattern(model, settings, raceStripes)
         const through = pattern.holes.filter((hole) => hole.kind === 'through')
         const recesses = pattern.holes.filter((hole) => hole.kind === 'recess')
         if (!through.length)

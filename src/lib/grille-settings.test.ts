@@ -6,8 +6,38 @@ import {
   GRILLE_PERFORATION_RADIUS,
   normalizeGrilleSettings,
 } from './grille-settings'
+import { getRaceStripeIntervals } from './race-stripe-settings'
 
 describe('parametric grille settings and shared cutter layout', () => {
+  it('reserves stripe bands for blind face recesses while preserving every through-hole', () => {
+    for (const model of ['s', 'm'] as const)
+      for (const pattern of ['round', 'hex', 'slot'] as const) {
+        const settings = {
+          mode: 'custom' as const,
+          extendPattern: true,
+          pattern,
+          rotation: 37,
+        }
+        const original = getGrillePattern(model, settings)
+        const stripes = { enabled: true, count: 3, width: 8, gap: 6 }
+        const striped = getGrillePattern(model, settings, stripes)
+        expect(striped.holes.filter((hole) => hole.kind === 'through')).toEqual(
+          original.holes.filter((hole) => hole.kind === 'through'),
+        )
+        expect(striped.holes.length).toBeLessThan(original.holes.length)
+        for (const hole of striped.holes.filter(
+          (hole) => hole.kind === 'recess',
+        ))
+          for (const stripe of getRaceStripeIntervals(stripes)) {
+            const xs = hole.points.map(([x]) => x)
+            expect(
+              Math.max(...xs) <= stripe.minX - 0.25 ||
+                Math.min(...xs) >= stripe.maxX + 0.25,
+            ).toBe(true)
+          }
+      }
+  })
+
   it('normalizes invalid inputs and couples slot length to hole width', () => {
     const settings = normalizeGrilleSettings({
       mode: 'custom',

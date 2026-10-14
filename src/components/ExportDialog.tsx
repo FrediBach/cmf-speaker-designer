@@ -271,6 +271,16 @@ function PanelExportSummary({
               : ''}
           </span>
         )}
+        {design.raceStripes.enabled && (
+          <span>
+            {design.raceStripes.count} recessed race{' '}
+            {design.raceStripes.count === 1 ? 'stripe' : 'stripes'} ·{' '}
+            {design.raceStripes.width} mm wide
+            {design.raceStripes.count > 1
+              ? ` · ${design.raceStripes.gap} mm gap`
+              : ''}
+          </span>
+        )}
         {customHalo && (
           <span>
             {haloLabel} · {design.halo.depth} mm depth · {design.halo.thickness}{' '}

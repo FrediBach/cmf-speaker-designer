@@ -14,6 +14,7 @@ import {
   type HandleSettings,
 } from './handle-settings'
 import type { PanelStyle, SpeakerModel } from './panels'
+import type { RaceStripeSettings } from './race-stripe-settings'
 
 type Point = [number, number]
 export interface HandleMetadata {
@@ -96,6 +97,7 @@ export async function createHandleEngine(wasmUrl?: string) {
       input: HandleSettings,
       source?: Float32Array,
       panelExtension = 0,
+      raceStripes?: RaceStripeSettings,
     ): HandleResult {
       const settings = normalizeHandleSettings(model, input)
       const key = `${model}:${style}`
@@ -189,12 +191,14 @@ export async function createHandleEngine(wasmUrl?: string) {
         }
         const extrusion = own(section.extrude(HANDLE_THICKNESS))
         const extension = own(extrusion.translate([0, base.seamY, base.backZ]))
-        const studCenters = getHandleStudCenters(model, settings).map(
-          (center) => ({
-            x: center.x,
-            y: center.y + base.seamY,
-          }),
-        )
+        const studCenters = getHandleStudCenters(
+          model,
+          settings,
+          raceStripes,
+        ).map((center) => ({
+          x: center.x,
+          y: center.y + base.seamY,
+        }))
         let united = own(base.solid.add(extension))
         if (studCenters.length) {
           // Embed each cylinder slightly into the face for a robust solid union.

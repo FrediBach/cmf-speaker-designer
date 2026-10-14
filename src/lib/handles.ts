@@ -8,6 +8,10 @@ import { normalizeHandleSettings, type HandleSettings } from './handle-settings'
 import { normalizeGrilleSettings, type GrilleSettings } from './grille-settings'
 import { normalizeHaloSettings, type HaloSettings } from './halo-settings'
 import type { GeneratedPanel } from './panel-engine'
+import {
+  normalizeRaceStripeSettings,
+  type RaceStripeSettings,
+} from './race-stripe-settings'
 
 export interface HandleWorkerRequest {
   id: number
@@ -19,6 +23,7 @@ export interface HandleWorkerRequest {
   relief: number
   panelExtension: number
   panelGap: number
+  raceStripes?: RaceStripeSettings
   source?: Float32Array
 }
 export interface HandleWorkerResponse {
@@ -77,7 +82,7 @@ let testEngine:
   | undefined
 
 /**
- * Generate the handle, side extension, gap, face depth, grille, and halo in one worker.
+ * Generate the handle, side extension, gap, face depth, grille, halo, and stripes in one worker.
  * Callers own the returned geometry; preview and STL export use this same mesh.
  * The original path clones the original mesh without any CSG or remeshing.
  */
@@ -91,15 +96,18 @@ export async function buildHandledPanelGeometry(
   haloInput?: HaloSettings,
   panelExtension = 0,
   panelGap = 0,
+  raceStripesInput?: RaceStripeSettings,
 ): Promise<BufferGeometry> {
   const settings = normalizeHandleSettings(model, input)
   const grille = normalizeGrilleSettings(grilleInput)
   const halo = normalizeHaloSettings(haloInput)
+  const raceStripes = normalizeRaceStripeSettings(raceStripesInput)
   if (
     settings.mode === 'original' &&
     grille.mode === 'original' &&
     halo.mode === 'original' &&
-    panelGap === 0
+    panelGap === 0 &&
+    !raceStripes.enabled
   )
     return buildPanelGeometry(source, model, style, relief, panelExtension)
 
@@ -120,6 +128,7 @@ export async function buildHandledPanelGeometry(
       relief,
       panelExtension,
       panelGap,
+      raceStripes,
       source: new Float32Array(source.getAttribute('position').array),
     })
   } else {
@@ -143,6 +152,7 @@ export async function buildHandledPanelGeometry(
             relief,
             panelExtension,
             panelGap,
+            raceStripes,
             source: positions,
           } satisfies HandleWorkerRequest,
           positions ? [positions.buffer] : [],
@@ -167,6 +177,7 @@ export async function buildHandledPanelGeometry(
   completed.userData.addedFaceDepth = relief
   completed.userData.panelExtension = panelExtension
   completed.userData.panelGap = panelGap
+  if (result.raceStripes) completed.userData.raceStripes = result.raceStripes
   if (result.handle) completed.userData.handle = result.handle
   if (result.grille) completed.userData.grille = result.grille
   if (result.halo) completed.userData.halo = result.halo

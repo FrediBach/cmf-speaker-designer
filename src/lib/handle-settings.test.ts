@@ -12,6 +12,7 @@ import {
   type HandleSettings,
 } from './handle-settings'
 import type { SvgCutout } from './svg-cutout'
+import { getRaceStripeIntervals } from './race-stripe-settings'
 
 const svgTriangle: SvgCutout = {
   name: 'triangle.svg',
@@ -42,6 +43,35 @@ function outerDistance(x: number, y: number, handle: HandleSettings) {
 }
 
 describe('printable custom handle settings', () => {
+  it('keeps complete stud footprints clear of one to three recessed race stripes', () => {
+    for (const model of ['s', 'm'] as const) {
+      const handle = normalizeHandleSettings(model, {
+        mode: 'custom',
+        legoStuds: true,
+        height: 48,
+        width: 96,
+        cutout: 'none',
+      })
+      const original = getHandleStudCenters(model, handle)
+      for (const count of [1, 2, 3]) {
+        const stripes = { enabled: true, count, width: 8, gap: 6 }
+        const intervals = getRaceStripeIntervals(stripes)
+        const studs = getHandleStudCenters(model, handle, stripes)
+        expect(studs.length).toBeGreaterThan(0)
+        expect(studs.length).toBeLessThan(original.length)
+        for (const stud of studs)
+          for (const { minX, maxX } of intervals)
+            expect(
+              stud.x + HANDLE_STUD_DIAMETER / 2 <= minX - 0.249 ||
+                stud.x - HANDLE_STUD_DIAMETER / 2 >= maxX + 0.249,
+            ).toBe(true)
+        expect(
+          getHandleStudCenters(model, handle, { ...stripes, enabled: false }),
+        ).toEqual(original)
+      }
+    }
+  })
+
   it('keeps original handles by default and does not mutate input settings', () => {
     expect(getDefaultHandleSettings('s').height).toBe(24)
     expect(getDefaultHandleSettings('m').height).toBe(27)

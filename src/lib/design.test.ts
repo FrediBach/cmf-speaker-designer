@@ -8,9 +8,44 @@ import {
 } from './design'
 import { DEFAULT_KNOB_SETTINGS } from './knob-settings'
 import { DEFAULT_HALO_SETTINGS } from './halo-settings'
+import { DEFAULT_RACE_STRIPE_SETTINGS } from './race-stripe-settings'
 import type { SvgCutout } from './svg-cutout'
 
 afterEach(() => vi.unstubAllGlobals())
+
+describe('saved and shared race stripes', () => {
+  it('keeps legacy designs unchanged when stripe settings are absent or malformed', () => {
+    for (const raceStripes of [undefined, null, 'invalid', 1, {}]) {
+      const restored = validateDesign({ model: 'm', raceStripes })
+      expect(restored.raceStripes).toEqual(DEFAULT_RACE_STRIPE_SETTINGS)
+      expect(restored.style).toBe('original')
+    }
+  })
+
+  it.each([false, true])(
+    'restores stripes enabled=%s and retained dimensions through storage and shared links',
+    (enabled) => {
+      const design = validateDesign({
+        ...DEFAULT_DESIGN,
+        raceStripes: { enabled, count: 3, width: 8, gap: 5 },
+      })
+      expect(design.raceStripes).toEqual({
+        enabled,
+        count: 3,
+        width: 8,
+        gap: 5,
+      })
+      expect(design.style).toBe(enabled ? 'custom' : 'original')
+      vi.stubGlobal('window', { location: { search: '' } })
+      vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(design) })
+      expect(readDesign()).toEqual(design)
+      vi.stubGlobal('window', {
+        location: designShareUrl(design, 'https://example.com/designer/'),
+      })
+      expect(readDesign()).toEqual(design)
+    },
+  )
+})
 
 describe('panel extension', () => {
   it('keeps legacy designs at the original width and rejects malformed extensions', () => {

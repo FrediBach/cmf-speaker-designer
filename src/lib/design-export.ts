@@ -110,6 +110,9 @@ function selectedPanelFilename(design: Design): string {
     design.grille.mode === 'custom'
       ? `-grille-${design.grille.pattern}${design.grille.extendPattern ? '-extended' : ''}`
       : ''
+  const stripeSuffix = design.raceStripes.enabled
+    ? `-race-stripes-${design.raceStripes.count}x${design.raceStripes.width.toFixed(1)}mm${design.raceStripes.count > 1 ? `-gap-${design.raceStripes.gap.toFixed(1)}mm` : ''}`
+    : ''
   return panelFilename(
     design.model,
     'original',
@@ -118,7 +121,7 @@ function selectedPanelFilename(design: Design): string {
     design.panelGap,
   ).replace(
     '.stl',
-    `${handleSuffix}${grilleSuffix}${haloFilenameSuffix(design.halo)}.stl`,
+    `${handleSuffix}${grilleSuffix}${haloFilenameSuffix(design.halo)}${stripeSuffix}.stl`,
   )
 }
 

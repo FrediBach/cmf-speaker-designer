@@ -1,5 +1,9 @@
 import type { SpeakerModel } from './panels'
 import { normalizeSvgCutout, type SvgCutout } from './svg-cutout'
+import {
+  getRaceStripeIntervals,
+  type RaceStripeSettings,
+} from './race-stripe-settings'
 
 export type HandleCutout = 'none' | 'circle' | 'slot' | 'svg'
 export interface HandleSettings {
@@ -275,6 +279,7 @@ export function getHandleSvgPaths(
 export function getHandleStudCenters(
   model: SpeakerModel,
   input: Partial<HandleSettings>,
+  raceStripes?: Partial<RaceStripeSettings>,
 ): { x: number; y: number }[] {
   const settings = normalizeHandleSettings(model, input)
   if (settings.mode !== 'custom' || !settings.legoStuds) return []
@@ -282,10 +287,17 @@ export function getHandleStudCenters(
   // A small margin keeps the whole footprint supported, including the faceted
   // outline's rounded corners, and avoids tangent boolean intersections.
   const clearance = HANDLE_STUD_DIAMETER / 2 + 0.25
+  const stripes = getRaceStripeIntervals(raceStripes)
   const outline = getHandleOutline(model, settings)
   const holes = getHandleHoleCenters(model, settings)
   const centerY = (settings.height + HANDLE_SHOULDER_HEIGHT) / 2
   const supported = (x: number, y: number) => {
+    if (
+      stripes.some(
+        ({ minX, maxX }) => x + clearance > minX && x - clearance < maxX,
+      )
+    )
+      return false
     if (y < HANDLE_SHOULDER_HEIGHT + clearance) return false
     let inside = false
     for (let index = 0; index < outline.length; index += 1) {

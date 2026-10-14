@@ -1,4 +1,8 @@
 import type { SpeakerModel } from './panels'
+import {
+  getRaceStripeIntervals,
+  type RaceStripeSettings,
+} from './race-stripe-settings'
 
 export interface GrilleSettings {
   mode: 'original' | 'custom'
@@ -148,8 +152,10 @@ function holeOutline(settings: GrilleSettings): [number, number][] {
 export function getGrillePattern(
   model: SpeakerModel,
   input: Partial<GrilleSettings>,
+  raceStripes?: Partial<RaceStripeSettings>,
 ): GrillePattern {
   const settings = normalizeGrilleSettings(input)
+  const stripes = getRaceStripeIntervals(raceStripes)
   const openings = getGrilleOpenings(model)
   const bounds = {
     minX: -38,
@@ -215,7 +221,16 @@ export function getGrillePattern(
       ) {
         holes.push({ x, y, points, kind: 'through' })
       } else if (settings.extendPattern) {
-        holes.push({ x, y, points, kind: 'recess' })
+        // Keep decorative pockets clear of the full stripe, including its
+        // edge. Overlapping recesses could consume the minimum solid backing.
+        const minX = Math.min(...points.map(([px]) => px))
+        const maxX = Math.max(...points.map(([px]) => px))
+        if (
+          !stripes.some(
+            (stripe) => maxX + 0.25 > stripe.minX && minX - 0.25 < stripe.maxX,
+          )
+        )
+          holes.push({ x, y, points, kind: 'recess' })
       }
     }
   }

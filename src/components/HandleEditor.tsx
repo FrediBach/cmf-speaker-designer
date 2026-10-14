@@ -25,11 +25,16 @@ import {
 } from '@/lib/handle-settings'
 import type { SpeakerModel } from '@/lib/panels'
 import { SVG_MAX_FILE_SIZE, type SvgCutout } from '@/lib/svg-cutout'
+import {
+  getRaceStripeIntervals,
+  type RaceStripeSettings,
+} from '@/lib/race-stripe-settings'
 
 interface Props {
   model: SpeakerModel
   value: HandleSettings
   panelExtension: number
+  raceStripes: RaceStripeSettings
   onChange: (value: HandleSettings) => void
 }
 
@@ -207,11 +212,14 @@ function HandleDiagram({
   model,
   value,
   panelExtension,
+  raceStripes,
 }: {
   model: SpeakerModel
   value: HandleSettings
   panelExtension: number
+  raceStripes: RaceStripeSettings
 }) {
+  const stripeClipId = useId()
   const h = value.height
   const w = value.width
   const baseWidth = 84.9715 + panelExtension * 2
@@ -220,11 +228,14 @@ function HandleDiagram({
     .join(' ')
   const holes = getHandleHoleCenters(model, value)
   const svgPaths = getHandleSvgPaths(model, value)
-  const studs = getHandleStudCenters(model, value)
+  const studs = getHandleStudCenters(model, value, raceStripes)
   return (
     <div className="handle-diagram" aria-hidden="true">
       <svg viewBox="-72 -49 144 100">
         <defs>
+          <clipPath id={stripeClipId}>
+            <polygon points={outline} />
+          </clipPath>
           <pattern
             id="handle-grid"
             width="5"
@@ -253,6 +264,19 @@ function HandleDiagram({
           stroke="var(--accent-ink)"
           strokeWidth=".6"
         />
+        <g clipPath={`url(#${stripeClipId})`}>
+          {getRaceStripeIntervals(raceStripes).map(({ minX, maxX }) => (
+            <rect
+              key={minX}
+              x={minX}
+              y={-h / 2}
+              width={maxX - minX}
+              height={h + 0.25}
+              fill="var(--accent-ink)"
+              opacity=".18"
+            />
+          ))}
+        </g>
         {holes.map((hole, i) => (
           <rect
             key={i}
@@ -320,12 +344,13 @@ export function HandleEditor({
   model,
   value,
   panelExtension,
+  raceStripes,
   onChange,
 }: Props) {
   const studsLabelId = useId()
   const studsDescriptionId = useId()
   const limits = getHandleLimits(model, value)
-  const studCount = getHandleStudCenters(model, value).length
+  const studCount = getHandleStudCenters(model, value, raceStripes).length
   const set = (patch: Partial<HandleSettings>) =>
     onChange(normalizeHandleSettings(model, { ...value, ...patch }))
   const parameter = (
@@ -403,6 +428,7 @@ export function HandleEditor({
             model={model}
             value={value}
             panelExtension={panelExtension}
+            raceStripes={raceStripes}
           />
           <div
             className="handle-presets"
@@ -596,8 +622,11 @@ export function HandleEditor({
               <span>
                 <strong id={studsLabelId}>LEGO-compatible studs</strong>
                 <small id={studsDescriptionId}>
-                  Add studs to the front of the handle, avoiding edges and
-                  cutouts.
+                  Add studs to the front of the handle, avoiding{' '}
+                  {raceStripes.enabled
+                    ? 'edges, cutouts, and race stripes'
+                    : 'edges and cutouts'}
+                  .
                 </small>
               </span>
             </label>
@@ -605,7 +634,7 @@ export function HandleEditor({
               <p className="handle-studs-detail" role="status">
                 {studCount > 0
                   ? `${studCount} studs · ${HANDLE_STUD_DIAMETER} mm diameter · ${HANDLE_STUD_HEIGHT} mm high · ${HANDLE_STUD_PITCH} mm spacing`
-                  : 'No studs fit this shape. Enlarge the handle or reduce the cutout.'}
+                  : 'No studs fit this shape. Enlarge the handle or reduce the cutout or stripes.'}
               </p>
             )}
           </section>

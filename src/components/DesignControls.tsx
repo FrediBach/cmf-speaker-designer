@@ -227,6 +227,7 @@ export function DesignControls({
           <GrilleEditor
             model={design.model}
             value={design.grille}
+            raceStripes={design.raceStripes}
             onChange={(grille) => update({ grille })}
           />
         </div>
@@ -240,6 +241,7 @@ export function DesignControls({
             model={design.model}
             value={design.handle}
             panelExtension={design.panelExtension}
+            raceStripes={design.raceStripes}
             onChange={(handle) => update({ handle })}
           />
         </div>

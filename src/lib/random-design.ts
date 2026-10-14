@@ -27,6 +27,12 @@ export function randomizeDesign(
     panelColor: pick(PALETTE).value,
     knobColor: pick(PALETTE).value,
     relief: range(0, 2, 0.1),
+    raceStripes: {
+      enabled: pick([false, true]),
+      count: range(1, 3),
+      width: range(3, 12),
+      gap: range(2, 10),
+    },
     handle: {
       // Always include a visible custom component, even when both face
       // components happened to land on their original versions.

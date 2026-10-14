@@ -9,11 +9,14 @@ export function getDesignSummary(design: Design) {
   const customGrille = design.grille.mode === 'custom'
   const grilleLabel = `${{ round: 'Round', hex: 'Hexagonal', slot: 'Slotted' }[design.grille.pattern]} grille`
   const haloLabel = design.model === 'm' ? 'Custom Halos' : 'Custom Halo'
-  const panelLabel = customHalo
+  const shapeLabel = customHalo
     ? `${haloLabel}${customGrille ? ` · ${grilleLabel}` : ''}`
     : customGrille
       ? grilleLabel
       : currentStyle.label
+  const panelLabel = design.raceStripes.enabled
+    ? `${shapeLabel} · ${design.raceStripes.count} race ${design.raceStripes.count === 1 ? 'stripe' : 'stripes'}`
+    : shapeLabel
   const knobLabel =
     KNOB_STYLES.find((item) => item.id === design.knob.style)?.label ??
     'Volume knob'

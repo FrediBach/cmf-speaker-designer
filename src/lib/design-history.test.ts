@@ -32,6 +32,51 @@ const svgCutout = (): SvgCutout => ({
 })
 
 describe('design history', () => {
+  it('records stripe-only edits and restores isolated settings with undo and redo', () => {
+    const design = validateDesign({
+      ...DEFAULT_DESIGN,
+      raceStripes: { ...DEFAULT_DESIGN.raceStripes, enabled: true },
+    })
+    const start = createDesignHistory(design)
+    const changed = designHistoryReducer(start, {
+      type: 'set',
+      update: (current) => {
+        current.raceStripes.width = 8
+        return current
+      },
+    })
+    expect(changed.present.raceStripes.width).toBe(8)
+    expect(changed.past).toHaveLength(1)
+    expect(start.present).toEqual(design)
+    expect(changed.past[0].raceStripes).not.toBe(start.present.raceStripes)
+    expect(
+      designHistoryReducer(changed, {
+        type: 'set',
+        update: structuredClone(changed.present),
+      }),
+    ).toBe(changed)
+    const undone = designHistoryReducer(changed, { type: 'undo' })
+    expect(undone.present).toEqual(design)
+    expect(designHistoryReducer(undone, { type: 'redo' }).present).toEqual(
+      changed.present,
+    )
+    const disabled = designHistoryReducer(changed, {
+      type: 'set',
+      update: (current) => ({
+        ...current,
+        raceStripes: { ...current.raceStripes, enabled: false },
+      }),
+    })
+    expect(disabled.past).toHaveLength(2)
+    expect(disabled.present.raceStripes).toEqual({
+      ...changed.present.raceStripes,
+      enabled: false,
+    })
+    expect(designHistoryReducer(disabled, { type: 'undo' }).present).toEqual(
+      changed.present,
+    )
+  })
+
   it('records panel gap independently of width and restores it with undo and redo', () => {
     const design = validateDesign({ ...DEFAULT_DESIGN, panelExtension: 7.5 })
     const start = createDesignHistory(design)

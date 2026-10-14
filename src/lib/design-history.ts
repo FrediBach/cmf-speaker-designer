@@ -37,6 +37,7 @@ function snapshot(design: Design): Design {
     },
     grille: { ...design.grille },
     halo: { ...design.halo },
+    raceStripes: { ...design.raceStripes },
     knob: { ...design.knob },
   }
 }
@@ -93,6 +94,7 @@ function designsEqual(left: Design, right: Design) {
     svgCutoutsEqual(leftSvg, rightSvg) &&
     settingsEqual(left.grille, right.grille) &&
     settingsEqual(left.halo, right.halo) &&
+    settingsEqual(left.raceStripes, right.raceStripes) &&
     settingsEqual(left.knob, right.knob)
   )
 }

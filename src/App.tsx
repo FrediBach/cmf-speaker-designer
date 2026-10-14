@@ -9,6 +9,7 @@ import { normalizeKnobSettings } from '@/lib/knob-settings'
 import { normalizeHandleSettings } from '@/lib/handle-settings'
 import { normalizeGrilleSettings } from '@/lib/grille-settings'
 import { normalizeHaloSettings } from '@/lib/halo-settings'
+import { normalizeRaceStripeSettings } from '@/lib/race-stripe-settings'
 import {
   STORAGE_KEY,
   designShareUrl,
@@ -53,12 +54,15 @@ function App() {
       return {
         ...next,
         style:
-          next.halo.mode === 'custom' || next.grille.mode === 'custom'
+          next.halo.mode === 'custom' ||
+          next.grille.mode === 'custom' ||
+          next.raceStripes.enabled
             ? 'custom'
             : next.style,
         handle: normalizeHandleSettings(next.model, next.handle),
         grille: normalizeGrilleSettings(next.grille),
         halo: normalizeHaloSettings(next.halo),
+        raceStripes: normalizeRaceStripeSettings(next.raceStripes),
         knob: normalizeKnobSettings(next.knob),
       }
     })
