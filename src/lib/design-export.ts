@@ -1,3 +1,4 @@
+import { buildArchive } from './archive'
 import type { BufferGeometry } from 'three'
 import type { Design } from './design'
 import { exportKnobStl, knobFilename, prepareKnobExportGeometry } from './knobs'
@@ -10,9 +11,22 @@ import {
 } from './panels'
 import { exportStepFile } from './step-export-client'
 import { STEP_TOLERANCE_MM } from './step-settings'
+import {
+  patternGeometryKey,
+  type MaterialGeometry,
+} from './multicolor-geometry'
+import {
+  exportThreeMf,
+  panelAssemblyTransform,
+  serializePlacedStl,
+  type ThreeMfAssembly,
+  type ThreeMfPart,
+} from './three-mf-export'
+
+const encoder = new TextEncoder()
 
 export type DesignExportTarget = 'both' | 'panel' | 'knob'
-export type DesignExportFormat = 'stl' | 'stp'
+export type DesignExportFormat = 'stl' | 'stp' | '3mf' | 'stl-parts'
 
 export interface DesignExportInput {
   panel: BufferGeometry
@@ -20,88 +34,13 @@ export interface DesignExportInput {
   design: Design
   target: DesignExportTarget
   format?: DesignExportFormat
+  materialParts?: MaterialGeometry[] | null
 }
 
 export interface DesignExportFile {
   filename: string
   data: ArrayBuffer
-  mimeType: 'model/stl' | 'model/step' | 'application/zip'
-}
-
-interface ArchiveEntry {
-  name: string
-  data: Uint8Array
-}
-
-const encoder = new TextEncoder()
-const crcTable = Uint32Array.from({ length: 256 }, (_, value) => {
-  let crc = value
-  for (let bit = 0; bit < 8; bit += 1)
-    crc = crc & 1 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1
-  return crc >>> 0
-})
-
-function crc32(data: Uint8Array) {
-  let crc = 0xffffffff
-  for (const byte of data) crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8)
-  return (crc ^ 0xffffffff) >>> 0
-}
-
-/** Stored ZIP entries keep this small, browser-native export dependency-free. */
-function buildArchive(entries: ArchiveEntry[]): ArrayBuffer {
-  const files = entries.map((entry) => ({
-    ...entry,
-    nameBytes: encoder.encode(entry.name),
-    checksum: crc32(entry.data),
-  }))
-  const directoryOffset = files.reduce(
-    (size, file) => size + 30 + file.nameBytes.length + file.data.length,
-    0,
-  )
-  const directorySize = files.reduce(
-    (size, file) => size + 46 + file.nameBytes.length,
-    0,
-  )
-  const buffer = new ArrayBuffer(directoryOffset + directorySize + 22)
-  const view = new DataView(buffer)
-  const bytes = new Uint8Array(buffer)
-  let localOffset = 0
-  let centralOffset = directoryOffset
-
-  for (const file of files) {
-    view.setUint32(localOffset, 0x04034b50, true)
-    view.setUint16(localOffset + 4, 20, true)
-    view.setUint16(localOffset + 6, 0x0800, true) // UTF-8 filenames
-    view.setUint16(localOffset + 12, 0x0021, true) // January 1, 1980
-    view.setUint32(localOffset + 14, file.checksum, true)
-    view.setUint32(localOffset + 18, file.data.length, true)
-    view.setUint32(localOffset + 22, file.data.length, true)
-    view.setUint16(localOffset + 26, file.nameBytes.length, true)
-    bytes.set(file.nameBytes, localOffset + 30)
-    bytes.set(file.data, localOffset + 30 + file.nameBytes.length)
-
-    view.setUint32(centralOffset, 0x02014b50, true)
-    view.setUint16(centralOffset + 4, 20, true)
-    view.setUint16(centralOffset + 6, 20, true)
-    view.setUint16(centralOffset + 8, 0x0800, true)
-    view.setUint16(centralOffset + 14, 0x0021, true)
-    view.setUint32(centralOffset + 16, file.checksum, true)
-    view.setUint32(centralOffset + 20, file.data.length, true)
-    view.setUint32(centralOffset + 24, file.data.length, true)
-    view.setUint16(centralOffset + 28, file.nameBytes.length, true)
-    view.setUint32(centralOffset + 42, localOffset, true)
-    bytes.set(file.nameBytes, centralOffset + 46)
-
-    localOffset += 30 + file.nameBytes.length + file.data.length
-    centralOffset += 46 + file.nameBytes.length
-  }
-
-  view.setUint32(centralOffset, 0x06054b50, true)
-  view.setUint16(centralOffset + 8, files.length, true)
-  view.setUint16(centralOffset + 10, files.length, true)
-  view.setUint32(centralOffset + 12, directorySize, true)
-  view.setUint32(centralOffset + 16, directoryOffset, true)
-  return buffer
+  mimeType: 'model/stl' | 'model/step' | 'model/3mf' | 'application/zip'
 }
 
 function selectedPanelFilename(design: Design): string {
@@ -132,7 +71,17 @@ export async function buildDesignExport({
   design,
   target,
   format = 'stl',
+  materialParts,
 }: DesignExportInput): Promise<DesignExportFile> {
+  if (format === '3mf' || format === 'stl-parts')
+    return buildMaterialExport({
+      panel,
+      knob,
+      design,
+      target,
+      format,
+      materialParts,
+    })
   const panelName = selectedPanelFilename(design).replace(
     /\.stl$/,
     `.${format}`,
@@ -202,6 +151,179 @@ export async function buildDesignExport({
       },
     ]),
     mimeType: 'application/zip',
+  }
+}
+
+function buildMaterialExport({
+  panel,
+  knob,
+  design,
+  target,
+  format,
+  materialParts,
+}: DesignExportInput): DesignExportFile {
+  const owned: BufferGeometry[] = []
+  const own = (geometry: BufferGeometry) => {
+    owned.push(geometry)
+    return geometry
+  }
+  try {
+    const assemblies: ThreeMfAssembly[] = []
+    let printablePanel: BufferGeometry | undefined
+    if (target !== 'knob') {
+      const transform = panelAssemblyTransform(panel)
+      printablePanel = own(panel.clone().applyMatrix4(transform))
+      printablePanel.computeBoundingBox()
+      let parts: ThreeMfPart[]
+      if (design.multicolor.enabled) {
+        if (!materialParts?.length)
+          throw new Error(
+            'Wait for the current multicolor regions before exporting.',
+          )
+        const key = patternGeometryKey(design.multicolor)
+        if (
+          materialParts.some(
+            ({ geometry }) =>
+              geometry.userData.multicolorKey !== key ||
+              geometry.userData.multicolorSourceUuid !== panel.uuid,
+          )
+        )
+          throw new Error(
+            'The multicolor regions are out of date. Wait for the current design to finish.',
+          )
+        parts = materialParts.map((part) => {
+          const material =
+            part.materialId === 'base'
+              ? { name: 'Background', color: design.panelColor }
+              : design.multicolor.materials.find(
+                  (item) => item.id === part.materialId,
+                )
+          if (!material)
+            throw new Error(
+              'The material regions no longer match the current palette. Please regenerate.',
+            )
+          return {
+            id: part.materialId,
+            name: material.name,
+            color: material.color,
+            geometry: own(part.geometry.clone().applyMatrix4(transform)),
+          }
+        })
+      } else {
+        parts = [
+          {
+            id: 'base',
+            name: 'Front panel',
+            color: design.panelColor,
+            geometry: printablePanel,
+          },
+        ]
+      }
+      assemblies.push({
+        name: `Speaker ${design.model.toUpperCase()} panel`,
+        parts,
+      })
+    }
+    if (target !== 'panel') {
+      const printableKnob = own(prepareKnobExportGeometry(knob))
+      if (printablePanel) {
+        printableKnob.computeBoundingBox()
+        printableKnob.translate(
+          printablePanel.boundingBox!.max.x +
+            10 -
+            printableKnob.boundingBox!.min.x,
+          printablePanel.boundingBox!.min.y - printableKnob.boundingBox!.min.y,
+          0,
+        )
+      }
+      assemblies.push({
+        name: 'Volume knob',
+        parts: [
+          {
+            id: 'knob',
+            name: 'Volume knob',
+            color: design.knobColor,
+            geometry: printableKnob,
+          },
+        ],
+      })
+    }
+    const metadata = {
+      ...design,
+      export: {
+        version: 2,
+        units: 'mm',
+        format,
+        geometryType: 'material-volumes',
+        mapping: 'front-projection',
+        depthMode: 'full-depth',
+        colorNote:
+          'Assign and confirm filament for each named material part in your slicer. Keep panel parts assembled; do not center or ground them separately.',
+      },
+    }
+    if (format === '3mf')
+      return {
+        filename: `cmf-speaker-${design.model}-${target === 'both' ? 'design' : target}.3mf`,
+        mimeType: 'model/3mf',
+        data: exportThreeMf(assemblies, metadata),
+      }
+    const entries: { name: string; data: Uint8Array }[] = []
+    const manifest: {
+      materialId: string
+      name: string
+      color: string
+      file: string
+      assembly: string
+    }[] = []
+    for (const assembly of assemblies)
+      for (const [index, part] of assembly.parts.entries()) {
+        const slug =
+          part.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '')
+            .slice(0, 40) || 'material'
+        const name =
+          assembly.name === 'Volume knob'
+            ? 'volume-knob.stl'
+            : `panel-material-${String(index + 1).padStart(2, '0')}-${slug}.stl`
+        entries.push({
+          name,
+          data: new Uint8Array(serializePlacedStl(part.geometry)),
+        })
+        manifest.push({
+          materialId: part.id,
+          name: part.name,
+          color: part.color,
+          file: name,
+          assembly: assembly.name,
+        })
+      }
+    entries.push({
+      name: 'design.json',
+      data: encoder.encode(
+        `${JSON.stringify({ ...metadata, export: { ...metadata.export, files: manifest } }, null, 2)}\n`,
+      ),
+    })
+    entries.push({
+      name: 'materials.json',
+      data: encoder.encode(
+        `${JSON.stringify({ units: 'mm', parts: manifest }, null, 2)}\n`,
+      ),
+    })
+    entries.push({
+      name: 'README.txt',
+      data: encoder.encode(
+        'CMF Speaker Designer — multicolor parts\n\nImport all panel-material STLs together as PARTS OF ONE OBJECT at 100% scale in millimeters. Preserve their common positions; do not auto-arrange, center, or drop each part independently. Assign a filament to each named material, using materials.json as your color guide. The volume knob is a separate object.\n\nThese are full-depth material regions of one assembled print, not separately printable inlays. Review sliced layers, supports, interfaces, and filament compatibility. Reopen the authored composition using Load design JSON in the designer.\n',
+      ),
+    })
+    return {
+      filename: `cmf-speaker-${design.model}-${target}-materials.zip`,
+      mimeType: 'application/zip',
+      data: buildArchive(entries),
+    }
+  } finally {
+    owned.forEach((geometry) => geometry.dispose())
   }
 }
 

@@ -2,6 +2,8 @@ import { Component, useEffect, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
 import { BODY_COLORS, type BodyColor } from '@/lib/design'
+import type { MaterialGeometry } from '@/lib/multicolor-geometry'
+import type { PatternMaterial } from '@/lib/multicolor-settings'
 import {
   ContactShadows,
   Environment,
@@ -34,6 +36,8 @@ export interface SpeakerPreviewProps {
   bodyColor: BodyColor
   style: 'original' | 'custom'
   panelColor: string
+  materialParts?: MaterialGeometry[] | null
+  materials?: PatternMaterial[]
   knobColor: string
   knobGeometry: BufferGeometry | null
   knobStyle?: string
@@ -478,6 +482,8 @@ function SpeakerScene({
   model,
   bodyColor,
   panelColor,
+  materialParts,
+  materials,
   knobColor,
   knobGeometry,
   view,
@@ -488,6 +494,8 @@ function SpeakerScene({
   model: 's' | 'm'
   bodyColor: BodyColor
   panelColor: string
+  materialParts?: MaterialGeometry[] | null
+  materials?: PatternMaterial[]
   knobColor: string
   knobGeometry: BufferGeometry | null
   view: 'perspective' | 'front'
@@ -577,15 +585,39 @@ function SpeakerScene({
       )}
       {assembly !== 'knob' && (
         <group position={[0, 0, offset]}>
-          <mesh castShadow receiveShadow>
-            <primitive object={geometry} attach="geometry" dispose={null} />
-            <meshStandardMaterial
-              color={panelColor}
-              roughness={0.43}
-              metalness={0.025}
-              envMapIntensity={0.5}
-            />
-          </mesh>
+          {materialParts ? (
+            materialParts.map((part) => (
+              <mesh key={part.materialId} castShadow receiveShadow>
+                <primitive
+                  object={part.previewGeometry ?? part.geometry}
+                  attach="geometry"
+                  dispose={null}
+                />
+                <meshStandardMaterial
+                  color={
+                    part.materialId === 'base'
+                      ? panelColor
+                      : (materials?.find(
+                          (material) => material.id === part.materialId,
+                        )?.color ?? panelColor)
+                  }
+                  roughness={0.43}
+                  metalness={0.025}
+                  envMapIntensity={0.5}
+                />
+              </mesh>
+            ))
+          ) : (
+            <mesh castShadow receiveShadow>
+              <primitive object={geometry} attach="geometry" dispose={null} />
+              <meshStandardMaterial
+                color={panelColor}
+                roughness={0.43}
+                metalness={0.025}
+                envMapIntensity={0.5}
+              />
+            </mesh>
+          )}
           {assembly !== 'panel' && (
             <SpeakerControls
               panelColor={panelColor}
@@ -635,6 +667,8 @@ export function SpeakerPreview({
   bodyColor,
   style,
   panelColor,
+  materialParts,
+  materials,
   knobColor,
   knobGeometry,
   knobStyle,
@@ -660,6 +694,7 @@ export function SpeakerPreview({
       data-panel-style={style}
       data-knob-style={knobStyle}
       data-knob-ready={!!knobGeometry}
+      data-material-count={materialParts?.length ?? 0}
       role="img"
       data-preview-controls
       tabIndex={0}
@@ -699,6 +734,8 @@ export function SpeakerPreview({
                 model={model}
                 bodyColor={bodyColor}
                 panelColor={panelColor}
+                materialParts={materialParts}
+                materials={materials}
                 knobColor={knobColor}
                 knobGeometry={knobGeometry}
                 view={view}

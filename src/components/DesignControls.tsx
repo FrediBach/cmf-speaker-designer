@@ -43,6 +43,10 @@ interface Props {
   onReset: () => void
   onRandomize: () => void
   onRetry: () => void
+  onBeginTransaction: () => void
+  onEndTransaction: () => void
+  onSaveDesign: () => void
+  onLoadDesign: () => void
 }
 
 export function DesignControls({
@@ -59,8 +63,21 @@ export function DesignControls({
   onReset,
   onRandomize,
   onRetry,
+  onBeginTransaction,
+  onEndTransaction,
+  onSaveDesign,
+  onLoadDesign,
 }: Props) {
-  const { geometry, knobGeometry, error, knobError } = meshes
+  const {
+    geometry,
+    knobGeometry,
+    error,
+    knobError,
+    materialParts,
+    multicolorError,
+  } = meshes
+  const colorsReady = !design.multicolor.enabled || !!materialParts
+  const exportError = error || knobError || multicolorError
   return (
     <aside
       className="controls"
@@ -204,7 +221,21 @@ export function DesignControls({
             design={design}
             update={update}
             onOpenGuide={onOpenGuide}
+            geometry={meshes.previewGeometry}
+            materialCount={meshes.materialParts?.length ?? null}
+            patternNotes={meshes.multicolorDiagnostics}
+            patternError={meshes.multicolorError}
+            onBeginTransaction={onBeginTransaction}
+            onEndTransaction={onEndTransaction}
           />
+          <div className="design-file-actions">
+            <button className="text-button" onClick={onSaveDesign}>
+              Save design JSON
+            </button>
+            <button className="text-button" onClick={onLoadDesign}>
+              Load design JSON
+            </button>
+          </div>
         </div>
         <div
           id="halo-editor"
@@ -262,13 +293,14 @@ export function DesignControls({
       <div className="export-section">
         <div className="export-spec">
           <span>
-            <Box size={13} /> STL / STP
+            <Box size={13} />{' '}
+            {design.multicolor.enabled ? '3MF / STL / STP' : 'STL / STP / 3MF'}
           </span>
           <span>1:1 SCALE · MM</span>
         </div>
-        {error || knobError ? (
+        {exportError ? (
           <div className="load-error" role="alert">
-            {error || knobError}
+            {exportError}
             <button onClick={onRetry}>Retry</button>
           </div>
         ) : null}
@@ -277,7 +309,7 @@ export function DesignControls({
           disabled={!geometry || !knobGeometry || !!error || !!knobError}
           onClick={onOpenExport}
         >
-          {(!geometry || !knobGeometry) && !error && !knobError ? (
+          {(!geometry || !knobGeometry || !colorsReady) && !exportError ? (
             <LoaderCircle size={17} className="spin" />
           ) : (
             <ArrowDownToLine size={18} />

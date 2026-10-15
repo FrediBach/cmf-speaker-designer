@@ -23,15 +23,26 @@ async function expectReady(page: Page) {
 }
 
 async function randomize(page: Page, seed = 4281) {
-  // Seed immediately before the action so preview initialization cannot consume it.
-  await page.evaluate((initial) => {
+  const button = page.getByRole('button', { name: 'Randomize', exact: true })
+  await expect(button).toBeEnabled()
+  // Keep seeding and dispatch atomic: preview UUID creation must not consume
+  // this sequence between Playwright actions or after the randomization.
+  await button.evaluate((element, initial) => {
+    if (!(element instanceof HTMLButtonElement))
+      throw new Error('Expected the Randomize button.')
+    element.focus()
+    const originalRandom = Math.random
     let state = initial
-    Math.random = () => {
-      state = (Math.imul(state, 1664525) + 1013904223) >>> 0
-      return state / 4294967296
+    try {
+      Math.random = () => {
+        state = (Math.imul(state, 1664525) + 1013904223) >>> 0
+        return state / 4294967296
+      }
+      element.click()
+    } finally {
+      Math.random = originalRandom
     }
   }, seed)
-  await page.getByRole('button', { name: 'Randomize', exact: true }).click()
 }
 
 async function workspaceShortcut(page: Page, shortcut: string) {
@@ -57,7 +68,8 @@ test('randomizes every design section, preserves either speaker model, and saves
     await page.getByRole('button', { name: 'Reset', exact: true }).click()
     await expectDesign(page, validateDesign({ model }))
     const original = await storedDesign(page)
-    await randomize(page, model === 's' ? 4281 : 8159)
+    // Both seeds deliberately change the default panel/knob color pair.
+    await randomize(page, model === 's' ? 4281 : 8160)
     await expect
       .poll(async () => (await storedDesign(page)).handle)
       .not.toEqual(original.handle)
@@ -86,7 +98,15 @@ test('randomizes every design section, preserves either speaker model, and saves
       exact: true,
     })
     await expect(
-      exportDialog.getByRole('button', { name: /^Download ZIP/ }),
+      exportDialog.getByRole('button', {
+        name: randomized.multicolor.enabled ? '3MF' : 'STL',
+        exact: true,
+      }),
+    ).toHaveAttribute('aria-pressed', 'true')
+    await expect(
+      exportDialog.getByRole('button', {
+        name: randomized.multicolor.enabled ? /^Download 3MF/ : /^Download ZIP/,
+      }),
     ).toBeEnabled()
     await page.keyboard.press('Escape')
     await page.reload()
@@ -142,8 +162,11 @@ test('reset keeps model-specific defaults and undo restores edits while a new ed
 
   await page.getByRole('tab', { name: 'Front panel', exact: true }).click()
   const color = randomized.panelColor === '#eeeae1' ? 'Lagoon' : 'Chalk'
+  const colorLabel = randomized.multicolor.enabled
+    ? 'Background'
+    : 'Front panel'
   await page
-    .getByRole('button', { name: `Front panel: ${color}`, exact: true })
+    .getByRole('button', { name: `${colorLabel}: ${color}`, exact: true })
     .click()
   const branched = await storedDesign(page)
   expect(branched).not.toEqual(randomized)

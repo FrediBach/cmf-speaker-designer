@@ -20,7 +20,7 @@ export function randomizeDesign(
   const grilleMode = mode()
   const haloMode = mode()
 
-  return validateDesign({
+  const design = validateDesign({
     model,
     bodyColor: pick(['black', 'gray'] as const),
     style: 'custom',
@@ -89,4 +89,30 @@ export function randomizeDesign(
       facets: range(5, 12),
     },
   })
+  // Keep randomized patterns modest; explicit IDs preserve seeded reproducibility.
+  if (random() < 0.35) {
+    const count = range(2, 4)
+    const horizontal = pick([false, true])
+    const { frame } = design.multicolor
+    const span = horizontal ? frame.height : frame.width
+    design.multicolor.enabled = true
+    design.multicolor.materials = Array.from({ length: count }, (_, index) => ({
+      id: `random-color-${index}`,
+      name: `Color ${index + 1}`,
+      color: pick(PALETTE).value,
+    }))
+    design.multicolor.elements = Array.from({ length: count }, (_, index) => ({
+      id: `random-stripe-${index}`,
+      name: `Stripe ${index + 1}`,
+      kind: 'stripe',
+      visible: true,
+      materialId: `random-color-${index}`,
+      rotation: 0,
+      x: horizontal ? 0 : -span / 2 + ((index + 0.5) * span) / count,
+      y: horizontal ? span / 2 - ((index + 0.5) * span) / count : 0,
+      width: horizontal ? frame.width : span / count,
+      height: horizontal ? span / count : frame.height,
+    }))
+  }
+  return validateDesign(design)
 }

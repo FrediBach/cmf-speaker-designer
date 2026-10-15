@@ -1,0 +1,599 @@
+.multicolor-editor {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  min-width: 0;
+  font-size: 12px;
+}
+.multicolor-editor *,
+.multicolor-editor *::before,
+.multicolor-editor *::after {
+  box-sizing: border-box;
+}
+.multicolor-editor button,
+.multicolor-editor input,
+.multicolor-editor select,
+.multicolor-editor textarea {
+  font: inherit;
+  color: var(--foreground);
+}
+.multicolor-editor button {
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 9px;
+  cursor: pointer;
+}
+.multicolor-editor button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--control-border);
+}
+.multicolor-editor button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.multicolor-editor button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+}
+.multicolor-editor :focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.multicolor-intro {
+  margin-bottom: 14px;
+}
+.multicolor-intro > strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+.multicolor-intro p,
+.multicolor-print-note p {
+  color: var(--muted-foreground);
+  line-height: 1.55;
+  margin: 5px 0 0;
+}
+.multicolor-details {
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.multicolor-details > summary {
+  padding: 11px 10px;
+  cursor: pointer;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.multicolor-details > summary > span {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+  margin-left: 6px;
+}
+.multicolor-details[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+.multicolor-details-body {
+  display: grid;
+  gap: 11px;
+  padding: 12px 10px;
+  min-width: 0;
+}
+.multicolor-text-field,
+.multicolor-select,
+.multicolor-number {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.multicolor-text-field > span,
+.multicolor-select > span,
+.multicolor-number > span:first-child {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.multicolor-text-field small {
+  opacity: 0.8;
+  margin-left: 4px;
+}
+.multicolor-editor select,
+.multicolor-editor textarea,
+.multicolor-text-field input,
+.multicolor-input-unit,
+.multicolor-color-field > input:not([type='color']) {
+  min-width: 0;
+  width: 100%;
+  min-height: 35px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 3px;
+  padding: 7px 8px;
+}
+.multicolor-editor select {
+  padding-right: 20px;
+  text-overflow: ellipsis;
+}
+.multicolor-editor textarea {
+  resize: vertical;
+  line-height: 1.5;
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.multicolor-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 9px;
+}
+.multicolor-field-grid .full-width {
+  grid-column: 1 / -1;
+}
+.multicolor-input-unit {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+}
+.multicolor-input-unit input {
+  border: 0;
+  background: transparent;
+  min-height: 33px;
+  padding: 5px 0;
+  width: 100%;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.multicolor-input-unit small {
+  color: var(--muted-foreground);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.multicolor-editor .multicolor-primary-button {
+  width: 100%;
+  background: var(--foreground);
+  border-color: var(--foreground);
+  color: var(--inverse);
+  font-weight: 500;
+  min-height: 38px;
+}
+.multicolor-editor .multicolor-primary-button:hover:not(:disabled) {
+  background: var(--control-strong);
+  color: var(--inverse);
+}
+.multicolor-direction-buttons {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.multicolor-direction-buttons > button {
+  flex: 1;
+}
+.multicolor-hint {
+  color: var(--muted-foreground);
+  line-height: 1.55;
+  font-size: 11px;
+  margin: 0;
+}
+.multicolor-canvas-wrap {
+  margin: 16px 0 19px;
+}
+.multicolor-canvas-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+  background: var(--surface);
+}
+.multicolor-canvas-toolbar > span {
+  font-size: 11px;
+  font-weight: 600;
+}
+.multicolor-canvas-toolbar small {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+  margin-left: 4px;
+}
+.multicolor-canvas-toolbar > div {
+  display: flex;
+  gap: 3px;
+}
+.multicolor-canvas-toolbar button {
+  padding: 5px;
+  width: 29px;
+  min-height: 29px;
+}
+.multicolor-canvas {
+  display: block;
+  width: 100%;
+  height: 330px;
+  background: var(--stage);
+  color: var(--stage-mark);
+  border: 1px solid var(--border);
+  touch-action: none;
+  user-select: none;
+}
+.multicolor-canvas.is-panning,
+.multicolor-canvas.is-panning .multicolor-shape {
+  cursor: grab;
+}
+.multicolor-canvas.is-panning:active {
+  cursor: grabbing;
+}
+.multicolor-grid {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.multicolor-shape {
+  cursor: move;
+}
+.multicolor-frame {
+  stroke: var(--stage-muted);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke;
+}
+.multicolor-selection > path,
+.multicolor-selection > rect,
+.multicolor-selection > line,
+.multicolor-selection > circle {
+  stroke: var(--ring);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.multicolor-selection > path {
+  filter: drop-shadow(0 0 1px var(--card));
+  cursor: move;
+}
+.multicolor-selection .multicolor-handle {
+  fill: var(--card);
+  stroke: var(--ring);
+  stroke-width: 2;
+}
+.multicolor-handle-hit {
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 8px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: all;
+}
+.multicolor-selection .resize {
+  cursor: nwse-resize;
+}
+.multicolor-selection .rotate {
+  cursor: grab;
+}
+.multicolor-selection .vertex {
+  cursor: crosshair;
+  fill: var(--accent-soft);
+}
+.multicolor-canvas-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 0 7px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+.multicolor-canvas-caption label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.multicolor-canvas-caption input {
+  accent-color: var(--accent-ink);
+}
+.multicolor-canvas-caption > span {
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+.multicolor-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.multicolor-section-heading > strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.multicolor-section-heading > span {
+  font: 10px var(--mono);
+  color: var(--muted-foreground);
+}
+.multicolor-add-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.multicolor-add-buttons button {
+  justify-content: flex-start;
+}
+.multicolor-empty {
+  text-align: center;
+  line-height: 1.7;
+  color: var(--muted-foreground);
+  padding: 20px 8px;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+}
+.multicolor-layers {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 8px;
+  max-height: 276px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.multicolor-layers > li {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+.multicolor-layers > li:last-child {
+  border-bottom: 0;
+}
+.multicolor-layers > li.is-selected {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 var(--accent-ink);
+}
+.multicolor-layers > li > button {
+  border: 0;
+  background: transparent;
+  flex-shrink: 0;
+  width: 29px;
+  padding: 5px;
+}
+.multicolor-layers > li > .multicolor-layer-select {
+  flex: 1;
+  justify-content: flex-start;
+  gap: 7px;
+  width: auto;
+  min-width: 0;
+  text-align: left;
+  padding-left: 5px;
+  color: var(--foreground);
+}
+.multicolor-layer-select > i {
+  display: block;
+  flex: 0 0 16px;
+  height: 20px;
+  border-radius: 2px;
+  border: 1px solid color-mix(in srgb, var(--foreground) 25%, transparent);
+}
+.multicolor-layer-select > span {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.45;
+}
+.multicolor-layer-select small {
+  display: block;
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+.multicolor-selected {
+  margin: 18px 0;
+  padding: 15px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 12px;
+}
+.multicolor-selected .multicolor-section-heading {
+  margin: 0;
+}
+.multicolor-icon-actions {
+  display: flex;
+  gap: 5px;
+}
+.multicolor-icon-actions button {
+  width: 32px;
+  padding: 5px;
+}
+.multicolor-material-edit {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+}
+.multicolor-material-edit > .multicolor-color-field {
+  flex: 1;
+}
+.multicolor-material-edit > button {
+  flex-shrink: 0;
+  font-size: 10px;
+  min-height: 35px;
+}
+.multicolor-color-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.multicolor-color-field > input[type='color'] {
+  width: 35px;
+  height: 35px;
+  min-width: 35px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--card);
+  cursor: pointer;
+}
+.multicolor-color-field > input:not([type='color']) {
+  width: 70px;
+  flex: 1;
+  font: 11px var(--mono);
+}
+.multicolor-color-field > input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+.multicolor-color-error {
+  flex: 1 0 100%;
+  color: var(--danger);
+  font-size: 10px;
+}
+.multicolor-wide-button {
+  width: 100%;
+}
+.multicolor-align-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  padding: 9px;
+}
+.multicolor-align-buttons button {
+  padding: 5px;
+  font-size: 10px;
+}
+.multicolor-vertex-row {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) minmax(0, 1fr) 26px;
+  gap: 5px;
+  align-items: end;
+}
+.multicolor-vertex-row > span {
+  font: 10px var(--mono);
+  padding-bottom: 10px;
+  color: var(--muted-foreground);
+}
+.multicolor-vertex-row > button {
+  padding: 4px;
+}
+.multicolor-vertex-row .multicolor-number > span:first-child {
+  font-size: 9px;
+}
+.multicolor-vertex-row .multicolor-input-unit small {
+  display: none;
+}
+.multicolor-palette-base,
+.multicolor-palette-row {
+  display: grid;
+  gap: 9px;
+  border-bottom: 1px solid var(--border);
+  padding: 0 0 13px;
+}
+.multicolor-palette-base > strong {
+  font-size: 11px;
+}
+.multicolor-merge-row {
+  display: flex;
+  gap: 5px;
+}
+.multicolor-merge-row > select {
+  flex: 1;
+}
+.multicolor-merge-row > button {
+  flex-shrink: 0;
+}
+.multicolor-print-note {
+  margin-top: 14px;
+  padding: 11px;
+  border-radius: 4px;
+  background: var(--surface);
+  font-size: 11px;
+}
+.multicolor-print-note > strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+.multicolor-error {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 12px;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  padding: 9px;
+  border-radius: 4px;
+  line-height: 1.5;
+}
+.multicolor-error > span {
+  flex: 1;
+}
+.multicolor-error > button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  min-height: 22px;
+}
+.multicolor-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+@media (pointer: coarse) {
+  .multicolor-handle-hit {
+    stroke-width: 28px;
+  }
+  .multicolor-editor button {
+    min-height: 42px;
+  }
+  .multicolor-canvas-toolbar button {
+    min-height: 38px;
+    width: 35px;
+  }
+  .multicolor-layers > li > button {
+    width: 33px;
+  }
+  .multicolor-editor input,
+  .multicolor-editor select,
+  .multicolor-editor textarea {
+    font-size: 16px;
+  }
+  .multicolor-editor input[type='number'] {
+    font-size: 14px;
+  }
+  .multicolor-canvas {
+    height: 360px;
+  }
+}
+@media (max-width: 380px) {
+  .multicolor-details > summary > span {
+    display: none;
+  }
+  .multicolor-canvas-toolbar {
+    padding: 6px;
+  }
+  .multicolor-canvas-toolbar small {
+    display: none;
+  }
+  .multicolor-material-edit {
+    flex-wrap: wrap;
+  }
+  .multicolor-material-edit > .multicolor-color-field {
+    flex-basis: 100%;
+  }
+  .multicolor-vertex-row {
+    grid-template-columns: 10px minmax(0, 1fr) minmax(0, 1fr) 24px;
+    gap: 3px;
+  }
+}

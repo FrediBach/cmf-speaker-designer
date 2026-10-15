@@ -1,8 +1,26 @@
 # Generative multicolor front-panel extension
 
-Date: 2026-10-15  
-Status: implementation plan; no application changes made  
+Date: 2026-10-15
+
+Status: implementation present; release validation incomplete
+
 Primary printing workflow: one assembled multicolor print, using 3MF and separate material regions, as selected by the user.
+
+## Implementation status — 2026-10-15
+
+The application now includes the Front panel Single color/Multicolor selector, editable stripes/crosses/circles/rings/polygons, canvas and numeric editing, material/layer controls, stripe generation, and all eight flag presets. Versioned settings participate in local persistence, undo/redo, fragment sharing, and Save/Load design JSON. Existing designs retain disabled multicolor defaults. Multipart 3MF, aligned STL-per-material ZIPs, and explicitly combined STL/STP geometry are implemented, with a shared panel transform and export checks against stale regions.
+
+Partitioning runs after structural generation in a **separate** `multicolor.worker.ts`, coordinated by `multicolor-client.ts` and `use-multicolor-geometry.ts`; the existing structural worker contract remains intact. Region diagnostics currently live in `multicolor-geometry.ts`. Palette color/name changes avoid Boolean work. The initial limits are 128 elements, 128 polygon vertices, and 128 explicit materials plus Background; full browser profiling is still required. Small-region warnings use a provisional 0.8 mm reference. User-configurable printer/nozzle diagnostics and cached regrouping of material assignments remain planned work.
+
+Verification checkpoint:
+
+- **Automated:** All 390 unit/integration tests pass, including real S/M 3MF and aligned-STL fixtures. TypeScript validation and the production build pass. All 54 production browser scenarios pass across the full run and the corrected history-suite rerun, including the five multicolor scenarios under the deployment security policy. The four development-only SVG parser checks also pass on an isolated Vite server. History expectations now cover multicolor export defaults, and seeded randomization is atomic to avoid unrelated preview code consuming its random sequence. Formatting and diff checks pass.
+- **Slicer import:** Bambu Studio 2.7.1.57 `--info` imported S/France with knob, M/Norway, S/United Kingdom, M/Rainbow, and S/Japan with a custom grille. All five reported manifold geometry and expected dimensions.
+- **Still unverified:** Bambu `--export-3mf` crashed during macOS graphics initialization. Filament assignability, sliced layers, saved-project round trips, PrusaSlicer/OrcaSlicer workflows, and physical fit/bonding prints remain release gates. Basic CLI import is not proof of those behaviors.
+
+Generate the fixture archives with `MULTICOLOR_FIXTURES=1 npm test -- src/lib/multicolor-integration.test.ts`; outputs go to `test-results/multicolor-fixtures/`. No deployment or physical validation is implied by this checkpoint. The sections below preserve the implementation contract and acceptance criteria; unfinished criteria remain open.
+
+Covered-layer regression follow-up: a saved S design with a round grille, slotted handle, rainbow stripes, and repeated three-stripe overlays exposed a zero-volume Boolean artifact from fully occluded layers. Material partitioning now checks remaining 2D coverage before cutting, skipping fully covered shapes while retaining the original cutters for partial overlaps. All authored layers and the white handle area beyond the artwork frame remain intact. The exact saved fixture and repeated-overlay/narrow-gap regressions are retained in the repository; all 41 multicolor geometry, integration, and export tests and all six multicolor production browser checks pass. The browser regression verifies the saved design's preview and actual 3MF/aligned-STL downloads, including closed topology, material identity, shared positions, and retained editable layers.
 
 ## 1. Product goal and main decisions
 
@@ -23,9 +41,9 @@ Recommended implementation decisions:
 
 Full-depth regions are a deliberate first-release choice: they work with the existing folded panel, grilles, halos, and handles without inventing a surface-offset system. They also place color interfaces through the panel thickness and can increase filament changes. A shallow decorative skin with shared structural backing is a separate later enhancement, not an implicit promise of this release.
 
-## 2. Current architecture and integration constraints
+## 2. Baseline architecture and integration constraints
 
-These findings come from the current repository:
+These findings describe the repository before this extension. The progress record above and the README describe the implemented architecture.
 
 | Area                  | Existing behavior                                                                                                                               | Consequence for this extension                                                                       |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |

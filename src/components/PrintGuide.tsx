@@ -60,6 +60,13 @@ export function PrintGuide({ open, onOpenChange, triggerRef }: Props) {
                 frequently handled parts. The STL contains geometry; set colors
                 by choosing filament.
               </p>
+              <p>
+                For multicolor, choose compatible filaments and assign each
+                named material part to a filament in your slicer. The pattern
+                runs through the panel's full depth, including handles and
+                mounting features. More materials can require more tool changes
+                and purge material.
+              </p>
             </div>
           </li>
           <li>
@@ -75,6 +82,16 @@ export function PrintGuide({ open, onOpenChange, triggerRef }: Props) {
                 geometry in CAD applications; these files preserve the mesh
                 without parametric feature history.
               </p>
+              <p>
+                Multicolor designs default to 3MF, with one assembled panel and
+                separate material regions. The STL parts ZIP is an alternative:
+                import every panel-material file together as parts of one
+                object. Keep their common positions; do not center or drop parts
+                onto the plate individually. Assign filaments and inspect the
+                sliced layers. Combined STL/STP exports contain geometry only.
+                Small regions may disappear in slicing; adjust the pattern for
+                your nozzle and line width.
+              </p>
             </div>
           </li>
           <li>
@@ -87,6 +104,11 @@ export function PrintGuide({ open, onOpenChange, triggerRef }: Props) {
                 been physically tested. Check that the attachments lock and the
                 controls move freely. Test strength before using a printed
                 handle to carry a speaker.
+              </p>
+              <p>
+                Multicolor material interfaces also need physical bonding and
+                strength tests. An unchanged panel shape does not establish
+                unchanged strength. Check a small color-boundary coupon first.
               </p>
             </div>
           </li>

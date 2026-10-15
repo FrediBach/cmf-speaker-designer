@@ -55,10 +55,17 @@ export function DesignerPreview({
     panelWidth,
     panelHeight,
     knobDimensions,
+    previewMaterialParts,
+    multicolorGenerating,
   } = meshes
   const { panelLabel, knobLabel } = getDesignSummary(design)
   return (
-    <div className="preview-column">
+    <div
+      className="preview-column"
+      data-materials-ready={
+        !design.multicolor.enabled || !!meshes.materialParts
+      }
+    >
       <div className="preview-card">
         <div className="preview-topbar">
           <span className="eyebrow">
@@ -102,6 +109,8 @@ export function DesignerPreview({
                 bodyColor={design.bodyColor}
                 style="original"
                 panelColor={design.panelColor}
+                materialParts={previewMaterialParts}
+                materials={design.multicolor.materials}
                 knobColor={design.knobColor}
                 knobGeometry={previewKnobGeometry}
                 knobStyle={design.knob.style}
@@ -113,11 +122,12 @@ export function DesignerPreview({
             </Suspense>
           </PreviewLoadBoundary>
         </div>
-        {(generating || knobGenerating) && previewGeometry && (
-          <div className="geometry-updating" role="status">
-            <LoaderCircle className="spin" size={12} /> Updating geometry…
-          </div>
-        )}
+        {(generating || knobGenerating || multicolorGenerating) &&
+          previewGeometry && (
+            <div className="geometry-updating" role="status">
+              <LoaderCircle className="spin" size={12} /> Updating geometry…
+            </div>
+          )}
         <div className="preview-bottom">
           <div>
             <span className="preview-model">
@@ -132,9 +142,11 @@ export function DesignerPreview({
                   : 'ORIGINAL FIT'
                 : `${panelWidth} × ${panelHeight} MM`}{' '}
               <span>·</span>{' '}
-              {colorName(
-                assembly === 'knob' ? design.knobColor : design.panelColor,
-              ).toUpperCase()}
+              {design.multicolor.enabled && assembly !== 'knob'
+                ? `${meshes.materialParts?.length ?? '…'} MATERIALS`
+                : colorName(
+                    assembly === 'knob' ? design.knobColor : design.panelColor,
+                  ).toUpperCase()}
             </span>
           </div>
           <div className="preview-actions">

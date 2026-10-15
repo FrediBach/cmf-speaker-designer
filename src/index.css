@@ -1,5 +1,34 @@
 @import 'tailwindcss';
 
+.design-file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 0;
+}
+
+.multicolor-export-summary {
+  margin-block: 14px;
+  font-size: 13px;
+}
+.multicolor-export-materials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-block: 8px;
+}
+.multicolor-export-materials span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.multicolor-export-materials i {
+  width: 13px;
+  height: 13px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+
 :root {
   font-family: 'DM Sans Variable', 'Helvetica Neue', sans-serif;
   color: var(--foreground);

@@ -4,6 +4,7 @@ import type { Design } from './design'
 import { loadPanelGeometry, getPanelDimensions } from './panels'
 import { usePanelGeometry } from './use-panel-geometry'
 import { useKnobGeometry } from './use-knob-geometry'
+import { useMulticolorGeometry } from './use-multicolor-geometry'
 
 export function useDesignGeometry(design: Design, retryKey: number) {
   const sourceStyle = 'original'
@@ -19,6 +20,11 @@ export function useDesignGeometry(design: Design, retryKey: number) {
     error: generationError,
     generating,
   } = usePanelGeometry(source, design, retryKey)
+  const multicolor = useMulticolorGeometry(
+    geometry,
+    design.multicolor,
+    retryKey,
+  )
   const {
     geometry: knobGeometry,
     previewGeometry: previewKnobGeometry,
@@ -82,5 +88,10 @@ export function useDesignGeometry(design: Design, retryKey: number) {
     panelWidth,
     panelHeight,
     knobDimensions,
+    materialParts: multicolor.parts,
+    previewMaterialParts: multicolor.previewParts,
+    multicolorGenerating: multicolor.generating,
+    multicolorError: multicolor.error,
+    multicolorDiagnostics: multicolor.diagnostics,
   }
 }

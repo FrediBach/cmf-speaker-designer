@@ -43,14 +43,48 @@ export function ExportDialog({
 }: Props) {
   const [busy, setBusy] = useState(false)
   const [exportTarget, setExportTarget] = useState<DesignExportTarget>('both')
-  const [exportFormat, setExportFormat] = useState<DesignExportFormat>('stl')
-  const formatLabel = exportFormat.toUpperCase()
-  const geometryLabel = exportFormat === 'stp' ? 'Faceted STEP' : 'Binary STL'
-  const { geometry, knobGeometry, panelWidth, panelHeight, knobDimensions } =
-    meshes
+  const [formatChoice, setFormatChoice] = useState<{
+    multicolor: boolean
+    format: DesignExportFormat
+  } | null>(null)
+  const exportFormat =
+    formatChoice?.multicolor === design.multicolor.enabled
+      ? formatChoice.format
+      : design.multicolor.enabled
+        ? '3mf'
+        : 'stl'
+  const setExportFormat = (format: DesignExportFormat) =>
+    setFormatChoice({ multicolor: design.multicolor.enabled, format })
+  const formatLabel =
+    exportFormat === 'stl-parts' ? 'STL parts' : exportFormat.toUpperCase()
+  const isMaterialExport =
+    exportFormat === '3mf' || exportFormat === 'stl-parts'
+  const geometryLabel =
+    exportFormat === 'stp'
+      ? 'Faceted STEP'
+      : exportFormat === '3mf'
+        ? 'Multipart 3MF'
+        : exportFormat === 'stl-parts'
+          ? 'Aligned material STLs'
+          : 'Binary STL'
+  const {
+    geometry,
+    knobGeometry,
+    panelWidth,
+    panelHeight,
+    knobDimensions,
+    materialParts,
+    multicolorError,
+    multicolorDiagnostics,
+  } = meshes
+  const regionsReady =
+    !design.multicolor.enabled ||
+    exportTarget === 'knob' ||
+    !isMaterialExport ||
+    !!materialParts
   const { knobLabel } = getDesignSummary(design)
   async function exportDesign() {
-    if (!geometry || !knobGeometry || busy) return
+    if (!geometry || !knobGeometry || !regionsReady || busy) return
     setBusy(true)
     try {
       await new Promise<void>((resolve) =>
@@ -63,6 +97,7 @@ export function ExportDialog({
         design,
         target: exportTarget,
         format: exportFormat,
+        materialParts,
       })
       onOpenChange(false)
       onNotify(
@@ -70,11 +105,13 @@ export function ExportDialog({
           ? 'Panel, knob, and design settings downloaded.'
           : `${formatLabel} downloaded.`,
       )
-    } catch {
+    } catch (error) {
       onNotify(
-        exportFormat === 'stp'
-          ? 'The STP export could not be created. Try STL to download the mesh.'
-          : 'The download could not start. Please try again.',
+        error instanceof Error
+          ? error.message
+          : exportFormat === 'stp'
+            ? 'The STP export could not be created. Try STL to download the mesh.'
+            : 'The download could not start. Please try again.',
       )
     } finally {
       setBusy(false)
@@ -100,16 +137,27 @@ export function ExportDialog({
         <span className="eyebrow">EXPORT / {formatLabel}</span>
         <DialogTitle>Export design</DialogTitle>
         <DialogDescription>
-          {exportFormat === 'stp'
-            ? 'Full-size STEP parts in millimeters for your CAD application.'
-            : 'Full-size parts in millimeters. Open each STL in your slicer at 100% scale.'}
+          {isMaterialExport
+            ? 'Full-size material regions in millimeters. Keep the panel assembled and assign a filament to each named part in your slicer.'
+            : exportFormat === 'stp'
+              ? 'Full-size STEP parts in millimeters for your CAD application.'
+              : 'Full-size parts in millimeters. Open each STL in your slicer at 100% scale.'}
         </DialogDescription>
         <div
           className="handle-mode export-formats"
           role="group"
           aria-label="Export format"
         >
-          {(['stl', 'stp'] as const).map((format) => (
+          {(
+            [
+              '3mf',
+              ...(design.multicolor.enabled && exportTarget !== 'knob'
+                ? ['stl-parts' as const]
+                : []),
+              'stl',
+              'stp',
+            ] as const
+          ).map((format) => (
             <button
               key={format}
               aria-pressed={exportFormat === format}
@@ -117,7 +165,7 @@ export function ExportDialog({
               disabled={busy}
               onClick={() => setExportFormat(format)}
             >
-              {format.toUpperCase()}
+              {format === 'stl-parts' ? 'STL parts' : format.toUpperCase()}
             </button>
           ))}
         </div>
@@ -138,7 +186,11 @@ export function ExportDialog({
               aria-pressed={exportTarget === target.id}
               className={exportTarget === target.id ? 'active' : ''}
               disabled={busy}
-              onClick={() => setExportTarget(target.id)}
+              onClick={() => {
+                setExportTarget(target.id)
+                if (target.id === 'knob' && exportFormat === 'stl-parts')
+                  setExportFormat('3mf')
+              }}
             >
               {target.label}
             </button>
@@ -169,6 +221,52 @@ export function ExportDialog({
             />
           </div>
         )}
+        {design.multicolor.enabled && exportTarget !== 'knob' && (
+          <div className="multicolor-export-summary">
+            {isMaterialExport ? (
+              <>
+                <strong>
+                  {materialParts?.length ?? '…'} used materials · Full-depth
+                  regions
+                </strong>
+                <div className="multicolor-export-materials">
+                  {materialParts?.map((part) => {
+                    const material =
+                      part.materialId === 'base'
+                        ? { name: 'Background', color: design.panelColor }
+                        : design.multicolor.materials.find(
+                            (item) => item.id === part.materialId,
+                          )
+                    return (
+                      material && (
+                        <span key={part.materialId}>
+                          <i style={{ background: material.color }} />
+                          {material.name}
+                        </span>
+                      )
+                    )
+                  })}
+                </div>
+                {!!multicolorDiagnostics.length && (
+                  <details>
+                    <summary>
+                      Pattern notes ({multicolorDiagnostics.length})
+                    </summary>
+                    {multicolorDiagnostics.map((note, index) => (
+                      <p key={index}>{note}</p>
+                    ))}
+                  </details>
+                )}
+              </>
+            ) : (
+              <p>
+                <strong>Combined geometry only.</strong> This {formatLabel}{' '}
+                joins the panel into one solid and discards material separation.
+                Choose 3MF or STL parts for multicolor printing.
+              </p>
+            )}
+          </div>
+        )}
         <div className="download-notes">
           <p>
             <Check size={15} />{' '}
@@ -177,9 +275,12 @@ export function ExportDialog({
               : 'Original mounting features retained'}
           </p>
           <p>
-            <Check size={15} /> Separate parts, positioned on the build plate
+            <Check size={15} />{' '}
+            {isMaterialExport
+              ? 'Panel regions share one assembly position'
+              : 'Separate parts, positioned on the build plate'}
           </p>
-          {exportTarget === 'both' && (
+          {exportTarget === 'both' && !isMaterialExport && (
             <p>
               <Check size={15} /> ZIP includes both {formatLabel} files and
               design.json with your colors and settings
@@ -187,14 +288,22 @@ export function ExportDialog({
           )}
         </div>
         <p className="export-caveat">
-          {exportFormat === 'stp'
-            ? `Faceted STEP with ${STEP_TOLERANCE_MM} mm surface tolerance, without smooth CAD surfaces or parametric feature history. ${exportTarget === 'both' ? 'Colors are saved in the ZIP’s design.json.' : 'Choose Panel + knob to include colors and settings in a ZIP.'}`
-            : 'STL files don’t store colors. Match your selected colors with filament. Review supports in your slicer and test-fit your first print.'}
+          {isMaterialExport
+            ? 'Confirm filament assignments in your slicer. Use compatible materials, inspect sliced boundaries and supports, and test fit and bonding before using the panel. 3MF display colors do not select printer filament slots.'
+            : exportFormat === 'stp'
+              ? `Faceted STEP with ${STEP_TOLERANCE_MM} mm surface tolerance, without smooth CAD surfaces or parametric feature history. ${exportTarget === 'both' ? 'Colors are saved in the ZIP’s design.json.' : 'Choose Panel + knob to include colors and settings in a ZIP.'}`
+              : 'STL files don’t store colors. Match your selected colors with filament. Review supports in your slicer and test-fit your first print.'}
         </p>
         <Button
           className="confirm-download"
           onClick={exportDesign}
-          disabled={busy || !geometry || !knobGeometry}
+          disabled={
+            busy ||
+            !geometry ||
+            !knobGeometry ||
+            !regionsReady ||
+            (isMaterialExport && exportTarget !== 'knob' && !!multicolorError)
+          }
         >
           {busy ? (
             <LoaderCircle size={17} className="spin" />
@@ -203,9 +312,11 @@ export function ExportDialog({
           )}{' '}
           {busy
             ? 'Preparing files…'
-            : exportTarget === 'both'
-              ? 'Download ZIP'
-              : `Download ${formatLabel}`}
+            : exportFormat === '3mf'
+              ? 'Download 3MF'
+              : exportFormat === 'stl-parts' || exportTarget === 'both'
+                ? 'Download ZIP'
+                : `Download ${formatLabel}`}
           <span>Speaker {design.model.toUpperCase()}</span>
         </Button>
       </DialogContent>

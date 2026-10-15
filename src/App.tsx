@@ -10,12 +10,20 @@ import { normalizeHandleSettings } from '@/lib/handle-settings'
 import { normalizeGrilleSettings } from '@/lib/grille-settings'
 import { normalizeHaloSettings } from '@/lib/halo-settings'
 import { normalizeRaceStripeSettings } from '@/lib/race-stripe-settings'
+import { normalizeMulticolorSettings } from '@/lib/multicolor-settings'
+import { downloadDesignJson } from '@/lib/design-files'
 import {
   STORAGE_KEY,
   designShareUrl,
   readDesign,
   validateDesign,
   type Design,
+  allowDesignSave,
+  getDesignLoadFailure,
+  hasRejectedSavedDesign,
+  parseDesignJson,
+  MAX_DESIGN_JSON_BYTES,
+  MAX_SHARE_URL_LENGTH,
 } from '@/lib/design'
 import { randomizeDesign } from '@/lib/random-design'
 import { useDesignHistory } from '@/lib/use-design-history'
@@ -26,6 +34,7 @@ import { COMMUNITY_URL } from '@/lib/community'
 function App() {
   const guideTriggerRef = useRef<HTMLButtonElement>(null)
   const exportTriggerRef = useRef<HTMLButtonElement>(null)
+  const designFileRef = useRef<HTMLInputElement>(null)
   const history = useDesignHistory(readDesign)
   const { design, setDesign, endTransaction } = history
   const [editorTab, setEditorTab] = useState<
@@ -46,9 +55,25 @@ function App() {
   const [resetKey, setResetKey] = useState(0)
   const [guideOpen, setGuideOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState(getDesignLoadFailure)
   const [retryKey, setRetryKey] = useState(0)
-  const update = (patch: Partial<Design>) =>
+  const update = (patch: Partial<Design>) => {
+    let multicolor: Design['multicolor'] | undefined
+    try {
+      if (patch.multicolor)
+        multicolor = normalizeMulticolorSettings(
+          patch.multicolor,
+          patch.model ?? design.model,
+        )
+    } catch (error) {
+      setToast(
+        error instanceof Error
+          ? error.message
+          : 'The pattern could not be updated.',
+      )
+      return
+    }
+    allowDesignSave()
     setDesign((current) => {
       const next = { ...current, ...patch }
       return {
@@ -64,12 +89,15 @@ function App() {
         halo: normalizeHaloSettings(next.halo),
         raceStripes: normalizeRaceStripeSettings(next.raceStripes),
         knob: normalizeKnobSettings(next.knob),
+        multicolor: multicolor ?? next.multicolor,
       }
     })
+  }
   const meshes = useDesignGeometry(design, retryKey)
   const interactionHandlers = useDesignInteractions(history, setToast)
 
   useEffect(() => {
+    if (hasRejectedSavedDesign()) return
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(design))
     } catch {
@@ -80,7 +108,9 @@ function App() {
       url.searchParams.has('design') ||
       new URLSearchParams(url.hash.slice(1)).has('design')
     ) {
-      window.history.replaceState(null, '', designShareUrl(design, url.href))
+      const shared = designShareUrl(design, url.href)
+      if (shared.toString().length <= MAX_SHARE_URL_LENGTH)
+        window.history.replaceState(null, '', shared)
     }
   }, [design])
 
@@ -97,6 +127,13 @@ function App() {
 
   async function shareDesign() {
     const url = designShareUrl(design, window.location.href)
+    if (url.toString().length > MAX_SHARE_URL_LENGTH) {
+      downloadDesignJson(design)
+      setToast(
+        'This design is too large for a link. Share the downloaded JSON; use Load design to reopen it.',
+      )
+      return
+    }
     try {
       await navigator.clipboard.writeText(url.toString())
       setToast('Design link copied.')
@@ -107,6 +144,7 @@ function App() {
   }
 
   function resetDesign() {
+    allowDesignSave()
     endTransaction()
     setDesign(validateDesign({ model: design.model }))
     setEditorTab('panel')
@@ -117,6 +155,7 @@ function App() {
   }
 
   function shuffleDesign() {
+    allowDesignSave()
     endTransaction()
     setDesign(randomizeDesign(design.model))
     setAssembly('assembled')
@@ -125,6 +164,34 @@ function App() {
 
   return (
     <div className="app-shell">
+      <input
+        ref={designFileRef}
+        type="file"
+        accept=".json,application/json"
+        aria-label="Design JSON file"
+        hidden
+        onChange={async (event) => {
+          const file = event.target.files?.[0]
+          event.target.value = ''
+          if (!file) return
+          try {
+            if (file.size > MAX_DESIGN_JSON_BYTES)
+              throw new Error('Choose a design JSON smaller than 2 MB.')
+            const imported = parseDesignJson(await file.text())
+            endTransaction()
+            allowDesignSave()
+            setDesign(imported)
+            setEditorTab('panel')
+            setToast('Design loaded. Undo to restore your previous design.')
+          } catch (error) {
+            setToast(
+              error instanceof Error
+                ? error.message
+                : 'The design could not be loaded.',
+            )
+          }
+        }}
+      />
       <a className="skip-link" href="#design-controls">
         Skip to design controls
       </a>
@@ -191,6 +258,18 @@ function App() {
             onReset={resetDesign}
             onRandomize={shuffleDesign}
             onRetry={() => setRetryKey((key) => key + 1)}
+            onBeginTransaction={() => {
+              if (
+                document.activeElement instanceof HTMLInputElement &&
+                ['number', 'text'].includes(document.activeElement.type)
+              )
+                document.activeElement.blur()
+              endTransaction()
+              history.beginTransaction()
+            }}
+            onEndTransaction={endTransaction}
+            onSaveDesign={() => downloadDesignJson(design)}
+            onLoadDesign={() => designFileRef.current?.click()}
           />
         </section>
       </main>

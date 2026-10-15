@@ -6,6 +6,9 @@ import { ColorPicker } from './ColorPicker'
 import type { Design } from '@/lib/design'
 import { getDesignSummary } from '@/lib/design-summary'
 import { RaceStripeEditor } from './RaceStripeEditor'
+import { MulticolorEditor } from './MulticolorEditor'
+import type { BufferGeometry } from 'three'
+import { getDefaultMulticolorSettings } from '@/lib/multicolor-settings'
 
 const looks = [
   { name: 'The original', panelColor: '#f45427', knobColor: '#303538' },
@@ -18,9 +21,25 @@ interface Props {
   design: Design
   update: (patch: Partial<Design>) => void
   onOpenGuide: MouseEventHandler<HTMLButtonElement>
+  geometry: BufferGeometry | null
+  materialCount: number | null
+  patternNotes: string[]
+  patternError: string
+  onBeginTransaction: () => void
+  onEndTransaction: () => void
 }
 
-export function PanelEditor({ design, update, onOpenGuide }: Props) {
+export function PanelEditor({
+  design,
+  update,
+  onOpenGuide,
+  geometry,
+  materialCount,
+  patternNotes,
+  patternError,
+  onBeginTransaction,
+  onEndTransaction,
+}: Props) {
   const { styles, currentStyle, customHalo, customGrille, haloLabel } =
     getDesignSummary(design)
   const panelStyleSelected = (style: Design['style']) => design.style === style
@@ -73,8 +92,38 @@ export function PanelEditor({ design, update, onOpenGuide }: Props) {
         <h3>
           <span>02</span> Colors
         </h3>
+        <div className="handle-mode" role="group" aria-label="Panel color mode">
+          {[false, true].map((enabled) => (
+            <button
+              key={String(enabled)}
+              aria-pressed={design.multicolor.enabled === enabled}
+              className={design.multicolor.enabled === enabled ? 'active' : ''}
+              onClick={() => {
+                const empty =
+                  !design.multicolor.elements.length &&
+                  !design.multicolor.groups.length &&
+                  !design.multicolor.materials.length
+                const untouched = ['s', 'm'].some(
+                  (model) =>
+                    JSON.stringify(design.multicolor.frame) ===
+                    JSON.stringify(
+                      getDefaultMulticolorSettings(model as Design['model'])
+                        .frame,
+                    ),
+                )
+                const frame =
+                  enabled && empty && untouched
+                    ? getDefaultMulticolorSettings(design.model).frame
+                    : design.multicolor.frame
+                update({ multicolor: { ...design.multicolor, frame, enabled } })
+              }}
+            >
+              {enabled ? 'Multicolor' : 'Single color'}
+            </button>
+          ))}
+        </div>
         <ColorPicker
-          label="Front panel"
+          label={design.multicolor.enabled ? 'Background' : 'Front panel'}
           value={design.panelColor}
           onChange={(panelColor) => update({ panelColor })}
         />
@@ -84,8 +133,41 @@ export function PanelEditor({ design, update, onOpenGuide }: Props) {
           onChange={(knobColor) => update({ knobColor })}
         />
         <p className="subtle-note">
-          Preview colors only. Match with your filament.
+          {design.multicolor.enabled
+            ? 'Assign these colors to filaments in your slicer.'
+            : 'Preview colors only. Match with your filament.'}
         </p>
+        {design.multicolor.enabled && (
+          <>
+            <p className="subtle-note" role="status">
+              {patternError
+                ? 'Material regions could not update. Adjust the pattern or use Retry below.'
+                : materialCount === null
+                  ? 'Updating printable material regions…'
+                  : `${materialCount} printable material${materialCount === 1 ? '' : 's'} on this panel. Match these to your printer’s available filament slots.`}
+            </p>
+            {!!patternNotes.length && (
+              <details className="multicolor-pattern-notes">
+                <summary>Pattern notes ({patternNotes.length})</summary>
+                {patternNotes.map((note, index) => (
+                  <p className="subtle-note" key={index}>
+                    {note}
+                  </p>
+                ))}
+              </details>
+            )}
+            <MulticolorEditor
+              value={design.multicolor}
+              onChange={(multicolor) => update({ multicolor })}
+              panelColor={design.panelColor}
+              onPanelColorChange={(panelColor) => update({ panelColor })}
+              model={design.model}
+              geometry={geometry}
+              onBeginTransaction={onBeginTransaction}
+              onEndTransaction={onEndTransaction}
+            />
+          </>
+        )}
       </section>
       <section className="control-section relief-section">
         <h3>

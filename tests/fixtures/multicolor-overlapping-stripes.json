@@ -1,0 +1,313 @@
+{
+  "model": "s",
+  "bodyColor": "gray",
+  "knob": {
+    "style": "bar",
+    "height": 16,
+    "taper": 0,
+    "fluteCount": 16,
+    "fluteDepth": 0.8,
+    "flutePath": "straight",
+    "facets": 6
+  },
+  "grille": {
+    "size": 4,
+    "spacing": 2,
+    "slotLength": 12,
+    "rotation": 0,
+    "thickness": 3.5,
+    "recessDepth": 0.6,
+    "mode": "custom",
+    "pattern": "round",
+    "layout": "staggered",
+    "extendPattern": false
+  },
+  "halo": {
+    "outwardAngle": 12.5,
+    "depth": 24,
+    "thickness": 4.5,
+    "rimHeight": 0,
+    "cutAngle": 0,
+    "cutRotation": 0,
+    "mode": "original"
+  },
+  "raceStripes": {
+    "enabled": false,
+    "count": 2,
+    "width": 6,
+    "gap": 4
+  },
+  "multicolor": {
+    "version": 1,
+    "enabled": true,
+    "mapping": "front-projection",
+    "depthMode": "full-depth",
+    "frame": {
+      "centerX": 0,
+      "centerY": 0,
+      "width": 85,
+      "height": 131
+    },
+    "materials": [
+      {
+        "id": "material-8159fd1e-fe77-4488-b057-27256c6c95cb",
+        "name": "Color 1",
+        "color": "#e40303"
+      },
+      {
+        "id": "material-b3cd2498-3226-4bee-8f04-aaeaf7de7af4",
+        "name": "Color 2",
+        "color": "#ff8c00"
+      },
+      {
+        "id": "material-b39d18ff-493a-4241-b0bf-31fc148a1e92",
+        "name": "Color 3",
+        "color": "#ffed00"
+      },
+      {
+        "id": "material-d93f1e0b-b3ca-4785-bff6-2e484278645e",
+        "name": "Color 4",
+        "color": "#008026"
+      },
+      {
+        "id": "material-943c1853-400f-4e4d-a6fa-82b47d13a363",
+        "name": "Color 5",
+        "color": "#24408e"
+      },
+      {
+        "id": "material-a805cd44-5e7b-407b-a7d7-44cf13b9b2f1",
+        "name": "Color 6",
+        "color": "#732982"
+      },
+      {
+        "id": "material-45860428-2d26-4675-ad87-bb1fcfe9ada9",
+        "name": "Color 7",
+        "color": "#f45427"
+      },
+      {
+        "id": "material-b37bfca6-36d8-4642-a10f-c97d673f336e",
+        "name": "Color 8",
+        "color": "#eeeae1"
+      },
+      {
+        "id": "material-d8469d37-ecc0-492f-8d56-27947e3c7904",
+        "name": "Color 9",
+        "color": "#303538"
+      }
+    ],
+    "elements": [
+      {
+        "id": "shape-f6ddcaf1-be45-4758-88c4-9d8d1a6dedb7",
+        "name": "Stripe 1",
+        "visible": true,
+        "materialId": "material-8159fd1e-fe77-4488-b057-27256c6c95cb",
+        "groupId": "stripes-1ce3c406-b273-42cd-9539-173ba573561f",
+        "x": 1.0026795668018956e-14,
+        "y": 54.58333333333334,
+        "rotation": 270,
+        "kind": "stripe",
+        "width": 21.83333333333334,
+        "height": 85.00000000000003
+      },
+      {
+        "id": "shape-eb8929b9-f5de-4c7f-9131-6819ed7320dc",
+        "name": "Stripe 2",
+        "visible": true,
+        "materialId": "material-b3cd2498-3226-4bee-8f04-aaeaf7de7af4",
+        "groupId": "stripes-1ce3c406-b273-42cd-9539-173ba573561f",
+        "x": 6.016077400811372e-15,
+        "y": 32.75,
+        "rotation": 270,
+        "kind": "stripe",
+        "width": 21.83333333333334,
+        "height": 85.00000000000003
+      },
+      {
+        "id": "shape-c87efbb2-013f-43aa-845c-8e55203e4b0d",
+        "name": "Stripe 3",
+        "visible": true,
+        "materialId": "material-b39d18ff-493a-4241-b0bf-31fc148a1e92",
+        "groupId": "stripes-1ce3c406-b273-42cd-9539-173ba573561f",
+        "x": 2.00535913360379e-15,
+        "y": 10.916666666666663,
+        "rotation": 270,
+        "kind": "stripe",
+        "width": 21.83333333333334,
+        "height": 85.00000000000003
+      },
+      {
+        "id": "shape-9ed9132e-db96-4b4e-af16-1d9e9130e332",
+        "name": "Stripe 4",
+        "visible": true,
+        "materialId": "material-d93f1e0b-b3ca-4785-bff6-2e484278645e",
+        "groupId": "stripes-1ce3c406-b273-42cd-9539-173ba573561f",
+        "x": -2.0053591336037928e-15,
+        "y": -10.916666666666677,
+        "rotation": 270,
+        "kind": "stripe",
+        "width": 21.83333333333334,
+        "height": 85.00000000000003
+      },
+      {
+        "id": "shape-effa3fb0-0961-40d4-b0fa-eaf96b2d69cf",
+        "name": "Stripe 5",
+        "visible": true,
+        "materialId": "material-943c1853-400f-4e4d-a6fa-82b47d13a363",
+        "groupId": "stripes-1ce3c406-b273-42cd-9539-173ba573561f",
+        "x": -6.016077400811375e-15,
+        "y": -32.750000000000014,
+        "rotation": 270,
+        "kind": "stripe",
+        "width": 21.83333333333334,
+        "height": 85.00000000000003
+      },
+      {
+        "id": "shape-1a75e454-fdb2-4094-9dc4-7a0a7a581045",
+        "name": "Stripe 6",
+        "visible": true,
+        "materialId": "material-a805cd44-5e7b-407b-a7d7-44cf13b9b2f1",
+        "groupId": "stripes-1ce3c406-b273-42cd-9539-173ba573561f",
+        "x": -1.0026795668018958e-14,
+        "y": -54.58333333333336,
+        "rotation": 270,
+        "kind": "stripe",
+        "width": 21.83333333333334,
+        "height": 85.00000000000003
+      },
+      {
+        "id": "shape-a0786b69-17a1-4b38-bbb9-14e04ba6d15a",
+        "name": "Stripe 1",
+        "visible": true,
+        "materialId": "material-45860428-2d26-4675-ad87-bb1fcfe9ada9",
+        "groupId": "stripes-815fa41e-eabd-4eb4-a3f9-4f8c4acf96c5",
+        "x": -28.333333333333336,
+        "y": 0,
+        "rotation": 0,
+        "kind": "stripe",
+        "width": 28.333333333333332,
+        "height": 131
+      },
+      {
+        "id": "shape-38b5819c-637d-4934-a8e6-93c3c15e2197",
+        "name": "Stripe 2",
+        "visible": true,
+        "materialId": "material-b37bfca6-36d8-4642-a10f-c97d673f336e",
+        "groupId": "stripes-815fa41e-eabd-4eb4-a3f9-4f8c4acf96c5",
+        "x": -1.7763568394002505e-15,
+        "y": 0,
+        "rotation": 0,
+        "kind": "stripe",
+        "width": 28.333333333333332,
+        "height": 131
+      },
+      {
+        "id": "shape-756b8e65-f01a-4bc6-b4c5-5544b346f3a7",
+        "name": "Stripe 3",
+        "visible": true,
+        "materialId": "material-d8469d37-ecc0-492f-8d56-27947e3c7904",
+        "groupId": "stripes-815fa41e-eabd-4eb4-a3f9-4f8c4acf96c5",
+        "x": 28.33333333333333,
+        "y": 0,
+        "rotation": 0,
+        "kind": "stripe",
+        "width": 28.333333333333332,
+        "height": 131
+      },
+      {
+        "id": "shape-37777386-4902-4ab2-88b0-c0d69cc39c40",
+        "name": "Stripe 1",
+        "visible": true,
+        "materialId": "material-45860428-2d26-4675-ad87-bb1fcfe9ada9",
+        "groupId": "stripes-39f2d215-8ee8-4d7c-b628-439fb39ac525",
+        "x": -28.333333333333336,
+        "y": 0,
+        "rotation": 0,
+        "kind": "stripe",
+        "width": 28.333333333333332,
+        "height": 131
+      },
+      {
+        "id": "shape-7f6f4863-e3c8-42bd-beeb-0a9ba758a1a3",
+        "name": "Stripe 2",
+        "visible": true,
+        "materialId": "material-b37bfca6-36d8-4642-a10f-c97d673f336e",
+        "groupId": "stripes-39f2d215-8ee8-4d7c-b628-439fb39ac525",
+        "x": -1.7763568394002505e-15,
+        "y": 0,
+        "rotation": 0,
+        "kind": "stripe",
+        "width": 28.333333333333332,
+        "height": 131
+      },
+      {
+        "id": "shape-3d72da3b-05f0-4c8a-94a3-d04fe639f483",
+        "name": "Stripe 3",
+        "visible": true,
+        "materialId": "material-d8469d37-ecc0-492f-8d56-27947e3c7904",
+        "groupId": "stripes-39f2d215-8ee8-4d7c-b628-439fb39ac525",
+        "x": 28.33333333333333,
+        "y": 0,
+        "rotation": 0,
+        "kind": "stripe",
+        "width": 28.333333333333332,
+        "height": 131
+      }
+    ],
+    "groups": [
+      {
+        "id": "stripes-1ce3c406-b273-42cd-9539-173ba573561f",
+        "name": "6 stripes",
+        "generator": {
+          "type": "stripes",
+          "count": 6,
+          "angle": 270,
+          "gap": 0
+        }
+      },
+      {
+        "id": "stripes-815fa41e-eabd-4eb4-a3f9-4f8c4acf96c5",
+        "name": "3 stripes",
+        "generator": {
+          "type": "stripes",
+          "count": 3,
+          "angle": 0,
+          "gap": 0
+        }
+      },
+      {
+        "id": "stripes-39f2d215-8ee8-4d7c-b628-439fb39ac525",
+        "name": "3 stripes",
+        "generator": {
+          "type": "stripes",
+          "count": 3,
+          "angle": 0,
+          "gap": 0
+        }
+      }
+    ]
+  },
+  "handle": {
+    "mode": "custom",
+    "legoStuds": false,
+    "height": 37,
+    "width": 85,
+    "cornerRadius": 3,
+    "topAngle": 0,
+    "topShape": "straight",
+    "topCurve": 10,
+    "cutout": "slot",
+    "svgCutout": null,
+    "holeCount": 1,
+    "holeWidth": 40,
+    "holeHeight": 12,
+    "holeGap": 6,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "style": "custom",
+  "panelColor": "#ffffff",
+  "knobColor": "#303538",
+  "relief": 0,
+  "panelExtension": 0,
+  "panelGap": 0
+}

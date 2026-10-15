@@ -16,7 +16,7 @@ Open the local URL printed by Vite. Other commands:
 ```sh
 npm run check    # TypeScript validation
 npm run doctor -- --verbose # React Doctor diagnostics
-npm test         # Geometry, STL, and STEP export checks
+npm test         # Geometry, state, STL, STEP, and 3MF export checks
 npm run build    # Production files in dist/
 npm run preview  # Serve the production build locally
 npm run test:production # Build and run the full browser regression suite
@@ -40,6 +40,8 @@ npm run test:e2e
 
 The tests start Vite automatically when needed and cover the WebGL preview, model and style changes, saved colors, keyboard face-depth controls, generated handles, grilles, and halos, actual STL and STP downloads, and a narrow mobile layout. Downloads are inspected independently for closed edges, one connected component, hole topology, clear passages through each opening, solid backing behind face recesses, and the projection of an angled halo cover. STEP download checks verify the selected format, millimeter units, part bounds, and ZIP contents. Screenshots, downloaded files, and failure traces are written to the ignored `test-results/` directory. GitHub Actions runs the unit checks and full production browser suite on Node.js 24 for pushes and pull requests, retaining browser artifacts when a run fails.
 
+Multicolor suites add editable preset coverage, JSON/share/history checks, material partition topology, and actual 3MF and aligned STL ZIP inspection. Individual material regions may contain disconnected islands; their assembled union must reproduce the complete panel. Browser coverage includes the canvas, material editing, JSON round trips, and downloads. The implementation's current validation status and outstanding slicer/print checks are recorded in [the multicolor plan](plans/multicolor-extension.md#implementation-status--2026-10-15).
+
 To check the bundled geometry worker and WebAssembly module against a production build:
 
 ```sh
@@ -59,6 +61,8 @@ Controls use larger text and targets, high-contrast selected states, and visible
 
 **Randomize**, next to **Reset**, replaces all design settings with a fresh combination of colors and geometry. Both actions keep the selected Speaker S or M. Undo design changes with **⌘/Ctrl+Z**; redo with **⌘/Ctrl+Shift+Z** or **Ctrl+Y**. A slider drag or held arrow key is one undo step. Text and number fields keep their native editing shortcuts. History includes up to 100 changes in the current session; reloading starts a new history from the saved design.
 
+**Save design JSON** downloads the authored settings; **Load design JSON** restores them as an undoable edit. Designs also save locally. Multicolor artwork and uploaded SVG cutouts use URL fragments for sharing; existing query-based links remain readable. When a link exceeds 64,000 characters, sharing downloads JSON instead. JSON import accepts up to 2 MB and rejects unsupported or oversized multicolor documents without truncating their artwork. A rejected saved document remains intact until an explicit edit, reset, randomization, or successful import allows saving again.
+
 ## What the POC does
 
 Choose **Black** or **Gray** under **Speaker body**, next to the model selection. Gray approximates the body and side radiator faces of the white speaker variant; panel and knob colors remain independent. The body choice is saved locally, shared in design links, and recorded as `bodyColor` in the ZIP's `design.json`. Older designs default to black. The body is preview context only and is not exported.
@@ -75,15 +79,16 @@ Choose **Black** or **Gray** under **Speaker body**, next to the model selection
 - Generate a custom upper handle: adjust its height, width, rounded corners, top angle, and straight or inward/outward rounded top, then choose a solid face, one to three circular or slotted openings, one to seven rounded slits open at the top, or an uploaded SVG cutout.
 - Add LEGO-compatible studs to the custom handle's front face.
 - Recess one to three centered vertical race stripes into the panel, with adjustable stripe width and gap. Studs and decorative face recesses leave the stripes clear.
+- Compose multicolor stripes, crosses, circles/rings, and polygons with arbitrary colors, editable flag presets, a front-view canvas, and numeric controls.
 - Change built-in cutout size, spacing, and position, with dependent dimensions constrained to retain at least 3 mm of material between openings and around their closed edges.
 - Keep your current design locally and copy a link to share a configuration.
 - Select the supplied ring, bar, and cross volume knobs, or generate fluted and faceted grips.
 - Keep the original STL base diameter, collar, and socket fixed; shape the upper grip with height and inward taper.
 - Generate straight, spiral, or chevron flutes with adjustable count and depth, or choose the number of faces on a faceted grip.
 - Inspect the knob at full size in a dedicated preview, or see it mounted on either speaker.
-- Choose binary **STL** or faceted **STP** (STEP) exports in millimeters. Download panel and knob together as a ZIP with separate part files and a `design.json` containing settings, colors, and export format, or download either part individually.
+- Export multipart **3MF**, aligned **STL parts** for multicolor, or combined **STL**/**STP** geometry. Include the panel, knob, or both, with authored settings and material mappings in the applicable archive.
 
-The designer starts from each model's original front panel mesh. **Custom** selects an open panel ready to configure in the **Halo** and **Grille** tabs; it does not add either feature automatically. Selecting **Original** removes generated halos and grilles while retaining their parameters for later use. The **Original handle** option retains the source upper section. **Custom handle** removes that upper section above the control deck and joins a newly generated extension to the remaining panel; its cutouts pass through the exported solid. Carry loop, Three dots, Hair, and Solid presets provide starting points. STL has no color or unit metadata: the exported coordinates are intended as millimeters. The ZIP records panel and knob colors in `design.json`. Choose the corresponding filament or material in your slicer. This POC does not include freeform drawing, text embossing, slicer integration, or multi-material exports.
+The designer starts from each model's original front panel mesh. **Custom** selects an open panel ready to configure in the **Halo** and **Grille** tabs; it does not add either feature automatically. Selecting **Original** removes generated halos and grilles while retaining their parameters for later use. The **Original handle** option retains the source upper section. **Custom handle** removes that upper section above the control deck and joins a newly generated extension to the remaining panel; its cutouts pass through the exported solid. Carry loop, Three dots, Hair, and Solid presets provide starting points. STL has no color or unit metadata: the exported coordinates are intended as millimeters. Choose and confirm the corresponding filament in your slicer. This POC does not include freehand drawing, text embossing, automatic filament-slot assignment, or embedded printer profiles.
 
 In **Handle → Custom handle**, adjust **Top angle** to slope the top edge and choose a **Straight**, **Outwards**, or **Inwards** top shape. Rounded shapes offer a **Curve depth** control. Handle height sets the highest point; angle and curve depth are limited together to retain the shoulder and connecting material. Top settings are retained when changing cutouts or switching to the original handle and support local saving, shared links, ZIP metadata, and undo/redo.
 
@@ -99,9 +104,23 @@ The **Grille** tab generates a perforated grille over the original driver openin
 
 Recess depth ranges from 0.2 to 3 mm and is limited to the grille thickness minus 0.5 mm to retain a solid floor. A 2 mm grille allows recesses up to 1.5 mm; the default 3.5 mm grille allows the full 3 mm. Reducing grille thickness also reduces the recess depth when needed.
 
+## Multicolor patterns
+
+In **Front panel → Colors**, choose **Multicolor** to reveal the configurator. The existing panel color becomes **Background**; knob color remains independent. Color mode works with both Original and Custom panel geometry. Switching to Single color hides the pattern without deleting it, and selecting Original panel shape retains the multicolor composition.
+
+Add and independently position stripes/rectangles, crosses with unequal arms, circles/rings, and polygons. Use the front-view canvas to move, rotate, resize, or edit polygon vertices, or use numeric coordinates in millimeters. Layer order determines which material wins at overlaps. Shapes can share named materials; **Make unique** separates an assignment, and explicit material merging combines it. Matching hex colors alone do not merge existing materials.
+
+The stripe generator supports equal or weighted widths, direction, count, gaps, and a repeating color sequence. Generated stripes remain individually editable; redistribution changes their layout as an explicit operation. Presets include **France, Italy, Germany, Switzerland, Norway, United Kingdom, Rainbow, and Japan**. Each creates ordinary shapes, including asymmetric UK diagonal arms. Choose panel adaptation or preserved flag proportions; display RGB values approximate flag colors and do not specify filament colors.
+
+Authored artwork keeps its physical dimensions when the speaker model or panel geometry changes. **Fit artwork to current panel** applies a uniform scale, preserving circles; **Reapply chosen preset to panel** regenerates the recipe against the current panel. The artwork frame clips the pattern, with background material outside it. Existing holes remain open: a disc entirely inside a driver opening contributes no printable material.
+
+Color regions extend through the finished panel's full depth, including intersected handles, halos, grille bars, and mounting features. They divide the existing solid without changing its shape. This is intended as one assembled multicolor print, not separate inlays or a shallow decorative skin. Front projection does not unwrap the angled control deck. Use compatible filaments and inspect bonding, sliced boundaries, supports, and tool changes; simple layer-height filament swaps cannot reproduce every pattern.
+
+The provisional limits are **128 elements**, **128 vertices per polygon**, and **128 explicit palette materials** plus Background. Excess documents are rejected rather than trimmed. Geometry runs in a separate worker; palette RGB/name edits do not repartition the panel. Empty and occluded regions are omitted from exports. Small-region diagnostics use a provisional 0.8 mm reference, not a guaranteed printable minimum. Dense jobs can time out after 45 seconds; reduce complexity or retry. Browser profiling, complete slicer workflows, and physical print validation remain release checks.
+
 ## Recessed race stripes
 
-In **Front panel → Race stripes**, enable **Recessed race stripes** and choose one to three stripes. The centered vertical grooves run from top to bottom wherever the panel has material, recessed 0.8 mm into the surface. They are part of the printable geometry and use the panel's material and color.
+In **Front panel → Race stripes**, enable **Recessed race stripes** and choose one to three stripes. The centered vertical grooves run from top to bottom wherever the panel has material, recessed 0.8 mm into the surface. They change the printable geometry without adding material assignments; multicolor patterns can cross the grooves independently.
 
 **Stripe width** and **Stripe gap** each range from 1 to 20 mm. Their limits adjust together to keep the complete group within 54 mm, leaving room at the sides of the narrowest handle. Gap is inactive for one stripe. Changing the count can reduce the width to keep the group inside these limits.
 
@@ -146,16 +165,28 @@ The **Knob** tab selects Ring, Bar, Cross, Fluted, or Faceted. Ring, Bar, and Cr
 
 Selecting the Knob tab opens the close-up **Knob only** preview. Use **Speaker** or **Exploded** to inspect it alongside the panel. The base diameter, entire lower collar, mounting stem, and internal socket remain at their original STL dimensions. There is no diameter or rigid rotation control; old saved values for these are discarded when a design opens. Only the grip above the collar changes. Adjust its height and inward taper; Fluted grips offer Straight, Spiral, and Chevron paths with flute count and depth, while Faceted grips offer an adjustable face count. Generative details stay within the original outer diameter. Unmodified supplied styles retain their exact source geometry. The Heart from the larger collection has different mounting dimensions and is no longer offered; saved Heart selections open as Bar. Preview and export use the same mesh, with dimensions measured from it; each knob STL contains one part, with its lowest point at Z=0. Check fit, grip clearance, and printing supports with a test print.
 
-Choose **Export design**, then **STL** or **STP** under **Export format**. STL is selected by default. The default **Panel + knob** export is a ZIP containing two part files in the selected format and `design.json`. The parts remain separate so different filaments can be used. The JSON retains both color hex values, all design parameters, and the selected `export.format`; the app does not currently provide a file-import control. Choose **Panel only** or **Knob only** for a direct `.stl` or `.stp` download.
+## Export and design files
+
+Choose **Export design**, then a format and **Panel + knob**, **Panel only**, or **Knob only**. Single-color designs default to STL; Multicolor defaults to 3MF. Material exports wait for regions matching the current design. Combined geometry exports remain available without material separation.
+
+| Format        | Output and use                                                                                                                                                                                                                                                                      |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **3MF**       | One panel assembly with named material meshes and display colors. Panel + knob adds a separate, positioned knob object. The archive contains authored settings in `Metadata/design.json` and object/material mapping in `Metadata/materials.json`.                                  |
+| **STL parts** | A ZIP with one STL per used panel material, an optional separate knob, `design.json`, `materials.json`, and import instructions. Import panel-material STLs together as parts of one object. Preserve their common placement; do not center, arrange, or drop regions individually. |
+| **STL / STP** | Combined panel geometry without multicolor separation. Panel + knob produces a ZIP with separate part files and `design.json`; either part alone downloads directly.                                                                                                                |
+
+3MF colors express design intent; they do not select printer filament slots. Assign and confirm filaments in the slicer. A material can contain several disconnected islands, all sharing the panel's print transform. The knob stays a separate printable object. Use **Load design JSON** to reopen settings, including JSON extracted from an export; the designer does not import arbitrary 3MF/STL geometry.
 
 STP exports use conventional AP214 advanced B-rep solids with explicit millimeter units and the same print orientation as STL. STEP preparation reduces excess mesh detail within a **0.01 mm surface tolerance**, preserves holes and separate shells, and combines coplanar triangles into shared planar faces. Curved surfaces remain faceted; the files do not reconstruct smooth CAD surfaces or contain parametric feature history. Preparation runs in a worker so the interface stays responsive. The ZIP records the STEP tolerance as `export.toleranceMm`. STL retains the full preview mesh. Neither export writes the preview colors into the part files; the ZIP retains them in `design.json`.
+
+Multicolor release validation is incomplete. The production build, 390 unit/integration tests, and 54 production browser scenarios pass; four additional development-only parser checks pass. Bambu Studio **2.7.1.57** imported five real S/M flag fixtures through `--info`, reporting manifold geometry and expected dimensions. Its `--export-3mf` attempt crashed during macOS graphics initialization, so this does not establish filament assignability, slicing, or slicer-project round trips. PrusaSlicer/OrcaSlicer workflows and physical bonding/fit tests are still pending. See [the plan's progress record](plans/multicolor-extension.md#implementation-status--2026-10-15) for the verification details.
 
 ## Implementation
 
 - **Vite, React, and TypeScript** provide the application shell and production build.
 - **shadcn/ui components, Radix UI, and Tailwind CSS** provide buttons, the face-depth slider, and accessible dialogs, with custom product-inspired styling.
 - **Three.js, React Three Fiber, and Drei** provide mesh loading, material previews, lighting, and camera interaction.
-- **Manifold** performs solid Boolean operations in a WebAssembly worker, keeping handle, grille, and halo generation off the main UI thread.
+- **Manifold** performs solid Boolean operations in WebAssembly workers, keeping structural generation and multicolor partitioning off the main UI thread.
 - `src/lib/panels.ts` owns source selection, model coordinates, face-depth transformations, and STL exports.
 - `src/lib/face-depth.ts` carries the original rounded corner into the deeper face and joins it to the unchanged 45° control deck. Local triangle subdivision keeps the front planar and shared edges watertight in both the preview and STL.
 - `src/lib/panel-normals.ts` smooths curved surfaces while keeping flat faces uniformly shaded and sharp edges crisp.
@@ -164,15 +195,18 @@ STP exports use conventional AP214 advanced B-rep solids with explicit millimete
 - `src/lib/grille-settings.ts` constrains grille dimensions and defines the shared pattern layout; `grille-geometry.ts` joins perforated inserts and cuts blind decorative recesses.
 - `src/lib/halo-settings.ts` constrains halo dimensions; `halo-geometry.ts` generates a flared annular wall, trims it with the selected cutting plane, and joins it to the panel.
 - `src/lib/race-stripe-settings.ts` validates centered stripe dimensions and shares their intervals with stud placement; `race-stripe-geometry.ts` cuts the recessed bands into the panel.
+- `src/lib/multicolor-settings.ts`, `multicolor-patterns.ts`, and `multicolor-presets.ts` own the versioned artwork document, primitive contours, generators, and editable flag recipes.
+- `src/components/MulticolorEditor.tsx` and `MulticolorCanvas.tsx` provide the layer/material inspector and 2D placement editor.
+- `src/lib/multicolor-geometry.ts` partitions the final solid and reports region diagnostics; `multicolor-client.ts`, `multicolor.worker.ts`, and `use-multicolor-geometry.ts` handle worker scheduling, disposal, and current-result gating.
 - `src/lib/panel-engine.ts` combines handle generation, the shared face-depth transformation, grille generation, and halo generation in order inside the worker.
 - `src/lib/use-panel-geometry.ts` schedules geometry updates, retains the last preview during generation, and enables export when the current design is ready.
 - `src/lib/knob-settings.ts` validates knob styles and dimensions; `knobs.ts` extracts the source parts, preserves the mounting interface, and builds the preview/export geometry.
 - `src/lib/use-knob-geometry.ts` loads and updates knobs while preventing stale geometry from being exported.
-- `src/lib/design-export.ts` writes individual STL or STP files, or a ZIP with both parts and saved colors/settings.
+- `src/lib/design-export.ts` writes STL/STP, multipart 3MF, and aligned material STL ZIPs. `three-mf-export.ts` serializes material assemblies and derives one shared panel print transform; `archive.ts` packages the archives.
 - `src/lib/step-export.ts` writes AP214 solids with shared edges and planar faces; `step-faces.ts` combines coplanar regions while retaining hole boundaries.
 - `src/lib/step-mesh.ts` prepares STEP geometry within the tolerance in `step-settings.ts`. `step-export-client.ts` and `step-export.worker.ts` keep preparation and serialization off the UI thread.
 - `src/lib/step-import.test.ts` independently imports complete panel and knob exports with OpenCascade, checking actual geometry rather than file text alone. `occt-import-js` is a development dependency only.
-- `src/lib/design.ts` validates shared and locally stored design settings.
+- `src/lib/design.ts` validates shared, locally stored, and imported design settings; `design-files.ts` downloads portable design JSON.
 - `src/components/SpeakerPreview.tsx` renders the selected panel and the contextual speaker body.
 - `src/components/DesignerPreview.tsx`, `DesignControls.tsx`, and `PanelEditor.tsx` compose the preview and editing workspace; `ExportDialog.tsx` and `PrintGuide.tsx` own the dialogs.
 - `src/lib/use-design-geometry.ts` owns source loading, disposal, and the panel/knob geometry state used by previews and exports.
@@ -187,7 +221,7 @@ Import this repository into Vercel and select **Node.js 24.x** in the project's 
 
 Add **cmfspeakerdesigner.com** and **www.cmfspeakerdesigner.com** in the project's domain settings, follow the DNS records Vercel supplies, and wait for HTTPS certificates to be issued. Connect **www.cmfspeakerdesigner.com** to Production and redirect **cmfspeakerdesigner.com** to it in **Settings → Domains**, preserving paths and shared-design query parameters. This matches the current deployment. Domain redirects belong in those settings; `vercel.json` deliberately has no competing host redirect. A reverse rule in the repository would create a redirect loop for scripts, styles, and other assets. Metadata and the sitemap use `https://www.cmfspeakerdesigner.com/`. Both public domains are excluded from the preview-only `X-Robots-Tag: noindex, nofollow` rule.
 
-Vite's content-hashed files under `/assets/`, including models, fonts, the geometry worker, and WebAssembly, can be cached for one year. HTML and files copied from `public/` revalidate on each use so metadata, icons, and crawler files update after deployment. All shared designs use query parameters on `/`; there is no catch-all rewrite, so missing assets and unknown paths return a real 404.
+Vite's content-hashed files under `/assets/`, including models, fonts, the geometry workers, and WebAssembly, can be cached for one year. HTML and files copied from `public/` revalidate on each use so metadata, icons, and crawler files update after deployment. Shared designs use query parameters or URL fragments on `/`; fragment artwork stays in the browser and is not sent to the server. There is no catch-all rewrite, so missing assets and unknown paths return a real 404.
 
 The app includes canonical, Open Graph, Twitter card, and structured metadata; a 1200 × 630 social image at `/og-image.png`; `/robots.txt` and `/sitemap.xml`; and `/site.webmanifest` with standard and maskable app icons. A standalone `/404.html` provides a route back to the designer, and the main page has a readable JavaScript-disabled fallback. The manifest supports an installed app window; it does not add offline caching.
 

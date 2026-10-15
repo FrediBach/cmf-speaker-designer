@@ -38,6 +38,7 @@ function snapshot(design: Design): Design {
     grille: { ...design.grille },
     halo: { ...design.halo },
     raceStripes: { ...design.raceStripes },
+    multicolor: structuredClone(design.multicolor),
     knob: { ...design.knob },
   }
 }
@@ -95,6 +96,7 @@ function designsEqual(left: Design, right: Design) {
     settingsEqual(left.grille, right.grille) &&
     settingsEqual(left.halo, right.halo) &&
     settingsEqual(left.raceStripes, right.raceStripes) &&
+    JSON.stringify(left.multicolor) === JSON.stringify(right.multicolor) &&
     settingsEqual(left.knob, right.knob)
   )
 }
