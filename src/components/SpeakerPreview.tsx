@@ -259,20 +259,21 @@ function SpeakerBody({
       >
         <SpeakerRearDetails bodyColor={bodyColor} />
       </group>
-      {[-1, 1].map((side) => (
-        <group
-          key={side}
-          position={[side * (width / 2 - 0.85), -13, -depth / 2 - 1]}
-          rotation={[0, (side * Math.PI) / 2, 0]}
-        >
-          <mesh geometry={radiatorRim}>
-            <meshStandardMaterial color="#141719" roughness={0.85} />
-          </mesh>
-          <mesh geometry={radiatorFace} position={[0, 0, 0.45]}>
-            <meshStandardMaterial color={colors.radiator} roughness={0.78} />
-          </mesh>
-        </group>
-      ))}
+      {model === 's' &&
+        [-1, 1].map((side) => (
+          <group
+            key={side}
+            position={[side * (width / 2 - 0.85), -13, -depth / 2 - 1]}
+            rotation={[0, (side * Math.PI) / 2, 0]}
+          >
+            <mesh geometry={radiatorRim}>
+              <meshStandardMaterial color="#141719" roughness={0.85} />
+            </mesh>
+            <mesh geometry={radiatorFace} position={[0, 0, 0.45]}>
+              <meshStandardMaterial color={colors.radiator} roughness={0.78} />
+            </mesh>
+          </group>
+        ))}
       {[-1, 1].map((side) => (
         <RoundedBox
           key={side}
