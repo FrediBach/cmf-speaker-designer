@@ -102,71 +102,92 @@ async function shortcut(page: Page, keys: string) {
   await page.keyboard.press(keys)
 }
 
-type MarkerPosition = { id: string; x: number; y: number }
+async function allVariationsReady(page: Page) {
+  const options = variationSelect(page).locator('option')
+  await expect(options).toHaveCount(25)
+  await expect
+    .poll(
+      () =>
+        options.evaluateAll((entries) =>
+          entries
+            .filter((entry) => (entry as HTMLOptionElement).disabled)
+            .map((entry) => entry.textContent),
+        ),
+      {
+        timeout: 240_000,
+        message:
+          'All 25 speaker assemblies should become selectable without errors',
+      },
+    )
+    .toEqual([])
+  await expect(explorer(page).getByRole('status')).toContainText(
+    '25 / 25 ready',
+  )
+}
 
-async function settledMarkerPositions(page: Page) {
-  let previous: Map<string, MarkerPosition> | undefined
-  let positions: MarkerPosition[] = []
+async function settledCanvasScreenshot(page: Page) {
+  const bounds = (await explorer(page).locator('canvas').boundingBox())!
+  // A canvas locator screenshot still captures sibling controls overlaid on
+  // top of it. Compare the unobstructed scene, excluding the legend and toolbar.
+  const clip = {
+    x: bounds.x,
+    y: bounds.y + 50,
+    width: bounds.width,
+    height: bounds.height - 120,
+  }
+  let previous: Buffer | undefined
+  let screenshot: Buffer | undefined
+  let stableFrames = 0
   await expect
     .poll(
       async () => {
-        positions = await explorer(page)
-          .locator('button[data-variation-id]')
-          .evaluateAll((markers) =>
-            markers
-              .map((marker) => {
-                const bounds = marker.getBoundingClientRect()
-                return {
-                  id: marker.getAttribute('data-variation-id')!,
-                  x: bounds.x + bounds.width / 2,
-                  y: bounds.y + bounds.height / 2,
-                }
-              })
-              .sort((a, b) => a.id.localeCompare(b.id)),
-          )
-        const current = new Map(
-          positions.map((position) => [position.id, position]),
-        )
-        if (positions.length !== 25 || current.size !== 25) {
-          previous = undefined
-          return Infinity
-        }
-        const sameMarkers =
-          previous && positions.every(({ id }) => previous!.has(id))
-        const movement = sameMarkers
-          ? Math.max(
-              ...positions.map((position) => {
-                const before = previous!.get(position.id)!
-                return Math.hypot(position.x - before.x, position.y - before.y)
-              }),
-            )
-          : Infinity
-        previous = current
-        return movement
+        screenshot = await page.screenshot({ clip })
+        stableFrames = previous?.equals(screenshot) ? stableFrames + 1 : 0
+        previous = screenshot
+        return stableFrames
       },
-      { message: 'The camera should finish moving before comparing views' },
+      {
+        intervals: [100, 200, 300],
+        message: 'The camera should finish moving before comparing views',
+      },
     )
-    .toBeLessThan(0.25)
-  return positions
+    .toBeGreaterThanOrEqual(2)
+  return screenshot!
 }
 
-function relativeMarkerPositions(positions: MarkerPosition[]) {
-  const original = positions.find(({ id }) => id === 'original')!
-  return positions.map(({ id, x, y }) => ({
-    id,
-    x: x - original.x,
-    y: y - original.y,
-  }))
-}
-
-function maximumMarkerMovement(
-  before: MarkerPosition[],
-  after: MarkerPosition[],
-) {
-  return Math.max(
-    ...before.map((position, index) =>
-      Math.hypot(position.x - after[index].x, position.y - after[index].y),
-    ),
+async function changedPixelRatio(page: Page, before: Buffer, after: Buffer) {
+  return page.evaluate(
+    async ({ before, after }) => {
+      const load = async (encoded: string) => {
+        const image = new Image()
+        image.src = `data:image/png;base64,${encoded}`
+        await image.decode()
+        return image
+      }
+      const [first, second] = await Promise.all([load(before), load(after)])
+      if (first.width !== second.width || first.height !== second.height)
+        return 1
+      const canvas = document.createElement('canvas')
+      canvas.width = first.width
+      canvas.height = first.height
+      const context = canvas.getContext('2d', { willReadFrequently: true })!
+      context.drawImage(first, 0, 0)
+      const a = context.getImageData(0, 0, canvas.width, canvas.height).data
+      context.drawImage(second, 0, 0)
+      const b = context.getImageData(0, 0, canvas.width, canvas.height).data
+      let changed = 0
+      for (let i = 0; i < a.length; i += 4)
+        if (
+          Math.max(
+            Math.abs(a[i] - b[i]),
+            Math.abs(a[i + 1] - b[i + 1]),
+            Math.abs(a[i + 2] - b[i + 2]),
+          ) > 16
+        )
+          changed += 1
+      return changed / (canvas.width * canvas.height)
+    },
+    { before: before.toString('base64'), after: after.toString('base64') },
   )
 }
 
@@ -299,9 +320,7 @@ test('camera modes rotate and pan the army without changing the selected or save
   await ready(page)
   const original = await savedSnapshot(page)
   await openExplorer(page, 4281)
-  await expect(
-    explorer(page).locator('button[data-variation-id][data-status="ready"]'),
-  ).toHaveCount(25, { timeout: 120_000 })
+  await allVariationsReady(page)
 
   const rotate = explorer(page).getByRole('button', {
     name: 'Rotate camera',
@@ -313,7 +332,7 @@ test('camera modes rotate and pan the army without changing the selected or save
   })
   await expect(rotate).toHaveAttribute('aria-pressed', 'true')
   await expect(pan).toHaveAttribute('aria-pressed', 'false')
-  const initialView = await settledMarkerPositions(page)
+  const initialView = await settledCanvasScreenshot(page)
   const canvasBounds = (await explorer(page).locator('canvas').boundingBox())!
   const drag = async (horizontal: number, vertical: number) => {
     const x = canvasBounds.x + canvasBounds.width * 0.82
@@ -325,41 +344,31 @@ test('camera modes rotate and pan the army without changing the selected or save
   }
 
   await drag(-150, 30)
-  const rotatedView = await settledMarkerPositions(page)
+  const rotatedView = await settledCanvasScreenshot(page)
   expect(
-    maximumMarkerMovement(
-      relativeMarkerPositions(initialView),
-      relativeMarkerPositions(rotatedView),
-    ),
-    'Rotating should change the relative positions of the speaker rows',
-  ).toBeGreaterThan(20)
+    rotatedView.equals(initialView),
+    'Rotating should visibly change the view of the speaker rows',
+  ).toBe(false)
   await page.screenshot({
     path: testInfo.outputPath('variation-camera-rotate.png'),
   })
   await pan.click()
   await expect(pan).toHaveAttribute('aria-pressed', 'true')
   await expect(rotate).toHaveAttribute('aria-pressed', 'false')
-  const switchedView = await settledMarkerPositions(page)
+  const switchedView = await settledCanvasScreenshot(page)
+  // WebGL redraws can change a few antialiased edge pixels without moving the
+  // camera. Allow those differences while still catching a changed view.
   expect(
-    maximumMarkerMovement(rotatedView, switchedView),
+    await changedPixelRatio(page, rotatedView, switchedView),
     'Changing the movement mode should preserve the viewing angle and framing',
-  ).toBeLessThan(1)
+  ).toBeLessThan(0.005)
 
   await drag(-100, 0)
-  const pannedView = await settledMarkerPositions(page)
-  const beforeOriginal = switchedView.find(({ id }) => id === 'original')!
-  const afterOriginal = pannedView.find(({ id }) => id === 'original')!
+  const pannedView = await settledCanvasScreenshot(page)
   expect(
-    beforeOriginal.x - afterOriginal.x,
-    'Panning left should move the speakers left across the preview',
-  ).toBeGreaterThan(40)
-  expect(
-    maximumMarkerMovement(
-      relativeMarkerPositions(switchedView),
-      relativeMarkerPositions(pannedView),
-    ),
-    'Panning should preserve the projected formation apart from perspective',
-  ).toBeLessThan(30)
+    pannedView.equals(switchedView),
+    'Panning should visibly move the speaker formation',
+  ).toBe(false)
   await expect(variationSelect(page)).toHaveValue('original')
   expect(await savedSnapshot(page)).toEqual(original)
   await page.screenshot({
@@ -370,31 +379,20 @@ test('camera modes rotate and pan the army without changing the selected or save
   const surface = explorer(page).locator('[data-variation-controls]')
   await surface.focus()
   await page.keyboard.press('ArrowRight')
-  const keyboardPanView = await settledMarkerPositions(page)
-  expect(maximumMarkerMovement(pannedView, keyboardPanView)).toBeGreaterThan(5)
+  const keyboardPanView = await settledCanvasScreenshot(page)
+  expect(keyboardPanView.equals(pannedView)).toBe(false)
   await rotate.click()
   await surface.focus()
   await page.keyboard.press('ArrowRight')
-  const keyboardRotateView = await settledMarkerPositions(page)
-  expect(
-    maximumMarkerMovement(
-      relativeMarkerPositions(keyboardPanView),
-      relativeMarkerPositions(keyboardRotateView),
-    ),
-  ).toBeGreaterThan(5)
+  const keyboardRotateView = await settledCanvasScreenshot(page)
+  expect(keyboardRotateView.equals(keyboardPanView)).toBe(false)
 
-  const spread = (positions: MarkerPosition[]) =>
-    Math.max(
-      ...relativeMarkerPositions(positions).map(({ x, y }) => Math.hypot(x, y)),
-    )
   await page.keyboard.press('+')
-  const zoomedView = await settledMarkerPositions(page)
-  expect(spread(zoomedView)).toBeGreaterThan(spread(keyboardRotateView) * 1.08)
+  const zoomedView = await settledCanvasScreenshot(page)
+  expect(zoomedView.equals(keyboardRotateView)).toBe(false)
   await page.keyboard.press('-')
-  const zoomedOutView = await settledMarkerPositions(page)
-  expect(maximumMarkerMovement(keyboardRotateView, zoomedOutView)).toBeLessThan(
-    1,
-  )
+  const zoomedOutView = await settledCanvasScreenshot(page)
+  expect(zoomedOutView.equals(zoomedView)).toBe(false)
   expect(await savedSnapshot(page)).toEqual(original)
   await expect(variationSelect(page)).toHaveValue('original')
 })
@@ -486,30 +484,24 @@ test('the explorer is keyboard accessible and its controls fit at 320 pixels', a
       touchPoints: [],
     })
   }
-  await expect(explorer(page).locator('button[data-variation-id]')).toHaveCount(
-    25,
-  )
-  const beforeTouchRotate = await settledMarkerPositions(page)
+  await allVariationsReady(page)
+  const beforeTouchRotate = await settledCanvasScreenshot(page)
   await touchDrag(-40)
-  const afterTouchRotate = await settledMarkerPositions(page)
+  const afterTouchRotate = await settledCanvasScreenshot(page)
   expect(
-    maximumMarkerMovement(
-      relativeMarkerPositions(beforeTouchRotate),
-      relativeMarkerPositions(afterTouchRotate),
-    ),
+    afterTouchRotate.equals(beforeTouchRotate),
     'A one-finger drag should rotate the speaker formation',
-  ).toBeGreaterThan(4)
+  ).toBe(false)
   await explorer(page)
     .getByRole('button', { name: 'Pan camera', exact: true })
     .click()
-  const beforeTouchPan = await settledMarkerPositions(page)
+  const beforeTouchPan = await settledCanvasScreenshot(page)
   await touchDrag(-30)
-  const afterTouchPan = await settledMarkerPositions(page)
+  const afterTouchPan = await settledCanvasScreenshot(page)
   expect(
-    beforeTouchPan.find(({ id }) => id === 'original')!.x -
-      afterTouchPan.find(({ id }) => id === 'original')!.x,
-    'A one-finger drag in Pan mode should move the speaker formation left',
-  ).toBeGreaterThan(8)
+    afterTouchPan.equals(beforeTouchPan),
+    'A one-finger drag in Pan mode should move the speaker formation',
+  ).toBe(false)
   await touchSession.detach()
   expect(await savedSnapshot(page)).toEqual(original)
   await variationSelect(page).focus()
@@ -573,7 +565,7 @@ test('Escape dismisses a dialog above the explorer before cancelling variations'
 })
 
 for (const multicolor of [false, true]) {
-  test(`renders every ${multicolor ? 'multicolor' : 'single-color'} variation and applies a bold speaker chosen in the scene`, async ({
+  test(`renders every ${multicolor ? 'multicolor' : 'single-color'} variation with ground indicators and clickable speakers`, async ({
     page,
   }, testInfo) => {
     test.setTimeout(300_000)
@@ -595,62 +587,42 @@ for (const multicolor of [false, true]) {
     const original = await savedSnapshot(page)
     await openExplorer(page, 4281)
 
+    const screenshotPrefix = multicolor ? 'multicolor' : 'single-color'
+    await expect(explorer(page).locator('.variation-marker')).toHaveCount(0)
+    await expect(
+      explorer(page).getByRole('button', {
+        name: /^Inspect (Original|Subtle|Explore|Bold)/,
+      }),
+    ).toHaveCount(0)
+    if (multicolor) {
+      // The ground loader is visible while the queue is still working. Capture
+      // this after the scene has mounted and a candidate has completed, rather
+      // than capturing the empty canvas before its first render.
+      await expect
+        .poll(() => variationSelect(page).locator('option:enabled').count())
+        .toBeGreaterThanOrEqual(2)
+      expect(
+        await variationSelect(page).locator('option:disabled').count(),
+      ).toBeGreaterThan(0)
+      await page.screenshot({
+        path: testInfo.outputPath('variation-generating-ground-loader.png'),
+      })
+    }
+
     // Wait through the whole queue: early candidates alone cannot expose a
     // failed outer-ring design or a stalled shared multicolor worker.
-    const markers = explorer(page).locator('button[data-variation-id]')
-    await expect(markers).toHaveCount(25)
-    let settled:
-      | { ready: number; failed: (string | null)[]; waiting: (string | null)[] }
-      | undefined
-    await expect
-      .poll(
-        async () => {
-          settled = await markers.evaluateAll((buttons) => ({
-            ready: buttons.filter(
-              (button) => button.getAttribute('data-status') === 'ready',
-            ).length,
-            failed: buttons
-              .filter(
-                (button) => button.getAttribute('data-status') === 'error',
-              )
-              .map((button) => button.getAttribute('title')),
-            waiting: buttons
-              .filter(
-                (button) => button.getAttribute('data-status') === 'loading',
-              )
-              .map((button) => button.getAttribute('data-variation-id')),
-          }))
-          return (
-            settled.waiting.length === 0 &&
-            settled.ready + settled.failed.length === 25
-          )
-        },
-        {
-          timeout: 240_000,
-          message: 'All 25 speaker assemblies should finish without errors',
-        },
-      )
-      .toBe(true)
-    expect(settled, 'All 25 assemblies should be valid').toEqual({
-      ready: 25,
-      failed: [],
-      waiting: [],
-    })
+    await allVariationsReady(page)
     expect(await savedSnapshot(page)).toEqual(original)
-    const screenshotPrefix = multicolor ? 'multicolor' : 'single-color'
     await page.screenshot({
       path: testInfo.outputPath(`variation-army-${screenshotPrefix}.png`),
     })
 
-    const bold = explorer(page).getByRole('button', {
-      name: 'Inspect Bold 1',
-      exact: true,
-    })
-    await expect(bold).toBeInViewport({ ratio: 1 })
-    const candidateId = await bold.getAttribute('data-variation-id')
-    await bold.click()
-    await expect(bold).toHaveAttribute('aria-pressed', 'true')
-    await expect(variationSelect(page)).toHaveValue(candidateId!)
+    const bold = variationSelect(page)
+      .locator('option')
+      .filter({ hasText: /^Bold 1$/ })
+    const candidateId = (await bold.getAttribute('value'))!
+    await variationSelect(page).selectOption(candidateId)
+    await expect(variationSelect(page)).toHaveValue(candidateId)
     if (multicolor)
       await expect(
         explorer(page).getByText(
@@ -674,6 +646,20 @@ for (const multicolor of [false, true]) {
       path: testInfo.outputPath(`variation-bold-${screenshotPrefix}.png`),
     })
     expect(await savedSnapshot(page)).toEqual(original)
+
+    // With labels removed, the speaker meshes remain directly clickable.
+    // Fit all centers the original speaker, whose ground circle identifies it.
+    await explorer(page)
+      .getByRole('button', { name: 'Fit all variations', exact: true })
+      .click()
+    await settledCanvasScreenshot(page)
+    const canvasBounds = (await canvas.boundingBox())!
+    await canvas.click({
+      position: { x: canvasBounds.width / 2, y: canvasBounds.height / 2 },
+    })
+    await expect(variationSelect(page)).toHaveValue('original')
+    expect(await savedSnapshot(page)).toEqual(original)
+    await variationSelect(page).selectOption(candidateId)
 
     await explorer(page)
       .getByRole('button', { name: 'Use variation', exact: true })

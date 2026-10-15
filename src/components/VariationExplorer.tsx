@@ -7,10 +7,9 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
+import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import {
   Environment,
-  Html,
   Lightformer,
   Line,
   OrbitControls,
@@ -20,6 +19,7 @@ import {
   DataTexture,
   LinearFilter,
   MOUSE,
+  Mesh,
   PerspectiveCamera,
   RGBAFormat,
   Spherical,
@@ -114,7 +114,7 @@ export function VariationExplorer(props: Props) {
       data-variation-controls
       tabIndex={0}
       aria-label="Interactive speaker variations"
-      aria-description={`Drag with a mouse or one finger to ${props.cameraMode}, scroll or pinch to zoom, and right-drag to ${props.cameraMode === 'rotate' ? 'pan' : 'rotate'}. Arrow keys ${props.cameraMode}, plus and minus zoom. Select a numbered speaker to inspect it, then use the Use variation button to apply it.`}
+      aria-description={`Drag with a mouse or one finger to ${props.cameraMode}, scroll or pinch to zoom, and right-drag to ${props.cameraMode === 'rotate' ? 'pan' : 'rotate'}. Arrow keys ${props.cameraMode}, plus and minus zoom. A circle on the ground marks the original. Click a speaker or use Inspect variation to inspect it, then use the Use variation button to apply it.`}
       style={{
         position: 'relative',
         height: '100%',
@@ -239,35 +239,23 @@ function VariationScene({
       {original && (
         <Candidate
           variation={original}
-          index={0}
           meshes={originalMeshes}
           status={originalStatus}
           selected={selectedId === original.id}
           onInspect={onInspect}
         />
       )}
-      {candidates.map((variation, index) =>
-        index < admitted ? (
-          <GeneratedCandidate
-            key={variation.id}
-            variation={variation}
-            index={index + 1}
-            selected={selectedId === variation.id}
-            onInspect={onInspect}
-            onStatus={reportStatus}
-            onFallback={onCandidateFallback}
-          />
-        ) : (
-          <Candidate
-            key={variation.id}
-            variation={variation}
-            index={index + 1}
-            status="loading"
-            selected={false}
-            onInspect={onInspect}
-          />
-        ),
-      )}
+      {candidates.slice(0, admitted).map((variation, index) => (
+        <GeneratedCandidate
+          key={variation.id}
+          variation={variation}
+          generating={index === admitted - 1}
+          selected={selectedId === variation.id}
+          onInspect={onInspect}
+          onStatus={reportStatus}
+          onFallback={onCandidateFallback}
+        />
+      ))}
       <ExplorerCamera
         bounds={bounds}
         selected={selected}
@@ -339,7 +327,7 @@ function GeneratedCandidate({
   ...props
 }: {
   variation: DesignVariation
-  index: number
+  generating: boolean
   selected: boolean
   onInspect: (id: string) => void
   onStatus: (id: string, status: VariationStatus) => void
@@ -372,14 +360,14 @@ function GeneratedCandidate({
 
 function Candidate({
   variation,
-  index,
+  generating = false,
   selected,
   status,
   meshes,
   onInspect,
 }: {
   variation: DesignVariation
-  index: number
+  generating?: boolean
   selected: boolean
   status: VariationStatus
   meshes?: DesignMeshes
@@ -388,11 +376,6 @@ function Candidate({
   const { design } = variation
   const height = design.model === 's' ? 130.97 : 224.97
   const ready = status === 'ready' && meshes?.geometry
-  const failureMessage =
-    meshes?.error ||
-    meshes?.knobError ||
-    meshes?.powerButtonError ||
-    meshes?.multicolorError
   const inspect = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation()
     if (ready && event.delta < 5) onInspect(variation.id)
@@ -401,7 +384,8 @@ function Candidate({
   const left = Math.min(-55, panelBounds?.min.x ?? -55) - 12
   const right = Math.max(55, panelBounds?.max.x ?? 55) + 12
   const floorY = -height / 2 - 1.65
-  const markerText = index === 0 ? 'Original' : String(index).padStart(2, '0')
+  const original = variation.ring === 0
+  const originalRadius = Math.max(Math.abs(left), right, 68) + 8
   return (
     <group position={variation.position}>
       <group onClick={inspect}>
@@ -424,19 +408,34 @@ function Candidate({
             powerButtonColor={design.powerButtonColor}
             powerButtonGeometry={meshes.powerButtonGeometry}
           />
-        ) : (
+        ) : status === 'error' ? (
           <mesh position={[0, 0, -30]}>
             <boxGeometry args={[85, height, 58]} />
             <meshBasicMaterial
-              color={status === 'error' ? '#b67767' : '#a7a29a'}
+              color="#b67767"
               wireframe
               transparent
               opacity={0.2}
             />
           </mesh>
-        )}
+        ) : null}
       </group>
-      {selected && (
+      {original && (
+        <mesh position={[0, floorY + 0.5, -26]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry
+            args={[originalRadius - 1.5, originalRadius + 1.5, 96]}
+          />
+          <meshBasicMaterial
+            color="#e85f2a"
+            transparent
+            opacity={0.9}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      )}
+      {generating && status === 'loading' && <GroundLoader floorY={floorY} />}
+      {selected && !original && (
         <Line
           points={[
             [left, floorY + 0.4, -92],
@@ -451,30 +450,52 @@ function Candidate({
           opacity={0.8}
         />
       )}
-      <Html position={[0, floorY + 2, 70]} center zIndexRange={[15, 0]}>
-        <button
-          type="button"
-          className={`variation-marker${selected ? ' is-selected' : ''}${index === 0 ? ' is-original' : ''}`}
-          data-variation-id={variation.id}
-          data-status={status}
-          aria-label={`Inspect ${variation.label}${status === 'loading' ? ' (building)' : status === 'error' ? ' (unavailable)' : ''}`}
-          aria-pressed={selected}
-          disabled={!ready}
-          title={`${variation.label}${status === 'loading' ? ' · Building geometry' : status === 'error' ? ` · ${failureMessage || 'Could not generate'}` : ''}`}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation()
-            if (ready) onInspect(variation.id)
-          }}
-        >
-          <span className="variation-marker-label">{markerText}</span>
-          {status !== 'ready' && (
-            <span className="variation-marker-status" aria-hidden="true">
-              {status === 'error' ? '!' : '·'}
-            </span>
-          )}
-        </button>
-      </Html>
+    </group>
+  )
+}
+
+function GroundLoader({ floorY }: { floorY: number }) {
+  const arc = useRef<Mesh>(null)
+  const invalidate = useThree((state) => state.invalidate)
+  const [reducedMotion, setReducedMotion] = useState(
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  )
+  useEffect(() => {
+    const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const update = () => {
+      setReducedMotion(preference.matches)
+      invalidate()
+    }
+    preference.addEventListener('change', update)
+    invalidate()
+    return () => preference.removeEventListener('change', update)
+  }, [invalidate])
+  useFrame((_, delta) => {
+    if (reducedMotion || !arc.current) return
+    arc.current.rotation.z -= Math.min(delta, 0.1) * 3
+    // Keep the demand-driven canvas moving only while a candidate is building.
+    invalidate()
+  })
+  return (
+    <group position={[0, floorY + 0.6, -28]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh>
+        <ringGeometry args={[29, 32, 64]} />
+        <meshBasicMaterial
+          color="#e85f2a"
+          transparent
+          opacity={0.18}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+      <mesh ref={arc} position={[0, 0, 0.1]}>
+        <ringGeometry args={[29, 32, 48, 1, 0, Math.PI * 1.4]} />
+        <meshBasicMaterial
+          color="#e85f2a"
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
     </group>
   )
 }
@@ -508,7 +529,7 @@ function ExplorerCamera({
     const point = new Vector3()
     let distance = 1
     // Fit every corner in the elevated camera's frame, including the rows'
-    // depth and the labels in front of their feet.
+    // depth and their ground indicators.
     for (const x of [bounds.min.x, bounds.max.x]) {
       for (const y of [bounds.min.y, bounds.max.y]) {
         for (const z of [bounds.min.z, bounds.max.z]) {
