@@ -6,6 +6,7 @@ import {
   type TestInfo,
 } from '@playwright/test'
 import { inspectBinaryStl } from './stl'
+import { revealSpeakerControls } from './controls'
 
 const test = base.extend<{ appErrors: string[] }>({
   appErrors: [
@@ -279,6 +280,7 @@ test('generates a cut halo, retains shared settings, and exports it with a grill
   expect(raised.mesh.rayZ(0, -23)).toEqual([])
   await screenshotHaloCloseup(page, testInfo, 'raised-halo-rim-closeup.png')
 
+  await revealSpeakerControls(page)
   await page.getByRole('button', { name: /^Speaker M/ }).click()
   const twinHoods = await downloadPanel(
     page,
@@ -351,6 +353,7 @@ test('generates a cut halo, retains shared settings, and exports it with a grill
     fullPage: true,
   })
 
+  await revealSpeakerControls(page)
   await page.getByRole('button', { name: /^Speaker S/ }).click()
   await page
     .getByRole('spinbutton', { name: 'Cut rotation in degrees', exact: true })

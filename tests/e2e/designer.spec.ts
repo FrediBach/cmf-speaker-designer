@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { test as base, expect, type Page } from '@playwright/test'
 import { inspectBinaryStl } from './stl'
+import { revealSpeakerControls } from './controls'
 
 const test = base.extend<{ appErrors: string[] }>({
   appErrors: [
@@ -308,6 +309,7 @@ test('renders WebGL and switches parametric panel modes, colors, and preview mod
     { model: 'M', height: '225' },
   ]
   for (const variant of variants) {
+    await revealSpeakerControls(page)
     const modelButton = page.getByRole('button', {
       name: new RegExp(`^Speaker ${variant.model}`),
     })
@@ -359,6 +361,7 @@ test('renders WebGL and switches parametric panel modes, colors, and preview mod
   await page.screenshot({
     path: testInfo.outputPath('gray-body-speaker-m.png'),
   })
+  await revealSpeakerControls(page)
   await blackBody.click()
   await expect(blackBody).toHaveAttribute('aria-pressed', 'true')
   expect((await stablePreviewFrame(page)).equals(graySpeakerM)).toBe(false)

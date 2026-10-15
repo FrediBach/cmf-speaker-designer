@@ -618,6 +618,87 @@ main {
 .model-section h3 > span {
   display: none;
 }
+.speaker-settings {
+  flex-shrink: 0;
+}
+.speaker-summary-row,
+.speaker-controls-row {
+  display: grid;
+  transition:
+    grid-template-rows 280ms cubic-bezier(0.2, 0, 0, 1),
+    opacity 200ms ease;
+}
+.speaker-summary-row,
+.speaker-settings[data-collapsed='true'] .speaker-controls-row {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+.speaker-controls-row,
+.speaker-settings[data-collapsed='true'] .speaker-summary-row {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.speaker-settings-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.speaker-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 72px;
+  padding: 12px 20px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.speaker-summary:hover {
+  background: var(--surface-hover);
+}
+.speaker-summary:focus-visible {
+  outline-offset: -4px;
+}
+.speaker-summary > svg {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+.speaker-summary > svg:first-child {
+  width: 24px;
+  height: 34px;
+}
+.speaker-summary-metadata {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 5px;
+}
+.speaker-summary-model,
+.speaker-summary-colors {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.speaker-summary-model strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.speaker-summary-model > span {
+  font: 10px var(--mono);
+  color: var(--muted-foreground);
+}
+.speaker-summary-colors > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.speaker-summary-colors .body-color-swatch {
+  width: 11px;
+  height: 11px;
+}
 .model-options {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -779,6 +860,7 @@ main {
   scrollbar-color: var(--control-border) transparent;
   scrollbar-gutter: stable;
   scroll-padding: 16px;
+  overflow-anchor: none;
 }
 .controls-scroll:focus-visible {
   outline-offset: -4px;
@@ -2248,6 +2330,10 @@ main {
   }
   .model-section h3 {
     display: none;
+  }
+  .speaker-summary {
+    min-height: 64px;
+    padding: 8px 16px;
   }
   .speaker-color-controls {
     margin-top: 6px;

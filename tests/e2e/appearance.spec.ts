@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { revealSpeakerControls } from './controls'
 
 const appearanceKey = 'cmf-speaker-appearance-v1'
 
@@ -137,6 +138,7 @@ test('all appearance combinations remain readable and preserve the speaker desig
   for (const theme of ['Light', 'Dark'] as const) {
     for (const accent of ['Orange', 'Turquoise'] as const) {
       await chooseAppearance(page, theme, accent)
+      await revealSpeakerControls(page)
       await expect(model).toHaveAttribute('aria-pressed', 'true')
       await expect(panelColor).toHaveAttribute('aria-pressed', 'true')
       await expectWorkspaceInViewport(page)

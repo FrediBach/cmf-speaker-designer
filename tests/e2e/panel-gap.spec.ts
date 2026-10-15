@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { expect, test, type Page, type TestInfo } from '@playwright/test'
 import { STORAGE_KEY } from '../../src/lib/design'
 import { inspectBinaryStl } from './stl'
+import { revealSpeakerControls } from './controls'
 
 async function expectReady(page: Page) {
   await expect(
@@ -192,6 +193,7 @@ test('spaces panels by up to 0.5 cm, preserves saved history, and exports connec
   expectPhysicalGap(smallOriginal, smallSpaced, 's')
   await screenshotGap(page, testInfo)
 
+  await revealSpeakerControls(page)
   await page.getByRole('button', { name: /^Speaker M/ }).click()
   await expect(slider).toHaveAttribute('aria-valuenow', '0.5')
   const mediumSpaced = await downloadPanel(page, testInfo, 'm', 5)
@@ -203,6 +205,7 @@ test('spaces panels by up to 0.5 cm, preserves saved history, and exports connec
   await page.getByRole('button', { name: 'Reset', exact: true }).click()
   await expect(slider).toHaveAttribute('aria-valuenow', '0')
   await expect.poll(() => storedGap(page)).toBe(0)
+  await revealSpeakerControls(page)
   await expect(
     page.getByRole('button', { name: /^Speaker M/ }),
   ).toHaveAttribute('aria-pressed', 'true')

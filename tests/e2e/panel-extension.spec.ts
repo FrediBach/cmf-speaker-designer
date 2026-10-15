@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { expect, test, type Page, type TestInfo } from '@playwright/test'
 import { STORAGE_KEY } from '../../src/lib/design'
 import { inspectBinaryStl } from './stl'
+import { revealSpeakerControls } from './controls'
 
 async function expectReady(page: Page) {
   await expect(
@@ -174,6 +175,7 @@ test('extends each panel side by up to 1 cm, keeps history and persistence, and 
     fullPage: true,
   })
 
+  await revealSpeakerControls(page)
   await page.getByRole('button', { name: /^Speaker M/ }).click()
   await expect(slider).toHaveAttribute('aria-valuenow', '1')
   const mediumExtended = await downloadPanel(page, testInfo, 'm', 10)
@@ -188,6 +190,7 @@ test('extends each panel side by up to 1 cm, keeps history and persistence, and 
   await page.getByRole('button', { name: 'Reset', exact: true }).click()
   await expect(slider).toHaveAttribute('aria-valuenow', '0')
   await expect.poll(() => storedExtension(page)).toBe(0)
+  await revealSpeakerControls(page)
   await expect(
     page.getByRole('button', { name: /^Speaker M/ }),
   ).toHaveAttribute('aria-pressed', 'true')
@@ -215,6 +218,7 @@ test('keeps the angled controls extended while custom handles retain their selec
   })
 
   for (const model of ['s', 'm'] as const) {
+    await revealSpeakerControls(page)
     await page
       .getByRole('button', {
         name: new RegExp(`^Speaker ${model.toUpperCase()}`),

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { STORAGE_KEY, validateDesign, type Design } from '../../src/lib/design'
+import { revealSpeakerControls } from './controls'
 
 async function storedDesign(page: Page): Promise<Design> {
   return page.evaluate(
@@ -139,6 +140,7 @@ test('undoes and redoes a complete randomization with Mac and Windows shortcuts'
     await workspaceShortcut(page, redo)
     await expectDesign(page, after)
   }
+  await revealSpeakerControls(page)
   await expect(
     page.getByRole('button', { name: /^Speaker M/ }),
   ).toHaveAttribute('aria-pressed', 'true')
