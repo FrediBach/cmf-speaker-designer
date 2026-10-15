@@ -25,6 +25,7 @@ const [template, photo, dmSans, spaceMono, favicon] = await Promise.all([
 const card = template
   .toString()
   .replaceAll('{{SPEAKERS_IMAGE}}', dataURL('image/png', photo))
+  .replaceAll('{{BRAND_ICON}}', dataURL('image/svg+xml', favicon))
   .replaceAll('{{DM_SANS_FONT}}', dataURL('font/woff2', dmSans))
   .replaceAll('{{MONO_FONT}}', dataURL('font/woff2', spaceMono))
 
@@ -62,7 +63,7 @@ try {
         canvas.width = canvas.height = size
         const context = canvas.getContext('2d')
         if (opaque || maskable) {
-          context.fillStyle = '#f45427'
+          context.fillStyle = '#fff'
           context.fillRect(0, 0, size, size)
         }
         const inset = maskable ? size / 8 : 0

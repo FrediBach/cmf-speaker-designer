@@ -204,9 +204,16 @@ function App() {
       </a>
       <header className="site-header">
         <a className="brand" href="#" aria-label="CMF Speaker designer home">
+          <img
+            className="brand-icon"
+            src="/favicon.svg"
+            width="44"
+            height="44"
+            alt=""
+            aria-hidden="true"
+          />
           <h1 className="brand-title" id="page-title">
             <span className="brand-product">CMF Speaker</span>{' '}
-            <span className="brand-divider" aria-hidden="true" />
             <span className="brand-descriptor">designer</span>
           </h1>
         </a>
