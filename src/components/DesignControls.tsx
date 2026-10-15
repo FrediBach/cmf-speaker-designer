@@ -1,4 +1,4 @@
-import { useRef, useState, type MouseEventHandler } from 'react'
+import { useRef, useState, type RefObject, type MouseEventHandler } from 'react'
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -70,9 +70,6 @@ export function DesignControls({
   const speakerControlsRef = useRef<HTMLDivElement>(null)
   const selectedModelRef = useRef<HTMLButtonElement>(null)
   const revealingScrollRef = useRef<HTMLDivElement | null>(null)
-  const speakerDimensions = design.model === 's' ? '85 × 131 mm' : '85 × 225 mm'
-  const bodyLabel = BODY_COLORS[design.bodyColor].label
-  const grilleLabel = BODY_GRILLE_COLORS[design.bodyGrilleColor].label
 
   function finishRevealScroll() {
     revealingScrollRef.current = null
@@ -94,18 +91,6 @@ export function DesignControls({
     )
   }
 
-  const {
-    geometry,
-    knobGeometry,
-    powerButtonGeometry,
-    error,
-    knobError,
-    powerButtonError,
-    materialParts,
-    multicolorError,
-  } = meshes
-  const colorsReady = !design.multicolor.enabled || !!materialParts
-  const exportError = error || knobError || powerButtonError || multicolorError
   return (
     <aside
       className="controls"
@@ -137,209 +122,20 @@ export function DesignControls({
           </button>
         </div>
       </div>
-      <div className="speaker-settings" data-collapsed={speakerCollapsed}>
-        <div
-          className="speaker-summary-row"
-          inert={!speakerCollapsed}
-          aria-hidden={!speakerCollapsed}
-        >
-          <div className="speaker-settings-clip">
-            <button
-              type="button"
-              className="speaker-summary"
-              aria-label={`Edit speaker model and colors: Speaker ${design.model.toUpperCase()}, ${speakerDimensions}, ${bodyLabel} body, ${grilleLabel} grille`}
-              aria-expanded={!speakerCollapsed}
-              aria-controls="speaker-settings-controls"
-              title="Edit speaker model and colors"
-              onClick={revealSpeakerControls}
-            >
-              <PanelIcon model={design.model} />
-              <span className="speaker-summary-metadata">
-                <span className="speaker-summary-model">
-                  <strong>Speaker {design.model.toUpperCase()}</strong>
-                  <span>{speakerDimensions}</span>
-                </span>
-                <span className="speaker-summary-colors">
-                  <span>
-                    <span
-                      className="body-color-swatch"
-                      style={{
-                        background: BODY_COLORS[design.bodyColor].shell,
-                      }}
-                      aria-hidden="true"
-                    />
-                    {bodyLabel} body
-                  </span>
-                  <span>
-                    <span
-                      className="body-color-swatch"
-                      style={{
-                        background:
-                          BODY_GRILLE_COLORS[design.bodyGrilleColor].value,
-                      }}
-                      aria-hidden="true"
-                    />
-                    {grilleLabel} grille
-                  </span>
-                </span>
-              </span>
-              <ChevronUp size={16} aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-        <div
-          className="speaker-controls-row"
-          id="speaker-settings-controls"
-          ref={speakerControlsRef}
-          inert={speakerCollapsed}
-          aria-hidden={speakerCollapsed}
-        >
-          <div className="speaker-settings-clip">
-            <section className="control-section model-section">
-              <h3>
-                <span>01</span> Speaker model
-              </h3>
-              <div className="model-options">
-                {(['s', 'm'] as const).map((model) => (
-                  <button
-                    key={model}
-                    ref={design.model === model ? selectedModelRef : undefined}
-                    aria-pressed={design.model === model}
-                    className={`model-option ${design.model === model ? 'selected' : ''}`}
-                    onClick={() => update({ model })}
-                  >
-                    <PanelIcon model={model} />
-                    <span>
-                      Speaker {model.toUpperCase()}
-                      <small>
-                        {model === 's' ? '85 × 131 mm' : '85 × 225 mm'}
-                      </small>
-                    </span>
-                    <span className="radio-indicator">
-                      {design.model === model && <span />}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <div className="speaker-color-controls">
-                <div className="body-color-control">
-                  <span id="body-color-label">Speaker body</span>
-                  <div
-                    className="body-color-options"
-                    role="group"
-                    aria-labelledby="body-color-label"
-                  >
-                    {(['black', 'gray'] as const).map((bodyColor) => (
-                      <button
-                        key={bodyColor}
-                        type="button"
-                        aria-label={`Speaker body: ${BODY_COLORS[bodyColor].label}`}
-                        aria-pressed={design.bodyColor === bodyColor}
-                        title={
-                          bodyColor === 'gray'
-                            ? 'Gray body (white speaker)'
-                            : 'Black body'
-                        }
-                        onClick={() => update({ bodyColor })}
-                      >
-                        <span
-                          className="body-color-swatch"
-                          style={{ background: BODY_COLORS[bodyColor].shell }}
-                          aria-hidden="true"
-                        />
-                        {BODY_COLORS[bodyColor].label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="body-color-control">
-                  <span id="body-grille-color-label">Speaker grille</span>
-                  <div
-                    className="body-color-options body-grille-options"
-                    role="group"
-                    aria-labelledby="body-grille-color-label"
-                    aria-describedby="body-grille-color-help"
-                  >
-                    {(['black', 'orange', 'turquoise'] as const).map(
-                      (bodyGrilleColor) => (
-                        <button
-                          key={bodyGrilleColor}
-                          type="button"
-                          aria-label={`Speaker grille: ${BODY_GRILLE_COLORS[bodyGrilleColor].label}`}
-                          aria-pressed={
-                            design.bodyGrilleColor === bodyGrilleColor
-                          }
-                          title={`${BODY_GRILLE_COLORS[bodyGrilleColor].label} grille`}
-                          disabled={
-                            design.bodyColor === 'gray' &&
-                            bodyGrilleColor !== 'black'
-                          }
-                          onClick={() => update({ bodyGrilleColor })}
-                        >
-                          <span
-                            className="body-color-swatch"
-                            style={{
-                              background:
-                                BODY_GRILLE_COLORS[bodyGrilleColor].value,
-                            }}
-                            aria-hidden="true"
-                          />
-                        </button>
-                      ),
-                    )}
-                  </div>
-                </div>
-              </div>
-              <p className="body-grille-color-help" id="body-grille-color-help">
-                {design.bodyColor === 'gray'
-                  ? 'Gray bodies come with a black grille.'
-                  : `${BODY_GRILLE_COLORS[design.bodyGrilleColor].label} grille selected.`}
-              </p>
-            </section>
-          </div>
-        </div>
-      </div>
-      <div className="editor-tabs" role="tablist" aria-label="Design area">
-        {EDITOR_TABS.map(({ id: tab, label }, index) => (
-          <button
-            key={tab}
-            role="tab"
-            aria-label={label}
-            id={`${tab}-tab`}
-            aria-controls={`${tab}-editor`}
-            aria-selected={editorTab === tab}
-            tabIndex={editorTab === tab ? 0 : -1}
-            onKeyDown={(event) => {
-              if (
-                ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)
-              ) {
-                event.preventDefault()
-                const nextIndex =
-                  event.key === 'Home'
-                    ? 0
-                    : event.key === 'End'
-                      ? EDITOR_TABS.length - 1
-                      : (index +
-                          (event.key === 'ArrowRight' ? 1 : -1) +
-                          EDITOR_TABS.length) %
-                        EDITOR_TABS.length
-                const next = EDITOR_TABS[nextIndex].id
-                setEditorTab(next)
-                if (next === 'knob') setAssembly('knob')
-                else if (assembly === 'knob') setAssembly('assembled')
-                document.getElementById(`${next}-tab`)?.focus()
-              }
-            }}
-            onClick={() => {
-              setEditorTab(tab)
-              if (tab === 'knob') setAssembly('knob')
-              else if (assembly === 'knob') setAssembly('assembled')
-            }}
-          >
-            {tab === 'panel' ? 'Panel' : label}
-          </button>
-        ))}
-      </div>
+      <SpeakerSettings
+        design={design}
+        update={update}
+        speakerCollapsed={speakerCollapsed}
+        revealSpeakerControls={revealSpeakerControls}
+        speakerControlsRef={speakerControlsRef}
+        selectedModelRef={selectedModelRef}
+      />
+      <EditorTabs
+        editorTab={editorTab}
+        setEditorTab={setEditorTab}
+        assembly={assembly}
+        setAssembly={setAssembly}
+      />
       <div
         className="controls-scroll"
         ref={scrollRef}
@@ -447,44 +243,297 @@ export function DesignControls({
           />
         </div>
       </div>
-      <div className="export-section">
-        <div className="export-spec">
-          <span>
-            <Box size={13} />{' '}
-            {design.multicolor.enabled ? '3MF / STL / STP' : 'STL / STP / 3MF'}
-          </span>
-          <span>1:1 SCALE · MM</span>
-        </div>
-        {exportError ? (
-          <div className="load-error" role="alert">
-            {exportError}
-            <button onClick={onRetry}>Retry</button>
-          </div>
-        ) : null}
-        <Button
-          className="download-button"
-          disabled={
-            !geometry ||
-            !knobGeometry ||
-            !powerButtonGeometry ||
-            !!error ||
-            !!knobError ||
-            !!powerButtonError
-          }
-          onClick={onOpenExport}
-        >
-          {(!geometry ||
-            !knobGeometry ||
-            !powerButtonGeometry ||
-            !colorsReady) &&
-          !exportError ? (
-            <LoaderCircle size={17} className="spin" />
-          ) : (
-            <ArrowDownToLine size={18} />
-          )}{' '}
-          Export design <ArrowRight size={17} />
-        </Button>
-      </div>
+      <ExportControls
+        design={design}
+        meshes={meshes}
+        onRetry={onRetry}
+        onOpenExport={onOpenExport}
+      />
     </aside>
+  )
+}
+
+function SpeakerSettings({
+  design,
+  update,
+  speakerCollapsed,
+  revealSpeakerControls,
+  speakerControlsRef,
+  selectedModelRef,
+}: Pick<Props, 'design' | 'update'> & {
+  speakerCollapsed: boolean
+  revealSpeakerControls: () => void
+  speakerControlsRef: RefObject<HTMLDivElement | null>
+  selectedModelRef: RefObject<HTMLButtonElement | null>
+}) {
+  const speakerDimensions = design.model === 's' ? '85 × 131 mm' : '85 × 225 mm'
+  const bodyLabel = BODY_COLORS[design.bodyColor].label
+  const grilleLabel = BODY_GRILLE_COLORS[design.bodyGrilleColor].label
+
+  return (
+    <div className="speaker-settings" data-collapsed={speakerCollapsed}>
+      <div
+        className="speaker-summary-row"
+        inert={!speakerCollapsed}
+        aria-hidden={!speakerCollapsed}
+      >
+        <div className="speaker-settings-clip">
+          <button
+            type="button"
+            className="speaker-summary"
+            aria-label={`Edit speaker model and colors: Speaker ${design.model.toUpperCase()}, ${speakerDimensions}, ${bodyLabel} body, ${grilleLabel} grille`}
+            aria-expanded={!speakerCollapsed}
+            aria-controls="speaker-settings-controls"
+            title="Edit speaker model and colors"
+            onClick={revealSpeakerControls}
+          >
+            <PanelIcon model={design.model} />
+            <span className="speaker-summary-metadata">
+              <span className="speaker-summary-model">
+                <strong>Speaker {design.model.toUpperCase()}</strong>
+                <span>{speakerDimensions}</span>
+              </span>
+              <span className="speaker-summary-colors">
+                <span>
+                  <span
+                    className="body-color-swatch"
+                    style={{
+                      background: BODY_COLORS[design.bodyColor].shell,
+                    }}
+                    aria-hidden="true"
+                  />
+                  {bodyLabel} body
+                </span>
+                <span>
+                  <span
+                    className="body-color-swatch"
+                    style={{
+                      background:
+                        BODY_GRILLE_COLORS[design.bodyGrilleColor].value,
+                    }}
+                    aria-hidden="true"
+                  />
+                  {grilleLabel} grille
+                </span>
+              </span>
+            </span>
+            <ChevronUp size={16} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+      <div
+        className="speaker-controls-row"
+        id="speaker-settings-controls"
+        ref={speakerControlsRef}
+        inert={speakerCollapsed}
+        aria-hidden={speakerCollapsed}
+      >
+        <div className="speaker-settings-clip">
+          <section className="control-section model-section">
+            <h3>
+              <span>01</span> Speaker model
+            </h3>
+            <div className="model-options">
+              {(['s', 'm'] as const).map((model) => (
+                <button
+                  key={model}
+                  ref={design.model === model ? selectedModelRef : undefined}
+                  aria-pressed={design.model === model}
+                  className={`model-option ${design.model === model ? 'selected' : ''}`}
+                  onClick={() => update({ model })}
+                >
+                  <PanelIcon model={model} />
+                  <span>
+                    Speaker {model.toUpperCase()}
+                    <small>
+                      {model === 's' ? '85 × 131 mm' : '85 × 225 mm'}
+                    </small>
+                  </span>
+                  <span className="radio-indicator">
+                    {design.model === model && <span />}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="speaker-color-controls">
+              <div className="body-color-control">
+                <span id="body-color-label">Speaker body</span>
+                <div
+                  className="body-color-options"
+                  role="group"
+                  aria-labelledby="body-color-label"
+                >
+                  {(['black', 'gray'] as const).map((bodyColor) => (
+                    <button
+                      key={bodyColor}
+                      type="button"
+                      aria-label={`Speaker body: ${BODY_COLORS[bodyColor].label}`}
+                      aria-pressed={design.bodyColor === bodyColor}
+                      title={
+                        bodyColor === 'gray'
+                          ? 'Gray body (white speaker)'
+                          : 'Black body'
+                      }
+                      onClick={() => update({ bodyColor })}
+                    >
+                      <span
+                        className="body-color-swatch"
+                        style={{ background: BODY_COLORS[bodyColor].shell }}
+                        aria-hidden="true"
+                      />
+                      {BODY_COLORS[bodyColor].label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="body-color-control">
+                <span id="body-grille-color-label">Speaker grille</span>
+                <div
+                  className="body-color-options body-grille-options"
+                  role="group"
+                  aria-labelledby="body-grille-color-label"
+                  aria-describedby="body-grille-color-help"
+                >
+                  {(['black', 'orange', 'turquoise'] as const).map(
+                    (bodyGrilleColor) => (
+                      <button
+                        key={bodyGrilleColor}
+                        type="button"
+                        aria-label={`Speaker grille: ${BODY_GRILLE_COLORS[bodyGrilleColor].label}`}
+                        aria-pressed={
+                          design.bodyGrilleColor === bodyGrilleColor
+                        }
+                        title={`${BODY_GRILLE_COLORS[bodyGrilleColor].label} grille`}
+                        disabled={
+                          design.bodyColor === 'gray' &&
+                          bodyGrilleColor !== 'black'
+                        }
+                        onClick={() => update({ bodyGrilleColor })}
+                      >
+                        <span
+                          className="body-color-swatch"
+                          style={{
+                            background:
+                              BODY_GRILLE_COLORS[bodyGrilleColor].value,
+                          }}
+                          aria-hidden="true"
+                        />
+                      </button>
+                    ),
+                  )}
+                </div>
+              </div>
+            </div>
+            <p className="body-grille-color-help" id="body-grille-color-help">
+              {design.bodyColor === 'gray'
+                ? 'Gray bodies come with a black grille.'
+                : `${BODY_GRILLE_COLORS[design.bodyGrilleColor].label} grille selected.`}
+            </p>
+          </section>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EditorTabs({
+  editorTab,
+  setEditorTab,
+  assembly,
+  setAssembly,
+}: Pick<Props, 'editorTab' | 'setEditorTab' | 'assembly' | 'setAssembly'>) {
+  function selectTab(tab: EditorTab) {
+    setEditorTab(tab)
+    if (tab === 'knob') setAssembly('knob')
+    else if (assembly === 'knob') setAssembly('assembled')
+  }
+
+  return (
+    <div className="editor-tabs" role="tablist" aria-label="Design area">
+      {EDITOR_TABS.map(({ id: tab, label }, index) => (
+        <button
+          key={tab}
+          role="tab"
+          aria-label={label}
+          id={`${tab}-tab`}
+          aria-controls={`${tab}-editor`}
+          aria-selected={editorTab === tab}
+          tabIndex={editorTab === tab ? 0 : -1}
+          onKeyDown={(event) => {
+            if (
+              ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)
+            ) {
+              event.preventDefault()
+              const nextIndex =
+                event.key === 'Home'
+                  ? 0
+                  : event.key === 'End'
+                    ? EDITOR_TABS.length - 1
+                    : (index +
+                        (event.key === 'ArrowRight' ? 1 : -1) +
+                        EDITOR_TABS.length) %
+                      EDITOR_TABS.length
+              const next = EDITOR_TABS[nextIndex].id
+              selectTab(next)
+              document.getElementById(`${next}-tab`)?.focus()
+            }
+          }}
+          onClick={() => selectTab(tab)}
+        >
+          {tab === 'panel' ? 'Panel' : label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ExportControls({
+  design,
+  meshes,
+  onRetry,
+  onOpenExport,
+}: Pick<Props, 'design' | 'meshes' | 'onRetry' | 'onOpenExport'>) {
+  const {
+    geometry,
+    knobGeometry,
+    powerButtonGeometry,
+    error,
+    knobError,
+    powerButtonError,
+    materialParts,
+    multicolorError,
+  } = meshes
+  const colorsReady = !design.multicolor.enabled || !!materialParts
+  const geometryReady = !!geometry && !!knobGeometry && !!powerButtonGeometry
+  const geometryError = error || knobError || powerButtonError
+  const exportError = geometryError || multicolorError
+  return (
+    <div className="export-section">
+      <div className="export-spec">
+        <span>
+          <Box size={13} />{' '}
+          {design.multicolor.enabled ? '3MF / STL / STP' : 'STL / STP / 3MF'}
+        </span>
+        <span>1:1 SCALE · MM</span>
+      </div>
+      {exportError ? (
+        <div className="load-error" role="alert">
+          {exportError}
+          <button onClick={onRetry}>Retry</button>
+        </div>
+      ) : null}
+      <Button
+        className="download-button"
+        disabled={!geometryReady || !!geometryError}
+        onClick={onOpenExport}
+      >
+        {(!geometryReady || !colorsReady) && !exportError ? (
+          <LoaderCircle size={17} className="spin" />
+        ) : (
+          <ArrowDownToLine size={18} />
+        )}{' '}
+        Export design <ArrowRight size={17} />
+      </Button>
+    </div>
   )
 }
