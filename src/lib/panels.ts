@@ -146,7 +146,7 @@ export function buildPanelGeometry(
 }
 
 export function getPanelDimensions(geometry: BufferGeometry) {
-  geometry.computeBoundingBox()
+  if (!geometry.boundingBox) geometry.computeBoundingBox()
   const size = geometry.boundingBox!.getSize(new Vector3())
   return { width: size.x, height: size.y, depth: size.z }
 }

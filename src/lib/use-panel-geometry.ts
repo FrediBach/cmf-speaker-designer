@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { BufferGeometry } from 'three'
 import type { Design } from './design'
-import { buildPanelGeometry } from './panels'
 
 export interface PanelSource {
   geometry: BufferGeometry
@@ -10,11 +9,7 @@ export interface PanelSource {
 }
 
 /** Keep the last preview visible while a worker generates the latest design. */
-export function usePanelGeometry(
-  source: PanelSource | null,
-  design: Design,
-  retryKey: number,
-) {
+export function usePanelGeometry(design: Design, retryKey: number) {
   const [result, setResult] = useState<(PanelSource & { key: string }) | null>(
     null,
   )
@@ -22,49 +17,25 @@ export function usePanelGeometry(
     key: string
     message: string
   } | null>(null)
-  const matches = source?.model === design.model && source?.style === 'original'
-  const key = `${matches ? source.geometry.uuid : 'loading'}:${design.model}:${design.style}:${design.relief}:${design.panelExtension}:${design.panelGap}:${JSON.stringify(design.handle)}:${JSON.stringify(design.grille)}:${JSON.stringify(design.halo)}:${JSON.stringify(design.raceStripes)}:${retryKey}`
+  const key = `${design.model}:${design.style}:${design.relief}:${design.panelExtension}:${design.panelGap}:${JSON.stringify(design.handle)}:${JSON.stringify(design.grille)}:${JSON.stringify(design.halo)}:${JSON.stringify(design.raceStripes)}:${retryKey}`
 
   useEffect(() => {
-    if (!matches || !source) return
-    let active = true
+    const controller = new AbortController()
     const generate = async () => {
       try {
-        const geometry =
-          design.handle.mode === 'original' &&
-          design.grille.mode === 'original' &&
-          design.halo.mode === 'original' &&
-          design.panelGap === 0 &&
-          !design.raceStripes.enabled
-            ? buildPanelGeometry(
-                source.geometry,
-                source.model,
-                source.style,
-                design.relief,
-                design.panelExtension,
-              )
-            : await (
-                await import('./handles')
-              ).buildHandledPanelGeometry(
-                source.geometry,
-                source.model,
-                source.style,
-                design.relief,
-                design.handle,
-                design.grille,
-                design.halo,
-                design.panelExtension,
-                design.panelGap,
-                design.raceStripes,
-              )
-        if (!active) {
+        const { buildDesignPanelGeometry } = await import('./handles')
+        const geometry = await buildDesignPanelGeometry(
+          design,
+          controller.signal,
+        )
+        if (controller.signal.aborted) {
           geometry.dispose()
           return
         }
-        setResult({ geometry, model: source.model, style: source.style, key })
+        setResult({ geometry, model: design.model, style: 'original', key })
         setFailure(null)
       } catch (error) {
-        if (active)
+        if (!controller.signal.aborted)
           setFailure({
             key,
             message:
@@ -85,25 +56,21 @@ export function usePanelGeometry(
         : 0,
     )
     return () => {
-      active = false
+      controller.abort()
       window.clearTimeout(timer)
     }
-    // The key includes the source identity and every geometry-affecting setting.
+    // The key includes every geometry-affecting setting and explicit retry.
   }, [key])
 
   useEffect(() => () => result?.geometry.dispose(), [result])
   const geometry = result?.key === key ? result.geometry : null
   const previewGeometry =
-    matches &&
-    result?.model === source?.model &&
-    result?.style === source?.style
-      ? result.geometry
-      : null
+    result?.model === design.model ? result.geometry : null
   const error = failure?.key === key ? failure.message : ''
   return {
     geometry,
     previewGeometry,
     error,
-    generating: matches && !geometry && !error,
+    generating: !geometry && !error,
   }
 }

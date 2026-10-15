@@ -1,26 +1,15 @@
-import { useEffect, useState } from 'react'
-import type { BufferGeometry } from 'three'
 import type { Design } from './design'
-import { loadPanelGeometry, getPanelDimensions } from './panels'
+import { getPanelDimensions } from './panels'
 import { usePanelGeometry } from './use-panel-geometry'
 import { useKnobGeometry } from './use-knob-geometry'
 import { usePowerButtonGeometry } from './use-power-button-geometry'
 import { useMulticolorGeometry } from './use-multicolor-geometry'
 
 export function useDesignGeometry(design: Design, retryKey: number) {
-  const sourceStyle = 'original'
-  const [source, setSource] = useState<{
-    geometry: BufferGeometry
-    model: Design['model']
-    style: Design['style']
-  } | null>(null)
-  const [loadError, setLoadError] = useState('')
-  const {
-    geometry,
-    previewGeometry,
-    error: generationError,
-    generating,
-  } = usePanelGeometry(source, design, retryKey)
+  const { geometry, previewGeometry, error, generating } = usePanelGeometry(
+    design,
+    retryKey,
+  )
   const multicolor = useMulticolorGeometry(
     geometry,
     design.multicolor,
@@ -61,38 +50,6 @@ export function useDesignGeometry(design: Design, retryKey: number) {
     : design.model === 's'
       ? 131
       : 225
-  const error = loadError || generationError
-  useEffect(() => {
-    let active = true
-    const controller = new AbortController()
-    setLoadError('')
-    loadPanelGeometry(design.model, sourceStyle, controller.signal)
-      .then((loaded) => {
-        if (!active) {
-          loaded.dispose()
-          return
-        }
-        setSource({
-          geometry: loaded,
-          model: design.model,
-          style: sourceStyle,
-        })
-      })
-      .catch(() => {
-        if (active) setLoadError('The panel could not load. Please try again.')
-      })
-    return () => {
-      active = false
-      controller.abort()
-    }
-  }, [design.model, sourceStyle, retryKey])
-
-  useEffect(
-    () => () => {
-      source?.geometry.dispose()
-    },
-    [source],
-  )
   return {
     geometry,
     previewGeometry,

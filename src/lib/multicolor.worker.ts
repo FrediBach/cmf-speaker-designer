@@ -2,8 +2,12 @@ import wasmUrl from 'manifold-3d/manifold.wasm?url'
 import {
   createMulticolorEngine,
   type MulticolorMesh,
-  type MulticolorResult,
 } from './multicolor-geometry'
+import {
+  multicolorTransferList,
+  prepareMulticolorResult,
+  type PreparedMulticolorResult,
+} from './multicolor-mesh'
 import type { MulticolorSettings } from './multicolor-settings'
 
 export interface MulticolorRequest {
@@ -14,7 +18,7 @@ export interface MulticolorRequest {
 
 export interface MulticolorResponse {
   id: number
-  result?: MulticolorResult
+  result?: PreparedMulticolorResult
   error?: string
 }
 
@@ -26,12 +30,12 @@ self.onmessage = async (event: MessageEvent<MulticolorRequest>) => {
       engine = undefined
       throw error
     })
-    const result = (await engine).build(mesh, settings)
+    const result = prepareMulticolorResult(
+      (await engine).build(mesh, settings),
+      settings,
+    )
     self.postMessage({ id, result } satisfies MulticolorResponse, {
-      transfer: result.parts.flatMap(({ positions, indices }) => [
-        positions.buffer,
-        indices.buffer,
-      ]),
+      transfer: multicolorTransferList(result),
     })
   } catch (error) {
     self.postMessage({

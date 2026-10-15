@@ -1,17 +1,13 @@
 import { BufferAttribute, BufferGeometry } from 'three'
-import type {
-  MaterialGeometry,
-  MulticolorMesh,
-  MulticolorResult,
-} from './multicolor-geometry'
+import type { MaterialGeometry, MulticolorMesh } from './multicolor-geometry'
 import type { MulticolorRequest, MulticolorResponse } from './multicolor.worker'
 import type { MulticolorSettings } from './multicolor-settings'
-import { computePanelNormals } from './panel-normals'
-import { patternGeometryKey } from './multicolor-geometry'
+import { deserializeGeometry } from './geometry-transfer'
+import type { PreparedMulticolorResult } from './multicolor-mesh'
 
 interface Job {
   request: MulticolorRequest
-  resolve(result: MulticolorResult): void
+  resolve(result: PreparedMulticolorResult): void
   reject(error: Error): void
   signal?: AbortSignal
   abort(): void
@@ -112,7 +108,7 @@ function requestPartition(
   signal?: AbortSignal,
 ) {
   if (signal?.aborted) return Promise.reject(cancelled())
-  return new Promise<MulticolorResult>((resolve, reject) => {
+  return new Promise<PreparedMulticolorResult>((resolve, reject) => {
     const job: Job = {
       request: { id: ++nextId, mesh, settings },
       resolve,
@@ -146,18 +142,26 @@ export async function buildMulticolorGeometry(
 ): Promise<{ parts: MaterialGeometry[]; diagnostics: string[] }> {
   if (signal?.aborted) throw cancelled()
   const attribute = panel.getAttribute('position')
-  const positions = new Float32Array(attribute.count * 3)
-  for (let i = 0; i < attribute.count; i++) {
-    positions[i * 3] = attribute.getX(i)
-    positions[i * 3 + 1] = attribute.getY(i)
-    positions[i * 3 + 2] = attribute.getZ(i)
+  const contiguous =
+    attribute instanceof BufferAttribute &&
+    attribute.itemSize === 3 &&
+    !attribute.normalized
+  const positions = contiguous
+    ? new Float32Array(attribute.array)
+    : new Float32Array(attribute.count * 3)
+  if (!contiguous) {
+    for (let i = 0; i < attribute.count; i++) {
+      positions[i * 3] = attribute.getX(i)
+      positions[i * 3 + 1] = attribute.getY(i)
+      positions[i * 3 + 2] = attribute.getZ(i)
+    }
   }
   const index = panel.getIndex()
   const mesh: MulticolorMesh = {
     positions,
     ...(index ? { indices: Uint32Array.from(index.array) } : {}),
   }
-  let result: MulticolorResult
+  let result: PreparedMulticolorResult
   if (typeof Worker === 'undefined') {
     testEngine ??= import('./multicolor-geometry')
       .then(({ createMulticolorEngine }) => createMulticolorEngine())
@@ -165,24 +169,27 @@ export async function buildMulticolorGeometry(
         testEngine = undefined
         throw error
       })
-    result = (await testEngine).build(mesh, settings)
+    const { prepareMulticolorResult } = await import('./multicolor-mesh')
+    result = prepareMulticolorResult(
+      (await testEngine).build(mesh, settings),
+      settings,
+    )
   } else {
     result = await requestPartition(mesh, settings, signal)
   }
   if (signal?.aborted) throw cancelled()
   const parts: MaterialGeometry[] = result.parts.map(
-    ({ materialId, positions, indices, volume, elementIds }) => {
-      const geometry = new BufferGeometry()
-      geometry.setAttribute('position', new BufferAttribute(positions, 3))
-      geometry.setIndex(new BufferAttribute(indices, 1))
-      geometry.computeVertexNormals()
-      geometry.computeBoundingBox()
-      geometry.computeBoundingSphere()
-      geometry.userData.multicolorKey = patternGeometryKey(settings)
+    ({
+      materialId,
+      geometry: printable,
+      previewGeometry: preview,
+      volume,
+      elementIds,
+    }) => {
+      const geometry = deserializeGeometry(printable)
+      const previewGeometry = deserializeGeometry(preview)
       geometry.userData.multicolorSourceUuid = panel.uuid
-      const previewGeometry = computePanelNormals(geometry)
-      previewGeometry.computeBoundingBox()
-      previewGeometry.computeBoundingSphere()
+      previewGeometry.userData.multicolorSourceUuid = panel.uuid
       return { materialId, geometry, previewGeometry, volume, elementIds }
     },
   )

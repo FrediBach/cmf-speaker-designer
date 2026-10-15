@@ -15,19 +15,22 @@ export function useKnobGeometry(settings: KnobSettings, retryKey: number) {
   } | null>(null)
 
   useEffect(() => {
-    let active = true
+    const controller = new AbortController()
     const timer = window.setTimeout(async () => {
       try {
-        const { buildKnobGeometry } = await import('./knobs')
-        const geometry = await buildKnobGeometry(settings)
-        if (!active) {
+        const { buildKnobGeometryInWorker } = await import('./knob-client')
+        const geometry = await buildKnobGeometryInWorker(
+          settings,
+          controller.signal,
+        )
+        if (controller.signal.aborted) {
           geometry.dispose()
           return
         }
         setResult({ key, geometry })
         setFailure(null)
       } catch (error) {
-        if (active)
+        if (!controller.signal.aborted)
           setFailure({
             key,
             message:
@@ -38,7 +41,7 @@ export function useKnobGeometry(settings: KnobSettings, retryKey: number) {
       }
     }, 120)
     return () => {
-      active = false
+      controller.abort()
       window.clearTimeout(timer)
     }
     // The key contains every geometry setting and the explicit retry request.

@@ -820,7 +820,7 @@ function SpeakerScene({
   const offset = assembly === 'exploded' ? 32 : 0
   const bounds = useMemo(() => {
     if (assembly === 'knob' && knobGeometry) {
-      knobGeometry.computeBoundingBox()
+      if (!knobGeometry.boundingBox) knobGeometry.computeBoundingBox()
       return knobGeometry
         .boundingBox!.clone()
         .applyMatrix4(new Matrix4().makeRotationX(-Math.PI / 2))

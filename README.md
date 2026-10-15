@@ -195,6 +195,8 @@ Multicolor release validation is incomplete. The production build, 390 unit/inte
 - **shadcn/ui components, Radix UI, and Tailwind CSS** provide buttons, the face-depth slider, and accessible dialogs, with custom product-inspired styling.
 - **Three.js, React Three Fiber, and Drei** provide mesh loading, material previews, lighting, and camera interaction.
 - **Manifold** performs solid Boolean operations in WebAssembly workers, keeping structural generation and multicolor partitioning off the main UI thread.
+- Both the designer and variation explorer prepare panel and knob meshes in workers, including STL parsing, deformation, normal smoothing, and bounds. Panel sources stay cached in the worker across variations. Completed position/normal/index buffers are transferred to the preview without copying or repeating vertex scans on the main thread. Rendering and GPU uploads remain on the main thread.
+- `src/lib/worker-client.ts` serializes panel and knob jobs, removes cancelled queued work, ignores obsolete results, and restarts failed or timed-out workers. `geometry-transfer.ts` preserves mesh metadata and bounds alongside the transferred buffers. Existing previews remain visible during edits; only current results can export.
 - `src/lib/panels.ts` owns source selection, model coordinates, face-depth transformations, and STL exports.
 - `src/lib/face-depth.ts` carries the original rounded corner into the deeper face and joins it to the unchanged 45° control deck. Local triangle subdivision keeps the front planar and shared edges watertight in both the preview and STL.
 - `src/lib/panel-normals.ts` smooths curved surfaces while keeping flat faces uniformly shaded and sharp edges crisp.
@@ -205,11 +207,11 @@ Multicolor release validation is incomplete. The production build, 390 unit/inte
 - `src/lib/race-stripe-settings.ts` validates centered stripe dimensions and shares their intervals with stud placement; `race-stripe-geometry.ts` cuts the recessed bands into the panel.
 - `src/lib/multicolor-settings.ts`, `multicolor-patterns.ts`, and `multicolor-presets.ts` own the versioned artwork document, primitive contours, generators, and editable flag recipes.
 - `src/components/MulticolorEditor.tsx` and `MulticolorCanvas.tsx` provide the layer/material inspector and 2D placement editor.
-- `src/lib/multicolor-geometry.ts` partitions the final solid and reports region diagnostics; `multicolor-client.ts`, `multicolor.worker.ts`, and `use-multicolor-geometry.ts` handle worker scheduling, disposal, and current-result gating.
+- `src/lib/multicolor-geometry.ts` partitions the final solid and reports region diagnostics; `multicolor-mesh.ts` prepares printable and smoothed preview meshes in the worker. `multicolor-client.ts`, `multicolor.worker.ts`, and `use-multicolor-geometry.ts` handle worker scheduling, disposal, and current-result gating.
 - `src/lib/panel-engine.ts` combines handle generation, the shared face-depth transformation, grille generation, and halo generation in order inside the worker.
 - `src/lib/use-panel-geometry.ts` schedules geometry updates, retains the last preview during generation, and enables export when the current design is ready.
 - `src/lib/knob-settings.ts` validates knob styles and dimensions; `knobs.ts` extracts the source parts, preserves the mounting interface, and builds the preview/export geometry.
-- `src/lib/use-knob-geometry.ts` loads and updates knobs while preventing stale geometry from being exported.
+- `src/lib/use-knob-geometry.ts`, `knob-client.ts`, and `knobs.worker.ts` load and update knobs in a worker while preventing stale geometry from being exported.
 - `src/lib/design-export.ts` writes STL/STP, multipart 3MF, and aligned material STL ZIPs. `three-mf-export.ts` serializes material assemblies and derives one shared panel print transform; `archive.ts` packages the archives.
 - `src/lib/step-export.ts` writes AP214 solids with shared edges and planar faces; `step-faces.ts` combines coplanar regions while retaining hole boundaries.
 - `src/lib/step-mesh.ts` prepares STEP geometry within the tolerance in `step-settings.ts`. `step-export-client.ts` and `step-export.worker.ts` keep preparation and serialization off the UI thread.
@@ -217,7 +219,7 @@ Multicolor release validation is incomplete. The production build, 390 unit/inte
 - `src/lib/design.ts` validates shared, locally stored, and imported design settings; `design-files.ts` downloads portable design JSON.
 - `src/components/SpeakerPreview.tsx` renders the selected panel and the contextual speaker body.
 - `src/components/DesignerPreview.tsx`, `DesignControls.tsx`, and `PanelEditor.tsx` compose the preview and editing workspace; `ExportDialog.tsx` and `PrintGuide.tsx` own the dialogs.
-- `src/lib/use-design-geometry.ts` owns source loading, disposal, and the panel/knob geometry state used by previews and exports.
+- `src/lib/use-design-geometry.ts` composes the panel, knob, power-button, and multicolor geometry state used by previews and exports.
 - `src/lib/use-design-interactions.ts` handles undo/redo shortcuts and groups slider and numeric input gestures into history transactions.
 - `src/App.tsx` connects the controls, preview, and download workflow.
 
