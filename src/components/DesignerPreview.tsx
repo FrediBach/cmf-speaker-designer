@@ -6,6 +6,8 @@ import {
   LoaderCircle,
   MousePointer2,
   MoveUpRight,
+  Pause,
+  Play,
   RotateCcw,
   SlidersHorizontal,
 } from 'lucide-react'
@@ -25,6 +27,8 @@ interface Props {
   design: Design
   meshes: ReturnType<typeof useDesignGeometry>
   view: NonNullable<SpeakerPreviewProps['view']>
+  presentation: boolean
+  setPresentation: (presentation: boolean) => void
   assembly: NonNullable<SpeakerPreviewProps['assembly']>
   setView: (view: NonNullable<SpeakerPreviewProps['view']>) => void
   setAssembly: (assembly: NonNullable<SpeakerPreviewProps['assembly']>) => void
@@ -38,6 +42,8 @@ export function DesignerPreview({
   design,
   meshes,
   view,
+  presentation,
+  setPresentation,
   assembly,
   setView,
   setAssembly,
@@ -75,16 +81,24 @@ export function DesignerPreview({
           </span>
           <div className="view-switch" role="group" aria-label="Camera view">
             <button
-              className={view === 'perspective' ? 'active' : ''}
-              aria-pressed={view === 'perspective'}
-              onClick={() => setView('perspective')}
+              className={
+                !presentation && view === 'perspective' ? 'active' : ''
+              }
+              aria-pressed={!presentation && view === 'perspective'}
+              onClick={() => {
+                setView('perspective')
+                onResetCamera()
+              }}
             >
               <Box size={14} /> 3D view
             </button>
             <button
-              className={view === 'front' ? 'active' : ''}
-              aria-pressed={view === 'front'}
-              onClick={() => setView('front')}
+              className={!presentation && view === 'front' ? 'active' : ''}
+              aria-pressed={!presentation && view === 'front'}
+              onClick={() => {
+                setView('front')
+                onResetCamera()
+              }}
             >
               Front
             </button>
@@ -121,6 +135,8 @@ export function DesignerPreview({
                 knobStyle={design.knob.style}
                 relief={design.relief}
                 view={view}
+                presentation={presentation}
+                onStopPresentation={() => setPresentation(false)}
                 assembly={assembly}
                 resetKey={resetKey}
               />
@@ -158,6 +174,20 @@ export function DesignerPreview({
             </span>
           </div>
           <div className="preview-actions">
+            <button
+              className="presentation-toggle"
+              title={presentation ? 'Stop presentation' : 'Start presentation'}
+              aria-label="Presentation mode"
+              aria-pressed={presentation}
+              aria-description="Automatically circle the speaker from changing heights. Drag the preview to take control."
+              disabled={!previewGeometry || !!error}
+              onClick={() => setPresentation(!presentation)}
+            >
+              {presentation ? <Pause size={16} /> : <Play size={16} />}
+              <span className="presentation-label">
+                {presentation ? 'Pause' : 'Present'}
+              </span>
+            </button>
             <button
               title="Reset camera"
               aria-label="Reset camera"
@@ -204,7 +234,10 @@ export function DesignerPreview({
             ))}
           </div>
           <span className="orbit-hint">
-            <MousePointer2 size={13} /> Drag to rotate · Pinch or scroll to zoom
+            <MousePointer2 size={13} />{' '}
+            {presentation
+              ? 'Presenting · Drag to take control'
+              : 'Drag to rotate · Pinch or scroll to zoom'}
           </span>
         </div>
       </div>

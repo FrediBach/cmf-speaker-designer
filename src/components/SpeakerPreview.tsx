@@ -1,6 +1,6 @@
-import { Component, useEffect, useMemo, useRef } from 'react'
+import { Component, useCallback, useEffect, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { SpeakerRearDetails } from './SpeakerRearDetails'
 import {
   BODY_COLORS,
@@ -11,6 +11,13 @@ import {
 } from '@/lib/design'
 import type { MaterialGeometry } from '@/lib/multicolor-geometry'
 import type { PatternMaterial } from '@/lib/multicolor-settings'
+import {
+  CAMERA_MAX_POLAR,
+  CAMERA_MIN_POLAR,
+  presentationAngles,
+  presentationDistance,
+  presentationFrameDelta,
+} from '@/lib/presentation-camera'
 import {
   ContactShadows,
   Environment,
@@ -55,6 +62,8 @@ export interface SpeakerPreviewProps {
   view?: 'perspective' | 'front'
   assembly?: 'assembled' | 'panel' | 'exploded' | 'knob'
   resetKey?: number
+  presentation?: boolean
+  onStopPresentation?: () => void
   className?: string
   onReady?: () => void
   onError?: (error: Error) => void
@@ -374,35 +383,97 @@ function CameraControls({
   view,
   resetKey,
   assembly,
+  presentation,
+  onStopPresentation,
 }: {
   bounds: Box3
   view: 'perspective' | 'front'
   resetKey: number
   assembly: 'assembled' | 'panel' | 'exploded' | 'knob'
+  presentation: boolean
+  onStopPresentation?: () => void
 }) {
   const { camera, size, invalidate, gl } = useThree()
-  const orbit = useRef<{ target: Vector3; update: () => void } | null>(null)
+  const orbit = useRef<{
+    target: Vector3
+    enableDamping: boolean
+    update: () => void
+  } | null>(null)
   const previousFraming = useRef<{
     view: typeof view
     resetKey: number
     assembly: typeof assembly
+    bounds: Box3
+    width: number
+    height: number
   } | null>(null)
+  const motion = useRef<{
+    elapsed: number
+    initialTheta: number
+    initialPhi: number
+    radius: number
+    target: Vector3
+  } | null>(null)
+  const scratch = useMemo(
+    () => ({
+      target: new Vector3(),
+      offset: new Vector3(),
+      spherical: new Spherical(),
+    }),
+    [],
+  )
   const extent = Math.max(
     bounds.max.x - bounds.min.x,
     bounds.max.y - bounds.min.y,
     bounds.max.z - bounds.min.z,
   )
+  const maxDistance = Math.max(
+    extent * 6,
+    camera instanceof PerspectiveCamera
+      ? presentationDistance(
+          bounds,
+          camera.fov,
+          Math.max(size.width, 1) / Math.max(size.height, 1),
+        )
+      : 0,
+    // Preserve a transitioning pose if bounds shrink just before a pause.
+    camera.position.distanceTo(orbit.current?.target ?? scratch.target),
+  )
 
   useEffect(() => {
     if (!(camera instanceof PerspectiveCamera)) return
+    const previous = previousFraming.current
+    if (
+      previous?.bounds === bounds &&
+      previous.view === view &&
+      previous.resetKey === resetKey &&
+      previous.assembly === assembly &&
+      previous.width === size.width &&
+      previous.height === size.height
+    )
+      return
+    previousFraming.current = {
+      view,
+      resetKey,
+      assembly,
+      bounds,
+      width: size.width,
+      height: size.height,
+    }
+    // Geometry and viewport edits update the moving camera's destination below;
+    // they must not restart its path or snap its current position.
+    if (presentation && previous) {
+      invalidate()
+      return
+    }
     const aspect = Math.max(size.width, 1) / Math.max(size.height, 1)
     const tangent = Math.tan((camera.fov * Math.PI) / 360)
     const target = bounds.getCenter(new Vector3())
     const resetView =
-      !previousFraming.current ||
-      previousFraming.current.view !== view ||
-      previousFraming.current.resetKey !== resetKey ||
-      (previousFraming.current.assembly === 'knob') !== (assembly === 'knob')
+      !previous ||
+      previous.view !== view ||
+      previous.resetKey !== resetKey ||
+      (previous.assembly === 'knob') !== (assembly === 'knob')
     const direction = resetView
       ? view === 'front'
         ? new Vector3(0, 0, 1)
@@ -439,7 +510,6 @@ function CameraControls({
       orbit.current.target.copy(target)
       orbit.current.update()
     }
-    previousFraming.current = { view, resetKey, assembly }
     invalidate()
   }, [
     camera,
@@ -449,8 +519,87 @@ function CameraControls({
     view,
     resetKey,
     assembly,
+    presentation,
     invalidate,
   ])
+
+  useEffect(() => {
+    if (!presentation) {
+      motion.current = null
+      return
+    }
+    const controls = orbit.current
+    if (controls) {
+      // Clear any remaining drag inertia without changing the visible pose.
+      const position = camera.position.clone()
+      const rotation = camera.quaternion.clone()
+      const damping = controls.enableDamping
+      controls.enableDamping = false
+      controls.update()
+      controls.enableDamping = damping
+      camera.position.copy(position)
+      camera.quaternion.copy(rotation)
+      controls.update()
+    }
+    const target = orbit.current?.target.clone() ?? new Vector3()
+    const spherical = new Spherical().setFromVector3(
+      camera.position.clone().sub(target),
+    )
+    motion.current = {
+      elapsed: 0,
+      initialTheta: spherical.theta,
+      initialPhi: spherical.phi,
+      radius: spherical.radius,
+      target,
+    }
+    invalidate()
+    const resume = () => {
+      if (!document.hidden && motion.current) invalidate()
+    }
+    document.addEventListener('visibilitychange', resume)
+    return () => {
+      motion.current = null
+      document.removeEventListener('visibilitychange', resume)
+    }
+  }, [presentation, camera, invalidate])
+
+  const stopPresentation = useCallback(() => {
+    if (!motion.current) return
+    // Stop synchronously so the first drag, wheel, or key event owns the camera.
+    motion.current = null
+    onStopPresentation?.()
+  }, [onStopPresentation])
+
+  useFrame((_, delta) => {
+    const current = motion.current
+    if (!current || !(camera instanceof PerspectiveCamera) || document.hidden)
+      return
+    const step = presentationFrameDelta(delta)
+    current.elapsed += step
+    const angles = presentationAngles(
+      current.elapsed,
+      current.initialTheta,
+      current.initialPhi,
+    )
+    const smoothing = -Math.expm1(-step * 3)
+    const aspect = Math.max(size.width, 1) / Math.max(size.height, 1)
+    const distance = presentationDistance(bounds, camera.fov, aspect)
+    current.radius += (distance - current.radius) * smoothing
+    current.target.lerp(bounds.getCenter(scratch.target), smoothing)
+    scratch.spherical.set(current.radius, angles.phi, angles.theta)
+    camera.position
+      .copy(current.target)
+      .add(scratch.offset.setFromSpherical(scratch.spherical))
+    camera.lookAt(current.target)
+    orbit.current?.target.copy(current.target)
+    const far = Math.max(2400, distance * 2)
+    if (camera.far !== far) {
+      camera.far = far
+      camera.updateProjectionMatrix()
+    }
+    // The canvas remains demand-rendered; this chain ends as soon as motion stops.
+    invalidate()
+  })
 
   useEffect(() => {
     const surface = gl.domElement.closest<HTMLElement>(
@@ -478,6 +627,7 @@ function CameraControls({
       )
         return
       event.preventDefault()
+      stopPresentation()
       const target = orbit.current?.target ?? new Vector3()
       const spherical = new Spherical().setFromVector3(
         camera.position.clone().sub(target),
@@ -488,10 +638,13 @@ function CameraControls({
       if (event.key === 'ArrowDown') spherical.phi += 0.12
       if (event.key === '+' || event.key === '=') spherical.radius *= 0.9
       if (event.key === '-') spherical.radius /= 0.9
-      spherical.phi = Math.max(0.18, Math.min(Math.PI * 0.78, spherical.phi))
+      spherical.phi = Math.max(
+        CAMERA_MIN_POLAR,
+        Math.min(CAMERA_MAX_POLAR, spherical.phi),
+      )
       spherical.radius = Math.max(
         extent * 0.7,
-        Math.min(extent * 6, spherical.radius),
+        Math.min(maxDistance, spherical.radius),
       )
       camera.position
         .copy(target)
@@ -502,7 +655,7 @@ function CameraControls({
     }
     surface.addEventListener('keydown', handleKey)
     return () => surface.removeEventListener('keydown', handleKey)
-  }, [camera, extent, gl, invalidate])
+  }, [camera, extent, maxDistance, gl, invalidate, stopPresentation])
 
   return (
     <OrbitControls
@@ -510,15 +663,16 @@ function CameraControls({
         orbit.current = instance
       }}
       makeDefault
+      onStart={stopPresentation}
       enablePan={false}
       enableDamping
       dampingFactor={0.1}
       rotateSpeed={0.65}
       zoomSpeed={0.65}
       minDistance={extent * 0.7}
-      maxDistance={extent * 6}
-      minPolarAngle={0.18}
-      maxPolarAngle={Math.PI * 0.78}
+      maxDistance={maxDistance}
+      minPolarAngle={CAMERA_MIN_POLAR}
+      maxPolarAngle={CAMERA_MAX_POLAR}
     />
   )
 }
@@ -538,6 +692,8 @@ function SpeakerScene({
   view,
   assembly,
   resetKey,
+  presentation,
+  onStopPresentation,
 }: {
   geometry: BufferGeometry
   model: 's' | 'm'
@@ -553,6 +709,8 @@ function SpeakerScene({
   view: 'perspective' | 'front'
   assembly: 'assembled' | 'panel' | 'exploded' | 'knob'
   resetKey: number
+  presentation: boolean
+  onStopPresentation?: () => void
 }) {
   const height = model === 's' ? 130.97 : 224.97
   const width = 84.97
@@ -717,6 +875,8 @@ function SpeakerScene({
         view={view}
         assembly={assembly}
         resetKey={resetKey}
+        presentation={presentation}
+        onStopPresentation={onStopPresentation}
       />
     </>
   )
@@ -740,6 +900,8 @@ export function SpeakerPreview({
   view = 'perspective',
   assembly = 'assembled',
   resetKey = 0,
+  presentation = false,
+  onStopPresentation,
   className,
   onReady,
   onError,
@@ -763,6 +925,7 @@ export function SpeakerPreview({
       data-knob-ready={!!knobGeometry}
       data-power-button-ready={!!powerButtonGeometry}
       data-power-button-color={powerButtonColor}
+      data-presentation={presentation}
       data-material-count={materialParts?.length ?? 0}
       role="img"
       data-preview-controls
@@ -813,6 +976,8 @@ export function SpeakerPreview({
                 view={view}
                 assembly={assembly}
                 resetKey={resetKey}
+                presentation={presentation}
+                onStopPresentation={onStopPresentation}
               />
             )}
           </Canvas>

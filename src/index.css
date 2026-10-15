@@ -475,6 +475,21 @@ main {
 .preview-actions button:hover {
   background: var(--card);
 }
+.preview-actions .presentation-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: auto;
+  padding: 0 14px;
+  border-radius: 22px;
+  font-size: 13px;
+}
+.preview-actions .presentation-toggle[aria-pressed='true'] {
+  background: var(--foreground);
+  border-color: var(--foreground);
+  color: var(--inverse);
+}
 .preview-toolbar {
   grid-row: 4;
   z-index: 2;
@@ -2163,6 +2178,14 @@ main {
     width: 16px;
     height: 16px;
   }
+  .preview-actions .presentation-toggle {
+    width: 36px;
+    padding: 0;
+    border-radius: 3px;
+  }
+  .presentation-label {
+    display: none;
+  }
   .preview-toolbar {
     grid-row: 2;
     grid-column: 1;
@@ -2376,6 +2399,9 @@ main {
   }
   .designer {
     grid-template-rows: 170px minmax(0, 1fr);
+  }
+  .view-switch {
+    flex-direction: row;
   }
   .preview-bottom > div:first-child {
     max-width: 112px;

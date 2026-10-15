@@ -50,6 +50,7 @@ function App() {
           : 'panel',
   )
   const [view, setView] = useState<'perspective' | 'front'>('perspective')
+  const [presentation, setPresentation] = useState(false)
   const [assembly, setAssembly] = useState<
     'assembled' | 'panel' | 'exploded' | 'knob'
   >('assembled')
@@ -154,6 +155,7 @@ function App() {
     setDesign(validateDesign({ model: design.model }))
     setEditorTab('panel')
     setView('perspective')
+    setPresentation(false)
     setAssembly('assembled')
     setResetKey((value) => value + 1)
     setToast('Design reset.')
@@ -238,12 +240,17 @@ function App() {
             design={design}
             meshes={meshes}
             view={view}
+            presentation={presentation}
+            setPresentation={setPresentation}
             assembly={assembly}
             setView={setView}
             setAssembly={setAssembly}
             resetKey={resetKey}
             retryKey={retryKey}
-            onResetCamera={() => setResetKey((value) => value + 1)}
+            onResetCamera={() => {
+              setPresentation(false)
+              setResetKey((value) => value + 1)
+            }}
             onShare={shareDesign}
           />
           <DesignControls
