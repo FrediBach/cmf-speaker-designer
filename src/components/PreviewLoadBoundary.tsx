@@ -3,13 +3,17 @@ import { Button } from '@/components/ui/button'
 
 /** Keep the editor usable when the separately loaded preview cannot start. */
 export class PreviewLoadBoundary extends Component<
-  { children: ReactNode },
+  { children: ReactNode; onError?: (error: Error) => void },
   { failed: boolean }
 > {
   state = { failed: false }
 
   static getDerivedStateFromError() {
     return { failed: true }
+  }
+
+  componentDidCatch(error: Error) {
+    this.props.onError?.(error)
   }
 
   render() {

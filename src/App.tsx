@@ -27,6 +27,10 @@ import {
   MAX_SHARE_URL_LENGTH,
 } from '@/lib/design'
 import { randomizeDesign } from '@/lib/random-design'
+import {
+  createDesignVariations,
+  type DesignVariation,
+} from '@/lib/design-variations'
 import { useDesignHistory } from '@/lib/use-design-history'
 import { useDesignGeometry } from '@/lib/use-design-geometry'
 import { useDesignInteractions } from '@/lib/use-design-interactions'
@@ -51,6 +55,10 @@ function App() {
   )
   const [view, setView] = useState<'perspective' | 'front'>('perspective')
   const [presentation, setPresentation] = useState(false)
+  const [variationSession, setVariationSession] = useState<
+    DesignVariation[] | null
+  >(null)
+  const exploringVariations = variationSession !== null
   const [assembly, setAssembly] = useState<
     'assembled' | 'panel' | 'exploded' | 'knob'
   >('assembled')
@@ -100,7 +108,11 @@ function App() {
     })
   }
   const meshes = useDesignGeometry(design, retryKey)
-  const interactionHandlers = useDesignInteractions(history, setToast)
+  const interactionHandlers = useDesignInteractions(
+    history,
+    setToast,
+    !exploringVariations,
+  )
 
   useEffect(() => {
     if (hasRejectedSavedDesign()) return
@@ -240,7 +252,7 @@ function App() {
       <main aria-labelledby="page-title">
         <section
           id="designer"
-          className="designer"
+          className={`designer${exploringVariations ? ' designer-exploring' : ''}`}
           aria-label="Speaker front panel designer"
         >
           <DesignerPreview
@@ -261,8 +273,26 @@ function App() {
             onShare={shareDesign}
             onSaveDesign={() => downloadDesignJson(design)}
             onLoadDesign={() => designFileRef.current?.click()}
+            variationSession={variationSession}
+            onExploreVariations={() => {
+              endTransaction()
+              setPresentation(false)
+              setVariationSession(createDesignVariations(design))
+            }}
+            onCancelVariations={() => setVariationSession(null)}
+            onChooseVariation={(variation) => {
+              endTransaction()
+              allowDesignSave()
+              setDesign(variation)
+              setVariationSession(null)
+              setAssembly('assembled')
+              setView('perspective')
+              setResetKey((key) => key + 1)
+              setToast('Variation applied. Undo with ⌘/Ctrl+Z.')
+            }}
           />
           <DesignControls
+            hidden={exploringVariations}
             design={design}
             update={update}
             editorTab={editorTab}

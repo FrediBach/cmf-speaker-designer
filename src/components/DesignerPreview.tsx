@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import {
   Box,
   Copy,
@@ -12,10 +12,13 @@ import {
   Play,
   RotateCcw,
   SlidersHorizontal,
+  Sparkles,
 } from 'lucide-react'
+import { VariationWorkspace } from './VariationWorkspace'
 import { PreviewLoadBoundary } from './PreviewLoadBoundary'
 import type { SpeakerPreviewProps } from './SpeakerPreview'
 import { colorName, type Design } from '@/lib/design'
+import type { DesignVariation } from '@/lib/design-variations'
 import { getDesignSummary } from '@/lib/design-summary'
 import type { useDesignGeometry } from '@/lib/use-design-geometry'
 
@@ -40,6 +43,10 @@ interface Props {
   onShare: () => void
   onSaveDesign: () => void
   onLoadDesign: () => void
+  variationSession: DesignVariation[] | null
+  onExploreVariations: () => void
+  onCancelVariations: () => void
+  onChooseVariation: (design: Design) => void
 }
 
 export function DesignerPreview({
@@ -57,7 +64,19 @@ export function DesignerPreview({
   onShare,
   onSaveDesign,
   onLoadDesign,
+  variationSession,
+  onExploreVariations,
+  onCancelVariations,
+  onChooseVariation,
 }: Props) {
+  const exploringVariations = variationSession !== null
+  const variationTrigger = useRef<HTMLButtonElement>(null)
+  const wasExploring = useRef(false)
+  useEffect(() => {
+    if (wasExploring.current && !exploringVariations)
+      variationTrigger.current?.focus({ preventScroll: true })
+    wasExploring.current = exploringVariations
+  }, [exploringVariations])
   const {
     previewGeometry,
     previewKnobGeometry,
@@ -69,6 +88,16 @@ export function DesignerPreview({
     previewMaterialParts,
     multicolorGenerating,
   } = meshes
+  if (variationSession)
+    return (
+      <VariationWorkspace
+        design={design}
+        initialVariations={variationSession}
+        meshes={meshes}
+        onCancel={onCancelVariations}
+        onChoose={onChooseVariation}
+      />
+    )
   return (
     <div
       className="preview-column"
@@ -84,6 +113,15 @@ export function DesignerPreview({
           setView={setView}
           onResetCamera={onResetCamera}
           disabled={!previewGeometry || !!error}
+          variationTrigger={variationTrigger}
+          onExploreVariations={onExploreVariations}
+          variationsDisabled={
+            !meshes.geometry ||
+            !meshes.knobGeometry ||
+            !meshes.powerButtonGeometry ||
+            !!error ||
+            (design.multicolor.enabled && !meshes.materialParts)
+          }
         />
         <div className="preview-watermark" aria-hidden="true">
           {design.model.toUpperCase()}-01
@@ -214,11 +252,17 @@ function PreviewCameraControls({
   setView,
   onResetCamera,
   disabled,
+  variationTrigger,
+  onExploreVariations,
+  variationsDisabled,
 }: Pick<
   Props,
   'view' | 'presentation' | 'setPresentation' | 'setView' | 'onResetCamera'
 > & {
   disabled: boolean
+  variationTrigger: React.RefObject<HTMLButtonElement | null>
+  onExploreVariations: () => void
+  variationsDisabled: boolean
 }) {
   return (
     <div className="preview-topbar">
@@ -239,6 +283,17 @@ function PreviewCameraControls({
           <span className="presentation-label">
             {presentation ? 'Pause' : 'Present'}
           </span>
+        </button>
+        <button
+          ref={variationTrigger}
+          className="presentation-toggle variation-toggle"
+          aria-label="Explore variations"
+          title="Explore variations without changing your design"
+          disabled={variationsDisabled}
+          onClick={onExploreVariations}
+        >
+          <Sparkles size={16} aria-hidden="true" />
+          <span className="presentation-label">Variations</span>
         </button>
       </div>
       <div className="view-switch" role="group" aria-label="Camera view">

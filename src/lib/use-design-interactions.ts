@@ -6,6 +6,7 @@ type History = ReturnType<typeof useDesignHistory>
 export function useDesignInteractions(
   { canUndo, canRedo, undo, redo, beginTransaction, endTransaction }: History,
   setToast: (message: string) => void,
+  enabled = true,
 ) {
   const historyGesture = useRef<'pointer' | 'keyboard' | null>(null)
   useEffect(() => {
@@ -27,6 +28,7 @@ export function useDesignInteractions(
     const handleShortcut = (event: KeyboardEvent) => {
       const target = event.target
       if (
+        !enabled ||
         event.defaultPrevented ||
         event.isComposing ||
         event.altKey ||
@@ -68,7 +70,7 @@ export function useDesignInteractions(
       window.removeEventListener('pointercancel', finishPointer)
       window.removeEventListener('blur', finishGesture)
     }
-  }, [canUndo, canRedo, undo, redo, endTransaction, setToast])
+  }, [canUndo, canRedo, undo, redo, endTransaction, setToast, enabled])
 
   const handlers: Pick<
     HTMLAttributes<HTMLElement>,

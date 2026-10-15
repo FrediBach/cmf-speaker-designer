@@ -31,6 +31,7 @@ const EDITOR_TABS = [
 
 type EditorTab = (typeof EDITOR_TABS)[number]['id']
 interface Props {
+  hidden?: boolean
   design: Design
   update: (patch: Partial<Design>) => void
   editorTab: EditorTab
@@ -49,6 +50,7 @@ interface Props {
 }
 
 export function DesignControls({
+  hidden,
   design,
   update,
   editorTab,
@@ -93,6 +95,7 @@ export function DesignControls({
 
   return (
     <aside
+      hidden={hidden}
       className="controls"
       id="design-controls"
       aria-label="Design controls"

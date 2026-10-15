@@ -677,6 +677,109 @@ function CameraControls({
   )
 }
 
+/** Shared assembled mesh tree. Geometry belongs to its producing hook. */
+export function SpeakerModel({
+  geometry,
+  model,
+  bodyColor,
+  bodyGrilleColor,
+  panelColor,
+  materialParts,
+  materials,
+  knobColor,
+  knobGeometry,
+  powerButtonColor,
+  powerButtonGeometry,
+  assembly = 'assembled',
+}: Pick<
+  SpeakerPreviewProps,
+  | 'model'
+  | 'bodyColor'
+  | 'bodyGrilleColor'
+  | 'panelColor'
+  | 'materialParts'
+  | 'materials'
+  | 'knobColor'
+  | 'knobGeometry'
+  | 'powerButtonColor'
+  | 'powerButtonGeometry'
+  | 'assembly'
+> & { geometry: BufferGeometry }) {
+  const height = model === 's' ? 130.97 : 224.97
+  const width = 84.97
+  const offset = assembly === 'exploded' ? 32 : 0
+  return (
+    <>
+      {assembly !== 'panel' && assembly !== 'knob' && (
+        <SpeakerBody
+          width={width}
+          height={height}
+          model={model}
+          bodyColor={bodyColor}
+          bodyGrilleColor={bodyGrilleColor}
+        />
+      )}
+      {assembly !== 'knob' && (
+        <group position={[0, 0, offset]}>
+          {materialParts ? (
+            materialParts.map((part) => (
+              <mesh key={part.materialId} castShadow receiveShadow>
+                <primitive
+                  object={part.previewGeometry ?? part.geometry}
+                  attach="geometry"
+                  dispose={null}
+                />
+                <meshStandardMaterial
+                  color={
+                    part.materialId === 'base'
+                      ? panelColor
+                      : (materials?.find(
+                          (material) => material.id === part.materialId,
+                        )?.color ?? panelColor)
+                  }
+                  roughness={0.43}
+                  metalness={0.025}
+                  envMapIntensity={0.5}
+                />
+              </mesh>
+            ))
+          ) : (
+            <mesh castShadow receiveShadow>
+              <primitive object={geometry} attach="geometry" dispose={null} />
+              <meshStandardMaterial
+                color={panelColor}
+                roughness={0.43}
+                metalness={0.025}
+                envMapIntensity={0.5}
+              />
+            </mesh>
+          )}
+          {assembly !== 'panel' && (
+            <SpeakerControls
+              knobColor={knobColor}
+              knobGeometry={knobGeometry}
+              powerButtonColor={powerButtonColor}
+              powerButtonGeometry={powerButtonGeometry}
+              model={model}
+            />
+          )}
+        </group>
+      )}
+      {assembly === 'knob' && knobGeometry && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
+          <primitive object={knobGeometry} attach="geometry" dispose={null} />
+          <meshStandardMaterial
+            color={knobColor}
+            roughness={0.42}
+            metalness={0.04}
+            envMapIntensity={0.5}
+          />
+        </mesh>
+      )}
+    </>
+  )
+}
+
 function SpeakerScene({
   geometry,
   model,
@@ -793,72 +896,20 @@ function SpeakerScene({
           target={[0, 0, 0]}
         />
       </Environment>
-      {assembly !== 'panel' && assembly !== 'knob' && (
-        <SpeakerBody
-          width={width}
-          height={height}
-          model={model}
-          bodyColor={bodyColor}
-          bodyGrilleColor={bodyGrilleColor}
-        />
-      )}
-      {assembly !== 'knob' && (
-        <group position={[0, 0, offset]}>
-          {materialParts ? (
-            materialParts.map((part) => (
-              <mesh key={part.materialId} castShadow receiveShadow>
-                <primitive
-                  object={part.previewGeometry ?? part.geometry}
-                  attach="geometry"
-                  dispose={null}
-                />
-                <meshStandardMaterial
-                  color={
-                    part.materialId === 'base'
-                      ? panelColor
-                      : (materials?.find(
-                          (material) => material.id === part.materialId,
-                        )?.color ?? panelColor)
-                  }
-                  roughness={0.43}
-                  metalness={0.025}
-                  envMapIntensity={0.5}
-                />
-              </mesh>
-            ))
-          ) : (
-            <mesh castShadow receiveShadow>
-              <primitive object={geometry} attach="geometry" dispose={null} />
-              <meshStandardMaterial
-                color={panelColor}
-                roughness={0.43}
-                metalness={0.025}
-                envMapIntensity={0.5}
-              />
-            </mesh>
-          )}
-          {assembly !== 'panel' && (
-            <SpeakerControls
-              knobColor={knobColor}
-              knobGeometry={knobGeometry}
-              powerButtonColor={powerButtonColor}
-              powerButtonGeometry={powerButtonGeometry}
-              model={model}
-            />
-          )}
-        </group>
-      )}
-      {assembly === 'knob' && knobGeometry && (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
-          <primitive object={knobGeometry} attach="geometry" dispose={null} />
-          <meshStandardMaterial
-            color={knobColor}
-            roughness={0.42}
-            metalness={0.04}
-            envMapIntensity={0.5}
-          />
-        </mesh>
-      )}
+      <SpeakerModel
+        geometry={geometry}
+        model={model}
+        bodyColor={bodyColor}
+        bodyGrilleColor={bodyGrilleColor}
+        panelColor={panelColor}
+        materialParts={materialParts}
+        materials={materials}
+        knobColor={knobColor}
+        knobGeometry={knobGeometry}
+        powerButtonColor={powerButtonColor}
+        powerButtonGeometry={powerButtonGeometry}
+        assembly={assembly}
+      />
       <ContactShadows
         key={`${geometry.uuid}:${knobGeometry?.uuid}:${powerButtonGeometry?.uuid}:${assembly}`}
         position={[0, bounds.min.y - 0.45, assembly === 'knob' ? 0 : -12]}
