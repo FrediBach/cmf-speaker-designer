@@ -1,6 +1,7 @@
 import { Component, useEffect, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
+import { SpeakerRearDetails } from './SpeakerRearDetails'
 import {
   BODY_COLORS,
   BODY_GRILLE_COLORS,
@@ -251,6 +252,13 @@ function SpeakerBody({
         <planeGeometry args={[width - 3, grilleHeight]} />
         <meshStandardMaterial map={grille} roughness={0.93} metalness={0.08} />
       </mesh>
+      {/* The rear face includes the shell offset and 0.65 mm bevel. */}
+      <group
+        position={[0, -height / 2 + 22, -depth - 1.57]}
+        rotation={[0, Math.PI, 0]}
+      >
+        <SpeakerRearDetails bodyColor={bodyColor} />
+      </group>
       {[-1, 1].map((side) => (
         <group
           key={side}
@@ -547,7 +555,7 @@ function SpeakerScene({
       const controlsTop = model === 's' ? 45.5 : 86
       result.union(
         new Box3(
-          new Vector3(-width / 2, -height / 2 - 1.65, -bodyDepth - 1.55),
+          new Vector3(-width / 2, -height / 2 - 1.65, -bodyDepth - 2),
           new Vector3(width / 2, controlsTop, 10 + offset),
         ),
       )
@@ -593,6 +601,14 @@ function SpeakerScene({
           color="#ffffff"
           scale={[200, 180, 1]}
           position={[0, 200, -50]}
+          target={[0, 0, 0]}
+        />
+        <Lightformer
+          form="rect"
+          intensity={1.2}
+          color="#ffffff"
+          scale={[180, 220, 1]}
+          position={[-100, 65, -180]}
           target={[0, 0, 0]}
         />
       </Environment>
