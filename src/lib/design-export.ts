@@ -3,6 +3,11 @@ import type { BufferGeometry } from 'three'
 import type { Design } from './design'
 import { exportKnobStl, knobFilename, prepareKnobExportGeometry } from './knobs'
 import {
+  exportPowerButtonStl,
+  powerButtonFilename,
+  preparePowerButtonExportGeometry,
+} from './power-button'
+import {
   exportPanelStl,
   haloFilenameSuffix,
   handleFilenameSuffix,
@@ -25,12 +30,13 @@ import {
 
 const encoder = new TextEncoder()
 
-export type DesignExportTarget = 'both' | 'panel' | 'knob'
+export type DesignExportTarget = 'all' | 'panel' | 'knob' | 'power-button'
 export type DesignExportFormat = 'stl' | 'stp' | '3mf' | 'stl-parts'
 
 export interface DesignExportInput {
   panel: BufferGeometry
   knob: BufferGeometry
+  powerButton: BufferGeometry
   design: Design
   target: DesignExportTarget
   format?: DesignExportFormat
@@ -68,6 +74,7 @@ function selectedPanelFilename(design: Design): string {
 export async function buildDesignExport({
   panel,
   knob,
+  powerButton,
   design,
   target,
   format = 'stl',
@@ -77,6 +84,7 @@ export async function buildDesignExport({
     return buildMaterialExport({
       panel,
       knob,
+      powerButton,
       design,
       target,
       format,
@@ -87,20 +95,25 @@ export async function buildDesignExport({
     `.${format}`,
   )
   const knobName = knobFilename(design.knob).replace(/\.stl$/, `.${format}`)
+  const powerButtonName = powerButtonFilename().replace(/\.stl$/, `.${format}`)
   const mimeType = format === 'stp' ? 'model/step' : 'model/stl'
   const serialize = async (
     geometry: BufferGeometry,
-    part: 'panel' | 'knob',
+    part: Exclude<DesignExportTarget, 'all'>,
     name: string,
   ) => {
     if (format === 'stl')
       return part === 'panel'
         ? exportPanelStl(geometry)
-        : exportKnobStl(geometry)
+        : part === 'knob'
+          ? exportKnobStl(geometry)
+          : exportPowerButtonStl(geometry)
     const printable =
       part === 'panel'
         ? preparePanelExportGeometry(geometry)
-        : prepareKnobExportGeometry(geometry)
+        : part === 'knob'
+          ? prepareKnobExportGeometry(geometry)
+          : preparePowerButtonExportGeometry(geometry)
     try {
       return await exportStepFile(printable, name)
     } finally {
@@ -121,6 +134,13 @@ export async function buildDesignExport({
       mimeType,
     }
   }
+  if (target === 'power-button') {
+    return {
+      filename: powerButtonName,
+      data: await serialize(powerButton, 'power-button', powerButtonName),
+      mimeType,
+    }
+  }
 
   const settings = {
     ...design,
@@ -130,8 +150,8 @@ export async function buildDesignExport({
       format,
       geometryType: format === 'stp' ? 'advanced-brep' : 'mesh',
       ...(format === 'stp' ? { toleranceMm: STEP_TOLERANCE_MM } : {}),
-      files: { panel: panelName, knob: knobName },
-      colorNote: `${format.toUpperCase()} files contain geometry only. Match panelColor and knobColor to filament or material colors in your slicer or CAD application. bodyColor and bodyGrilleColor identify the existing speaker body and grille, which are preview context only.`,
+      files: { panel: panelName, knob: knobName, powerButton: powerButtonName },
+      colorNote: `${format.toUpperCase()} files contain geometry only. Match panelColor, knobColor, and powerButtonColor to filament or material colors in your slicer or CAD application. bodyColor and bodyGrilleColor identify the existing speaker body and grille, which are preview context only.`,
     },
   }
   return {
@@ -146,6 +166,12 @@ export async function buildDesignExport({
         data: new Uint8Array(await serialize(knob, 'knob', knobName)),
       },
       {
+        name: powerButtonName,
+        data: new Uint8Array(
+          await serialize(powerButton, 'power-button', powerButtonName),
+        ),
+      },
+      {
         name: 'design.json',
         data: encoder.encode(`${JSON.stringify(settings, null, 2)}\n`),
       },
@@ -157,6 +183,7 @@ export async function buildDesignExport({
 function buildMaterialExport({
   panel,
   knob,
+  powerButton,
   design,
   target,
   format,
@@ -170,7 +197,7 @@ function buildMaterialExport({
   try {
     const assemblies: ThreeMfAssembly[] = []
     let printablePanel: BufferGeometry | undefined
-    if (target !== 'knob') {
+    if (target === 'all' || target === 'panel') {
       const transform = panelAssemblyTransform(panel)
       printablePanel = own(panel.clone().applyMatrix4(transform))
       printablePanel.computeBoundingBox()
@@ -224,18 +251,21 @@ function buildMaterialExport({
         parts,
       })
     }
-    if (target !== 'panel') {
-      const printableKnob = own(prepareKnobExportGeometry(knob))
-      if (printablePanel) {
-        printableKnob.computeBoundingBox()
-        printableKnob.translate(
-          printablePanel.boundingBox!.max.x +
-            10 -
-            printableKnob.boundingBox!.min.x,
-          printablePanel.boundingBox!.min.y - printableKnob.boundingBox!.min.y,
+    let precedingPart = printablePanel
+    const placeNextPart = (geometry: BufferGeometry) => {
+      geometry.computeBoundingBox()
+      if (precedingPart) {
+        geometry.translate(
+          precedingPart.boundingBox!.max.x + 10 - geometry.boundingBox!.min.x,
+          precedingPart.boundingBox!.min.y - geometry.boundingBox!.min.y,
           0,
         )
       }
+      precedingPart = geometry
+      return geometry
+    }
+    if (target === 'all' || target === 'knob') {
+      const printableKnob = placeNextPart(own(prepareKnobExportGeometry(knob)))
       assemblies.push({
         name: 'Volume knob',
         parts: [
@@ -244,6 +274,22 @@ function buildMaterialExport({
             name: 'Volume knob',
             color: design.knobColor,
             geometry: printableKnob,
+          },
+        ],
+      })
+    }
+    if (target === 'all' || target === 'power-button') {
+      const printablePowerButton = placeNextPart(
+        own(preparePowerButtonExportGeometry(powerButton)),
+      )
+      assemblies.push({
+        name: 'Power button',
+        parts: [
+          {
+            id: 'power-button',
+            name: 'Power button',
+            color: design.powerButtonColor,
+            geometry: printablePowerButton,
           },
         ],
       })
@@ -263,7 +309,7 @@ function buildMaterialExport({
     }
     if (format === '3mf')
       return {
-        filename: `cmf-speaker-${design.model}-${target === 'both' ? 'design' : target}.3mf`,
+        filename: `cmf-speaker-${design.model}-${target === 'all' ? 'design' : target}.3mf`,
         mimeType: 'model/3mf',
         data: exportThreeMf(assemblies, metadata),
       }
@@ -286,7 +332,9 @@ function buildMaterialExport({
         const name =
           assembly.name === 'Volume knob'
             ? 'volume-knob.stl'
-            : `panel-material-${String(index + 1).padStart(2, '0')}-${slug}.stl`
+            : assembly.name === 'Power button'
+              ? 'power-button.stl'
+              : `panel-material-${String(index + 1).padStart(2, '0')}-${slug}.stl`
         entries.push({
           name,
           data: new Uint8Array(serializePlacedStl(part.geometry)),
@@ -314,7 +362,7 @@ function buildMaterialExport({
     entries.push({
       name: 'README.txt',
       data: encoder.encode(
-        'CMF Speaker Designer — multicolor parts\n\nImport all panel-material STLs together as PARTS OF ONE OBJECT at 100% scale in millimeters. Preserve their common positions; do not auto-arrange, center, or drop each part independently. Assign a filament to each named material, using materials.json as your color guide. The volume knob is a separate object.\n\nThese are full-depth material regions of one assembled print, not separately printable inlays. Review sliced layers, supports, interfaces, and filament compatibility. Reopen the authored composition using Load design JSON in the designer.\n',
+        'CMF Speaker Designer — multicolor parts\n\nImport all panel-material STLs together as PARTS OF ONE OBJECT at 100% scale in millimeters. Preserve their common positions; do not auto-arrange, center, or drop each part independently. Assign a filament to each named material, using materials.json as your color guide. The volume knob and power button are separate objects.\n\nThese are full-depth material regions of one assembled print, not separately printable inlays. Review sliced layers, supports, interfaces, and filament compatibility. Reopen the authored composition using Load design JSON in the designer.\n',
       ),
     })
     return {

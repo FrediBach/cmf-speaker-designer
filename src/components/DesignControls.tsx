@@ -71,13 +71,15 @@ export function DesignControls({
   const {
     geometry,
     knobGeometry,
+    powerButtonGeometry,
     error,
     knobError,
+    powerButtonError,
     materialParts,
     multicolorError,
   } = meshes
   const colorsReady = !design.multicolor.enabled || !!materialParts
-  const exportError = error || knobError || multicolorError
+  const exportError = error || knobError || powerButtonError || multicolorError
   return (
     <aside
       className="controls"
@@ -346,10 +348,21 @@ export function DesignControls({
         ) : null}
         <Button
           className="download-button"
-          disabled={!geometry || !knobGeometry || !!error || !!knobError}
+          disabled={
+            !geometry ||
+            !knobGeometry ||
+            !powerButtonGeometry ||
+            !!error ||
+            !!knobError ||
+            !!powerButtonError
+          }
           onClick={onOpenExport}
         >
-          {(!geometry || !knobGeometry || !colorsReady) && !exportError ? (
+          {(!geometry ||
+            !knobGeometry ||
+            !powerButtonGeometry ||
+            !colorsReady) &&
+          !exportError ? (
             <LoaderCircle size={17} className="spin" />
           ) : (
             <ArrowDownToLine size={18} />

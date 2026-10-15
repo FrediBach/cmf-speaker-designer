@@ -49,9 +49,11 @@ export function DesignerPreview({
   const {
     previewGeometry,
     previewKnobGeometry,
+    previewPowerButtonGeometry,
     error,
     generating,
     knobGenerating,
+    powerButtonGenerating,
     panelWidth,
     panelHeight,
     knobDimensions,
@@ -114,6 +116,8 @@ export function DesignerPreview({
                 materials={design.multicolor.materials}
                 knobColor={design.knobColor}
                 knobGeometry={previewKnobGeometry}
+                powerButtonColor={design.powerButtonColor}
+                powerButtonGeometry={previewPowerButtonGeometry}
                 knobStyle={design.knob.style}
                 relief={design.relief}
                 view={view}
@@ -123,7 +127,10 @@ export function DesignerPreview({
             </Suspense>
           </PreviewLoadBoundary>
         </div>
-        {(generating || knobGenerating || multicolorGenerating) &&
+        {(generating ||
+          knobGenerating ||
+          powerButtonGenerating ||
+          multicolorGenerating) &&
           previewGeometry && (
             <div className="geometry-updating" role="status">
               <LoaderCircle className="spin" size={12} /> Updating geometry…

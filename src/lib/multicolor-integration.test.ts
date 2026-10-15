@@ -13,6 +13,7 @@ import type { MaterialGeometry } from './multicolor-geometry'
 import { applyMulticolorPreset } from './multicolor-presets'
 import { getDefaultMulticolorSettings } from './multicolor-settings'
 import { parsePanelGeometry } from './panels'
+import { parsePowerButtonGeometry } from './power-button'
 
 const decoder = new TextDecoder()
 
@@ -125,7 +126,7 @@ function placedBounds(geometry: BufferGeometry, frontZ: number) {
 }
 
 const fixtures = [
-  { model: 's', preset: 'france', target: 'both', grille: false },
+  { model: 's', preset: 'france', target: 'all', grille: false },
   { model: 'm', preset: 'norway', target: 'panel', grille: false },
   { model: 's', preset: 'united-kingdom', target: 'panel', grille: false },
   { model: 'm', preset: 'rainbow', target: 'panel', grille: false },
@@ -146,6 +147,7 @@ describe('real-panel multicolor export integration', () => {
         handle: getDefaultHandleSettings(model),
         multicolor: recipe.settings,
         panelColor: recipe.panelColor,
+        powerButtonColor: '#d9277c',
         grille: {
           ...DEFAULT_DESIGN.grille,
           mode: grille ? 'custom' : 'original',
@@ -160,6 +162,9 @@ describe('real-panel multicolor export integration', () => {
         design.knob.style,
       )
       const knob = customizeKnobGeometry(knobSource, design.knob)
+      const powerButton = parsePowerButtonGeometry(
+        sourceBytes('cmf-speaker-sm-3d-printing-power-button-original-v1.stl'),
+      )
       let panel: BufferGeometry | undefined
       let parts: MaterialGeometry[] = []
       try {
@@ -184,7 +189,14 @@ describe('real-panel multicolor export integration', () => {
           ({ geometry }) =>
             new Float32Array(geometry.getAttribute('position').array),
         )
-        const input = { panel, knob, design, target, materialParts: parts }
+        const input = {
+          panel,
+          knob,
+          powerButton,
+          design,
+          target,
+          materialParts: parts,
+        }
         const threeMf = await buildDesignExport({ ...input, format: '3mf' })
         const stlZip = await buildDesignExport({
           ...input,
@@ -242,7 +254,7 @@ describe('real-panel multicolor export integration', () => {
             assembly: string
           }[]
         }
-        const expectedPartCount = parts.length + (target === 'both' ? 1 : 0)
+        const expectedPartCount = parts.length + (target === 'all' ? 2 : 0)
         expect(materialMetadata.units).toBe('mm')
         expect(stlMetadata.units).toBe('mm')
         expect(materialMetadata.objects).toHaveLength(expectedPartCount)
@@ -255,7 +267,7 @@ describe('real-panel multicolor export integration', () => {
         const buildIds = [...xml.matchAll(/<item\b([^>]*)\/>/g)].map((item) =>
           Number(attributes(item[1]).objectid),
         )
-        expect(buildIds).toHaveLength(target === 'both' ? 2 : 1)
+        expect(buildIds).toHaveLength(target === 'all' ? 3 : 1)
         expect(objects.get(buildIds[0])!.components).toHaveLength(parts.length)
         expect(objects.size).toBe(expectedPartCount + buildIds.length)
         const bases = [...xml.matchAll(/<base\b([^>]*)\/>/g)].map((base) =>
@@ -316,7 +328,7 @@ describe('real-panel multicolor export integration', () => {
         expectBounds(assembledBounds, placedBounds(panel, frontZ))
         expect(assembledBounds.min.z).toBeCloseTo(0, 4)
         if (preset === 'rainbow') expect(raisedMaterial).toBe(true)
-        if (target === 'both') {
+        if (target === 'all') {
           const knobObject = objects.get(
             materialMetadata.objects.find(
               ({ materialId }) => materialId === 'knob',
@@ -325,6 +337,44 @@ describe('real-panel multicolor export integration', () => {
           expect(knobObject.bounds.min.x).toBeGreaterThan(assembledBounds.max.x)
           expect(knobObject.bounds.min.z).toBeCloseTo(0, 4)
           expect(objects.get(buildIds[1])!.components).toHaveLength(1)
+          const powerButtonMaterial = materialMetadata.objects.find(
+            ({ assembly }) => assembly === 'Power button',
+          )!
+          const powerButtonObject = objects.get(powerButtonMaterial.objectId)!
+          expect(powerButtonMaterial).toMatchObject({
+            materialId: 'power-button',
+            name: 'Power button',
+            color: '#d9277c',
+          })
+          expect(
+            powerButtonObject.bounds.min.x - knobObject.bounds.max.x,
+          ).toBeCloseTo(10, 4)
+          expect(powerButtonObject.bounds.min.z).toBeCloseTo(0, 4)
+          expect(objects.get(buildIds[2])!.components).toEqual([
+            powerButtonMaterial.objectId,
+          ])
+          expect(
+            bases[Number(powerButtonObject.attrs.pindex)].displaycolor,
+          ).toBe('#D9277CFF')
+          const fallback = stlMetadata.parts.find(
+            ({ assembly }) => assembly === 'Power button',
+          )!
+          expect(fallback).toMatchObject({
+            color: '#d9277c',
+            file: 'power-button.stl',
+          })
+          const buttonStl = new STLLoader().parse(
+            stlEntries.get(fallback.file)!.buffer as ArrayBuffer,
+          )
+          try {
+            buttonStl.computeBoundingBox()
+            expectBounds(buttonStl.boundingBox!, powerButtonObject.bounds)
+            expect(buttonStl.getAttribute('position').count).toBe(
+              powerButton.getAttribute('position').count,
+            )
+          } finally {
+            buttonStl.dispose()
+          }
         }
         if (process.env.MULTICOLOR_FIXTURES === '1') {
           const directory = resolve('test-results/multicolor-fixtures')
@@ -347,6 +397,7 @@ describe('real-panel multicolor export integration', () => {
         panel?.dispose()
         source.dispose()
         knob.dispose()
+        powerButton.dispose()
         knobSource.dispose()
       }
     },

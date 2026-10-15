@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { Box3, BoxGeometry, CylinderGeometry, Vector3 } from 'three'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 import { describe, expect, it } from 'vitest'
@@ -5,9 +6,29 @@ import { DEFAULT_DESIGN, validateDesign, type Design } from './design'
 import { buildDesignExport } from './design-export'
 import { exportKnobStl, knobFilename } from './knobs'
 import { exportPanelStl } from './panels'
+import {
+  exportPowerButtonStl,
+  parsePowerButtonGeometry,
+  powerButtonFilename,
+} from './power-button'
 import { STEP_TOLERANCE_MM } from './step-settings'
 
 const decoder = new TextDecoder()
+
+function powerButtonFixture() {
+  const source = readFileSync(
+    new URL(
+      '../../resources/stl-files/cmf-speaker-sm-3d-printing-power-button-original-v1.stl',
+      import.meta.url,
+    ),
+  )
+  return parsePowerButtonGeometry(
+    source.buffer.slice(
+      source.byteOffset,
+      source.byteOffset + source.byteLength,
+    ),
+  )
+}
 
 /** Independent bitwise CRC verifies the ZIP's stored payloads and headers. */
 function checksum(bytes: Uint8Array) {
@@ -109,16 +130,24 @@ function readStepBounds(buffer: ArrayBuffer) {
   return bounds
 }
 
-function expectStepMatchesStl(step: ArrayBuffer, stl: ArrayBuffer) {
+function expectStepMatchesStl(
+  step: ArrayBuffer,
+  stl: ArrayBuffer,
+  tolerance = 0.00001,
+) {
   const actual = readStepBounds(step)
   const geometry = new STLLoader().parse(stl)
   geometry.computeBoundingBox()
   const expected = geometry.boundingBox!
   for (const axis of ['x', 'y', 'z'] as const) {
-    expect(actual.min[axis]).toBeCloseTo(expected.min[axis], 5)
-    expect(actual.max[axis]).toBeCloseTo(expected.max[axis], 5)
+    expect(Math.abs(actual.min[axis] - expected.min[axis])).toBeLessThanOrEqual(
+      tolerance,
+    )
+    expect(Math.abs(actual.max[axis] - expected.max[axis])).toBeLessThanOrEqual(
+      tolerance,
+    )
   }
-  expect(actual.min.z).toBeCloseTo(0, 5)
+  expect(Math.abs(actual.min.z)).toBeLessThanOrEqual(tolerance)
   geometry.dispose()
 }
 
@@ -128,6 +157,7 @@ describe('design export', async () => {
     async (format) => {
       const panel = new BoxGeometry(85, 131, 24)
       const knob = new CylinderGeometry(10, 10, 12, 16)
+      const powerButton = powerButtonFixture()
       try {
         for (const [enabled, count, suffix] of [
           [true, 1, '-race-stripes-1x8.0mm'],
@@ -142,6 +172,7 @@ describe('design export', async () => {
           const file = await buildDesignExport({
             panel,
             knob,
+            powerButton,
             design,
             target: 'panel',
             format,
@@ -150,8 +181,9 @@ describe('design export', async () => {
           const archive = await buildDesignExport({
             panel,
             knob,
+            powerButton,
             design,
-            target: 'both',
+            target: 'all',
             format,
           })
           const entries = readArchive(archive.data)
@@ -166,6 +198,7 @@ describe('design export', async () => {
       } finally {
         panel.dispose()
         knob.dispose()
+        powerButton.dispose()
       }
     },
   )
@@ -173,11 +206,13 @@ describe('design export', async () => {
   it('packages separate printable parts and complete, reusable color settings', async () => {
     const panel = new BoxGeometry(85, 131, 24)
     const knob = new CylinderGeometry(10, 10, 12, 16)
+    const powerButton = powerButtonFixture()
     const design: Design = {
       ...DEFAULT_DESIGN,
       bodyColor: 'gray',
       panelColor: '#123456',
       knobColor: '#abcdef',
+      powerButtonColor: '#c41f82',
       knob: {
         ...DEFAULT_DESIGN.knob,
         style: 'fluted',
@@ -208,11 +243,13 @@ describe('design export', async () => {
     }
     const panelBefore = panel.getAttribute('position').array.slice()
     const knobBefore = knob.getAttribute('position').array.slice()
+    const powerButtonBefore = powerButton.getAttribute('position').array.slice()
     const file = await buildDesignExport({
       panel,
       knob,
+      powerButton,
       design,
-      target: 'both',
+      target: 'all',
     })
     expect(file.filename).toBe('cmf-speaker-s-design.zip')
     expect(file.mimeType).toBe('application/zip')
@@ -220,11 +257,20 @@ describe('design export', async () => {
     const panelName =
       'cmf-speaker-s-original-depth-1.2mm-sides-7.5mm-gap-3.5mm-handle-32.0mm-lego-studs-grille-hex-extended.stl'
     const knobName = knobFilename(design.knob)
-    expect([...entries.keys()]).toEqual([panelName, knobName, 'design.json'])
+    const powerButtonName = powerButtonFilename()
+    expect([...entries.keys()]).toEqual([
+      panelName,
+      knobName,
+      powerButtonName,
+      'design.json',
+    ])
     expect(entries.get(panelName)).toEqual(
       new Uint8Array(exportPanelStl(panel)),
     )
     expect(entries.get(knobName)).toEqual(new Uint8Array(exportKnobStl(knob)))
+    expect(entries.get(powerButtonName)).toEqual(
+      new Uint8Array(exportPowerButtonStl(powerButton)),
+    )
     const settings = JSON.parse(decoder.decode(entries.get('design.json')))
     expect(settings).toMatchObject(design)
     expect(settings.bodyColor).toBe('gray')
@@ -232,12 +278,17 @@ describe('design export', async () => {
     expect(settings.knob).not.toHaveProperty('diameter')
     expect(settings.knob).not.toHaveProperty('rotation')
     expect(settings.export.units).toBe('mm')
-    expect(settings.export.files).toEqual({ panel: panelName, knob: knobName })
+    expect(settings.export.files).toEqual({
+      panel: panelName,
+      knob: knobName,
+      powerButton: powerButtonName,
+    })
     expect(settings.export.colorNote).toContain('geometry only')
+    expect(settings.export.colorNote).toContain('powerButtonColor')
     expect(validateDesign(settings)).toEqual(validateDesign(design))
 
     // Each part has its own print-bed origin and the preview meshes stay intact.
-    for (const filename of [panelName, knobName]) {
+    for (const filename of [panelName, knobName, powerButtonName]) {
       const data = entries.get(filename)!
       const geometry = new STLLoader().parse(data.buffer as ArrayBuffer)
       geometry.computeBoundingBox()
@@ -246,17 +297,23 @@ describe('design export', async () => {
     }
     expect(panel.getAttribute('position').array).toEqual(panelBefore)
     expect(knob.getAttribute('position').array).toEqual(knobBefore)
+    expect(powerButton.getAttribute('position').array).toEqual(
+      powerButtonBefore,
+    )
     panel.dispose()
     knob.dispose()
+    powerButton.dispose()
   })
 
   it('supports individual STL exports without a ZIP wrapper', async () => {
     const panel = new BoxGeometry(85, 225, 29)
     const knob = new CylinderGeometry(10, 10, 12, 16)
+    const powerButton = powerButtonFixture()
     const design: Design = { ...DEFAULT_DESIGN, model: 'm', style: 'custom' }
     const panelFile = await buildDesignExport({
       panel,
       knob,
+      powerButton,
       design,
       target: 'panel',
     })
@@ -269,6 +326,7 @@ describe('design export', async () => {
     const knobFile = await buildDesignExport({
       panel,
       knob,
+      powerButton,
       design,
       target: 'knob',
     })
@@ -277,22 +335,38 @@ describe('design export', async () => {
     expect(new Uint8Array(knobFile.data)).toEqual(
       new Uint8Array(exportKnobStl(knob)),
     )
+    const powerButtonFile = await buildDesignExport({
+      panel,
+      knob,
+      powerButton,
+      design,
+      target: 'power-button',
+    })
+    expect(powerButtonFile.filename).toBe(powerButtonFilename())
+    expect(powerButtonFile.mimeType).toBe('model/stl')
+    expect(new Uint8Array(powerButtonFile.data)).toEqual(
+      new Uint8Array(exportPowerButtonStl(powerButton)),
+    )
     panel.dispose()
     knob.dispose()
+    powerButton.dispose()
   })
 
   it('exports each selected part as STEP in millimeters with the same orientation as STL', async () => {
     const panel = new BoxGeometry(85, 225, 29).translate(14, 6, 31)
     const knob = new CylinderGeometry(10, 7, 12, 16).translate(7, -4, 23)
+    const powerButton = powerButtonFixture()
     const design: Design = { ...DEFAULT_DESIGN, model: 'm', style: 'custom' }
     const panelBefore = panel.getAttribute('position').array.slice()
     const knobBefore = knob.getAttribute('position').array.slice()
+    const powerButtonBefore = powerButton.getAttribute('position').array.slice()
     const panelIndexBefore = panel.getIndex()!.array.slice()
     const knobIndexBefore = knob.getIndex()!.array.slice()
 
     const panelFile = await buildDesignExport({
       panel,
       knob,
+      powerButton,
       design,
       target: 'panel',
       format: 'stp',
@@ -304,6 +378,7 @@ describe('design export', async () => {
     const knobFile = await buildDesignExport({
       panel,
       knob,
+      powerButton,
       design,
       target: 'knob',
       format: 'stp',
@@ -313,17 +388,39 @@ describe('design export', async () => {
     )
     expect(knobFile.mimeType).toBe('model/step')
     expectStepMatchesStl(knobFile.data, exportKnobStl(knob))
+    const powerButtonFile = await buildDesignExport({
+      panel,
+      knob,
+      powerButton,
+      design,
+      target: 'power-button',
+      format: 'stp',
+    })
+    expect(powerButtonFile.filename).toBe(
+      powerButtonFilename().replace(/\.stl$/, '.stp'),
+    )
+    expect(powerButtonFile.mimeType).toBe('model/step')
+    expectStepMatchesStl(
+      powerButtonFile.data,
+      exportPowerButtonStl(powerButton),
+      STEP_TOLERANCE_MM,
+    )
     expect(panel.getAttribute('position').array).toEqual(panelBefore)
     expect(knob.getAttribute('position').array).toEqual(knobBefore)
+    expect(powerButton.getAttribute('position').array).toEqual(
+      powerButtonBefore,
+    )
     expect(panel.getIndex()!.array).toEqual(panelIndexBefore)
     expect(knob.getIndex()!.array).toEqual(knobIndexBefore)
     panel.dispose()
     knob.dispose()
+    powerButton.dispose()
   })
 
   it('packages STEP parts with their format, geometry type, and reusable settings', async () => {
     const panel = new BoxGeometry(85, 131, 48)
     const knob = new CylinderGeometry(10, 7, 12, 16)
+    const powerButton = powerButtonFixture()
     const design = validateDesign({
       ...DEFAULT_DESIGN,
       bodyColor: 'gray',
@@ -357,8 +454,9 @@ describe('design export', async () => {
     const file = await buildDesignExport({
       panel,
       knob,
+      powerButton,
       design,
-      target: 'both',
+      target: 'all',
       format: 'stp',
     })
     expect(file.filename).toBe('cmf-speaker-s-design-stp.zip')
@@ -367,7 +465,13 @@ describe('design export', async () => {
     const panelName =
       'cmf-speaker-s-original-depth-1.2mm-handle-32.0mm-lego-studs-grille-hex-extended-halo-30.0mm-cut-45.0deg.stp'
     const knobName = knobFilename(design.knob).replace(/\.stl$/, '.stp')
-    expect([...entries.keys()]).toEqual([panelName, knobName, 'design.json'])
+    const powerButtonName = powerButtonFilename().replace(/\.stl$/, '.stp')
+    expect([...entries.keys()]).toEqual([
+      panelName,
+      knobName,
+      powerButtonName,
+      'design.json',
+    ])
     expectStepMatchesStl(
       entries.get(panelName)!.buffer as ArrayBuffer,
       exportPanelStl(panel),
@@ -375,6 +479,11 @@ describe('design export', async () => {
     expectStepMatchesStl(
       entries.get(knobName)!.buffer as ArrayBuffer,
       exportKnobStl(knob),
+    )
+    expectStepMatchesStl(
+      entries.get(powerButtonName)!.buffer as ArrayBuffer,
+      exportPowerButtonStl(powerButton),
+      STEP_TOLERANCE_MM,
     )
     const settings = JSON.parse(decoder.decode(entries.get('design.json')))
     expect(settings).toMatchObject(design)
@@ -384,11 +493,12 @@ describe('design export', async () => {
       geometryType: 'advanced-brep',
       toleranceMm: STEP_TOLERANCE_MM,
       units: 'mm',
-      files: { panel: panelName, knob: knobName },
+      files: { panel: panelName, knob: knobName, powerButton: powerButtonName },
     })
     expect(validateDesign(settings)).toEqual(design)
     panel.dispose()
     knob.dispose()
+    powerButton.dispose()
   })
 
   it.each(['stl', 'stp'] as const)(
@@ -396,6 +506,7 @@ describe('design export', async () => {
     async (format) => {
       const panel = new BoxGeometry(85, 131, 24)
       const knob = new CylinderGeometry(10, 10, 12, 16)
+      const powerButton = powerButtonFixture()
       for (const [mode, legoStuds, topShape, topAngle, topCurve, suffix] of [
         ['custom', true, 'straight', 0, 10, '-handle-32.0mm-lego-studs'],
         ['custom', false, 'straight', 0, 10, '-handle-32.0mm'],
@@ -434,6 +545,7 @@ describe('design export', async () => {
         const file = await buildDesignExport({
           panel,
           knob,
+          powerButton,
           design,
           target: 'panel',
           format,
@@ -442,8 +554,9 @@ describe('design export', async () => {
         const archive = await buildDesignExport({
           panel,
           knob,
+          powerButton,
           design,
-          target: 'both',
+          target: 'all',
           format,
         })
         const entries = readArchive(archive.data)
@@ -455,12 +568,14 @@ describe('design export', async () => {
       }
       panel.dispose()
       knob.dispose()
+      powerButton.dispose()
     },
   )
 
   it('names generated halos and retains every halo parameter in the archive', async () => {
     const panel = new BoxGeometry(85, 131, 48)
     const knob = new CylinderGeometry(10, 10, 12, 16)
+    const powerButton = powerButtonFixture()
     const design = validateDesign({
       ...DEFAULT_DESIGN,
       style: 'custom',
@@ -476,11 +591,26 @@ describe('design export', async () => {
     })
     const filename = 'cmf-speaker-s-original-halo-30.0mm-cut-45.0deg.stl'
     expect(
-      (await buildDesignExport({ panel, knob, design, target: 'panel' }))
-        .filename,
+      (
+        await buildDesignExport({
+          panel,
+          knob,
+          powerButton,
+          design,
+          target: 'panel',
+        })
+      ).filename,
     ).toBe(filename)
     const entries = readArchive(
-      (await buildDesignExport({ panel, knob, design, target: 'both' })).data,
+      (
+        await buildDesignExport({
+          panel,
+          knob,
+          powerButton,
+          design,
+          target: 'all',
+        })
+      ).data,
     )
     expect(entries.get(filename)).toEqual(new Uint8Array(exportPanelStl(panel)))
     const restored = validateDesign(
@@ -489,5 +619,6 @@ describe('design export', async () => {
     expect(restored).toEqual(design)
     panel.dispose()
     knob.dispose()
+    powerButton.dispose()
   })
 })

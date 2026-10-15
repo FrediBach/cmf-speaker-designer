@@ -26,6 +26,7 @@ export function randomizeDesign(
     bodyGrilleColor: pick(['black', 'orange', 'turquoise'] as const),
     style: 'custom',
     panelColor: pick(PALETTE).value,
+    powerButtonColor: pick(PALETTE).value,
     knobColor: pick(PALETTE).value,
     relief: range(0, 2, 0.1),
     raceStripes: {

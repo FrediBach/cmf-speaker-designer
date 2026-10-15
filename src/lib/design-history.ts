@@ -88,6 +88,7 @@ function designsEqual(left: Design, right: Design) {
     left.bodyGrilleColor === right.bodyGrilleColor &&
     left.style === right.style &&
     left.panelColor === right.panelColor &&
+    left.powerButtonColor === right.powerButtonColor &&
     left.knobColor === right.knobColor &&
     left.relief === right.relief &&
     left.panelExtension === right.panelExtension &&

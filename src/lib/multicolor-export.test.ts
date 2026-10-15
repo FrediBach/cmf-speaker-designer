@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { BoxGeometry, BufferGeometry, Float32BufferAttribute } from 'three'
 import { unzipSync, strFromU8 } from 'three/addons/libs/fflate.module.js'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
@@ -7,6 +8,7 @@ import { buildDesignExport } from './design-export'
 import { buildMulticolorGeometry } from './multicolor-client'
 import { createPatternElement } from './multicolor-patterns'
 import { exportThreeMf } from './three-mf-export'
+import { parsePowerButtonGeometry } from './power-button'
 
 async function fixture(materialId = 'blue') {
   // Angled panel: each color has a different frontmost Z. Independent
@@ -14,7 +16,20 @@ async function fixture(materialId = 'blue') {
   const panel = new BoxGeometry(40, 30, 4).toNonIndexed()
   panel.rotateY(0.2)
   const knob = new BoxGeometry(10, 10, 12).toNonIndexed()
+  const powerButtonBytes = readFileSync(
+    new URL(
+      '../../resources/stl-files/cmf-speaker-sm-3d-printing-power-button-original-v1.stl',
+      import.meta.url,
+    ),
+  )
+  const powerButton = parsePowerButtonGeometry(
+    powerButtonBytes.buffer.slice(
+      powerButtonBytes.byteOffset,
+      powerButtonBytes.byteOffset + powerButtonBytes.byteLength,
+    ),
+  )
   const design = validateDesign({
+    powerButtonColor: '#cc22bb',
     panelColor: '#ffffff',
     multicolor: {
       enabled: true,
@@ -38,11 +53,13 @@ async function fixture(materialId = 'blue') {
   return {
     panel,
     knob,
+    powerButton,
     design,
     materialParts: generated.parts,
     dispose() {
       panel.dispose()
       knob.dispose()
+      powerButton.dispose()
       generated.parts.forEach(({ geometry, previewGeometry }) => {
         geometry.dispose()
         previewGeometry?.dispose()
@@ -74,7 +91,7 @@ describe('multicolor printable exports', () => {
     try {
       const file = await buildDesignExport({
         ...input,
-        target: 'both',
+        target: 'all',
         format: '3mf',
       })
       expect(file.filename).toMatch(/\.3mf$/)
@@ -84,6 +101,7 @@ describe('multicolor printable exports', () => {
       expect(source).toContain('unit="millimeter"')
       expect(source).toContain('Blue &amp; &quot;Sky&quot; &lt;1&gt;')
       expect(source).toContain('displaycolor="#0044FFFF"')
+      expect(source).toContain('name="Power button" displaycolor="#CC22BBFF"')
       expect(strFromU8(entries['_rels/.rels'])).toContain('/3D/3dmodel.model')
       const objects = [
         ...source.matchAll(/<object id="(\d+)"[^>]*>([\s\S]*?)<\/object>/g),
@@ -95,8 +113,8 @@ describe('multicolor printable exports', () => {
       expect(refs.every((id) => ids.includes(id))).toBe(true)
       expect(new Set(ids).size).toBe(ids.length)
       const meshes = objects.filter((match) => match[2].includes('<mesh>'))
-      expect(meshes).toHaveLength(3)
-      expect(source.match(/<item /g)).toHaveLength(2)
+      expect(meshes).toHaveLength(4)
+      expect(source.match(/<item /g)).toHaveLength(3)
       for (const object of meshes) {
         const points = vertices(object[2])
         expect(points.length).toBeGreaterThan(3)
@@ -129,9 +147,21 @@ describe('multicolor printable exports', () => {
         meshes.slice(0, 2).flatMap((match) => vertices(match[2])),
       )
       const knobBounds = bounds(vertices(meshes[2][2]))
+      const powerButtonBounds = bounds(vertices(meshes[3][2]))
       expect(knobBounds.min[0] - panelBounds.max[0]).toBeCloseTo(10, 5)
+      expect(powerButtonBounds.min[0] - knobBounds.max[0]).toBeCloseTo(10, 5)
+      expect(powerButtonBounds.min[1]).toBeCloseTo(panelBounds.min[1], 5)
+      expect(powerButtonBounds.min[2]).toBeCloseTo(0, 5)
+      input.powerButton.computeBoundingBox()
+      const sourceBounds = input.powerButton.boundingBox!
+      expect(powerButtonBounds.max[0] - powerButtonBounds.min[0]).toBeCloseTo(
+        sourceBounds.max.x - sourceBounds.min.x,
+        5,
+      )
+      expect(powerButtonBounds.max[2]).toBeCloseTo(sourceBounds.max.z, 5)
       const metadata = JSON.parse(strFromU8(entries['Metadata/design.json']))
       expect(metadata.multicolor).toEqual(input.design.multicolor)
+      expect(metadata.powerButtonColor).toBe('#cc22bb')
       const materials = JSON.parse(
         strFromU8(entries['Metadata/materials.json']),
       )
@@ -139,7 +169,17 @@ describe('multicolor printable exports', () => {
         materials.objects.map(
           (item: { materialId: string }) => item.materialId,
         ),
-      ).toEqual([...input.materialParts.map((part) => part.materialId), 'knob'])
+      ).toEqual([
+        ...input.materialParts.map((part) => part.materialId),
+        'knob',
+        'power-button',
+      ])
+      expect(materials.objects.at(-1)).toMatchObject({
+        materialId: 'power-button',
+        name: 'Power button',
+        assembly: 'Power button',
+        color: '#cc22bb',
+      })
     } finally {
       input.dispose()
     }
@@ -250,30 +290,106 @@ describe('multicolor printable exports', () => {
     geometry.dispose()
   })
 
-  it('keeps a panel material named knob distinct from the separate knob STL', async () => {
-    const input = await fixture('knob')
-    try {
-      const file = await buildDesignExport({
-        ...input,
-        target: 'both',
-        format: 'stl-parts',
-      })
-      const entries = unzipSync(new Uint8Array(file.data))
-      const manifest = JSON.parse(strFromU8(entries['materials.json']))
-      const filenames = manifest.parts.map(
-        (part: { file: string }) => part.file,
-      )
-      expect(new Set(filenames).size).toBe(3)
-      expect(
-        filenames.filter((name: string) => name === 'volume-knob.stl'),
-      ).toHaveLength(1)
-      expect(
-        Object.keys(entries).filter((name) => name.endsWith('.stl')),
-      ).toHaveLength(3)
-    } finally {
-      input.dispose()
-    }
-  })
+  it.each(['3mf', 'stl-parts'] as const)(
+    'exports only the original power button in %s without requiring panel material regions',
+    async (format) => {
+      const input = await fixture()
+      const before = input.powerButton.getAttribute('position').array.slice()
+      try {
+        const file = await buildDesignExport({
+          ...input,
+          materialParts: null,
+          target: 'power-button',
+          format,
+        })
+        const entries = unzipSync(new Uint8Array(file.data))
+        if (format === '3mf') {
+          expect(file.filename).toBe('cmf-speaker-s-power-button.3mf')
+          const source = strFromU8(entries['3D/3dmodel.model'])
+          expect(source.match(/<item /g)).toHaveLength(1)
+          expect(source.match(/<mesh>/g)).toHaveLength(1)
+          expect(source).toContain(
+            'name="Power button" displaycolor="#CC22BBFF"',
+          )
+          const points = vertices(source)
+          const exported = bounds(points)
+          input.powerButton.computeBoundingBox()
+          const original = input.powerButton.boundingBox!
+          expect(exported.min).toEqual([original.min.x, original.min.y, 0])
+          expect(exported.max).toEqual([
+            original.max.x,
+            original.max.y,
+            original.max.z,
+          ])
+          const materials = JSON.parse(
+            strFromU8(entries['Metadata/materials.json']),
+          )
+          expect(materials.objects).toHaveLength(1)
+          expect(materials.objects[0]).toMatchObject({
+            materialId: 'power-button',
+            color: '#cc22bb',
+            assembly: 'Power button',
+          })
+        } else {
+          expect(
+            Object.keys(entries).filter((name) => name.endsWith('.stl')),
+          ).toEqual(['power-button.stl'])
+          const materials = JSON.parse(strFromU8(entries['materials.json']))
+          expect(materials.parts).toEqual([
+            {
+              materialId: 'power-button',
+              name: 'Power button',
+              color: '#cc22bb',
+              file: 'power-button.stl',
+              assembly: 'Power button',
+            },
+          ])
+          const geometry = new STLLoader().parse(
+            entries['power-button.stl'].slice().buffer as ArrayBuffer,
+          )
+          try {
+            expect(geometry.getAttribute('position').array).toEqual(before)
+          } finally {
+            geometry.dispose()
+          }
+        }
+        expect(input.powerButton.getAttribute('position').array).toEqual(before)
+      } finally {
+        input.dispose()
+      }
+    },
+  )
+
+  it.each(['knob', 'power-button'])(
+    'keeps a panel material named %s distinct from the separate control STLs',
+    async (materialId) => {
+      const input = await fixture(materialId)
+      try {
+        const file = await buildDesignExport({
+          ...input,
+          target: 'all',
+          format: 'stl-parts',
+        })
+        const entries = unzipSync(new Uint8Array(file.data))
+        const manifest = JSON.parse(strFromU8(entries['materials.json']))
+        const filenames = manifest.parts.map(
+          (part: { file: string }) => part.file,
+        )
+        expect(new Set(filenames).size).toBe(4)
+        expect(
+          filenames.filter((name: string) => name === 'volume-knob.stl'),
+        ).toHaveLength(1)
+        expect(
+          filenames.filter((name: string) => name === 'power-button.stl'),
+        ).toHaveLength(1)
+        expect(
+          Object.keys(entries).filter((name) => name.endsWith('.stl')),
+        ).toHaveLength(4)
+      } finally {
+        input.dispose()
+      }
+    },
+  )
 
   it('rejects invalid XML names while accepting Unicode material names', () => {
     const geometry = new BoxGeometry(1, 1, 1).toNonIndexed()

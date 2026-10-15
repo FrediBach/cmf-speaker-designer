@@ -48,6 +48,8 @@ export interface SpeakerPreviewProps {
   materials?: PatternMaterial[]
   knobColor: string
   knobGeometry: BufferGeometry | null
+  powerButtonColor: string
+  powerButtonGeometry: BufferGeometry | null
   knobStyle?: string
   relief?: number
   view?: 'perspective' | 'front'
@@ -290,14 +292,16 @@ function SpeakerBody({
 }
 
 function SpeakerControls({
-  panelColor,
   knobColor,
   knobGeometry,
+  powerButtonColor,
+  powerButtonGeometry,
   model,
 }: {
-  panelColor: string
   knobColor: string
   knobGeometry: BufferGeometry | null
+  powerButtonColor: string
+  powerButtonGeometry: BufferGeometry | null
   model: 's' | 'm'
 }) {
   const top = model === 's' ? 29.5 : 70
@@ -307,27 +311,41 @@ function SpeakerControls({
 
   return (
     <>
-      <group
-        position={[-controlOffset, top, depth]}
-        rotation={[Math.PI / 4, 0, 0]}
-      >
-        <mesh castShadow>
-          <cylinderGeometry args={[9.4, 9.4, 1.1, 48]} />
-          <meshStandardMaterial color="#1f2224" roughness={0.45} />
-        </mesh>
-        <mesh position={[0, 0.3, 0]} castShadow>
-          <cylinderGeometry args={[8.85, 8.85, 0.8, 48]} />
-          <meshStandardMaterial color={panelColor} roughness={0.44} />
-        </mesh>
-        <mesh position={[0, 0.75, -2.5]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.9, 4]} />
-          <meshStandardMaterial
-            color="#f5f5e9"
-            emissive="#f5f5e9"
-            emissiveIntensity={0.7}
-          />
-        </mesh>
-      </group>
+      {powerButtonGeometry && (
+        <group
+          position={[-controlOffset, top, depth]}
+          rotation={[-Math.PI / 4, 0, 0]}
+        >
+          <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
+            <cylinderGeometry args={[9.4, 9.4, 1.1, 48]} />
+            <meshStandardMaterial color="#1f2224" roughness={0.45} />
+          </mesh>
+          {/* The print-ready source rests on its face. Flip its actuator into
+              the deck, keeping the original Ø17.9 mm cap just above it. */}
+          <mesh
+            position={[0, 0, 0.7]}
+            rotation={[Math.PI, 0, 0]}
+            castShadow
+            receiveShadow
+          >
+            <primitive
+              object={powerButtonGeometry}
+              attach="geometry"
+              dispose={null}
+            />
+            <meshStandardMaterial color={powerButtonColor} roughness={0.44} />
+          </mesh>
+          {/* Factory indicator overlay; the original printable cap is plain. */}
+          <mesh position={[0, 2.5, 0.75]}>
+            <planeGeometry args={[0.9, 4]} />
+            <meshStandardMaterial
+              color="#f5f5e9"
+              emissive="#f5f5e9"
+              emissiveIntensity={0.7}
+            />
+          </mesh>
+        </group>
+      )}
       {knobGeometry && (
         <group
           position={[controlOffset, top, depth]}
@@ -515,6 +533,8 @@ function SpeakerScene({
   materials,
   knobColor,
   knobGeometry,
+  powerButtonColor,
+  powerButtonGeometry,
   view,
   assembly,
   resetKey,
@@ -528,6 +548,8 @@ function SpeakerScene({
   materials?: PatternMaterial[]
   knobColor: string
   knobGeometry: BufferGeometry | null
+  powerButtonColor: string
+  powerButtonGeometry: BufferGeometry | null
   view: 'perspective' | 'front'
   assembly: 'assembled' | 'panel' | 'exploded' | 'knob'
   resetKey: number
@@ -659,9 +681,10 @@ function SpeakerScene({
           )}
           {assembly !== 'panel' && (
             <SpeakerControls
-              panelColor={panelColor}
               knobColor={knobColor}
               knobGeometry={knobGeometry}
+              powerButtonColor={powerButtonColor}
+              powerButtonGeometry={powerButtonGeometry}
               model={model}
             />
           )}
@@ -679,7 +702,7 @@ function SpeakerScene({
         </mesh>
       )}
       <ContactShadows
-        key={`${geometry.uuid}:${knobGeometry?.uuid}:${assembly}`}
+        key={`${geometry.uuid}:${knobGeometry?.uuid}:${powerButtonGeometry?.uuid}:${assembly}`}
         position={[0, bounds.min.y - 0.45, assembly === 'knob' ? 0 : -12]}
         opacity={0.32}
         scale={assembly === 'knob' ? 70 : height * 2.5}
@@ -711,6 +734,8 @@ export function SpeakerPreview({
   materials,
   knobColor,
   knobGeometry,
+  powerButtonColor,
+  powerButtonGeometry,
   knobStyle,
   view = 'perspective',
   assembly = 'assembled',
@@ -736,12 +761,14 @@ export function SpeakerPreview({
       data-body-grille-color={grilleColor}
       data-knob-style={knobStyle}
       data-knob-ready={!!knobGeometry}
+      data-power-button-ready={!!powerButtonGeometry}
+      data-power-button-color={powerButtonColor}
       data-material-count={materialParts?.length ?? 0}
       role="img"
       data-preview-controls
       tabIndex={0}
       aria-description="Use arrow keys to rotate, plus to zoom in, and minus to zoom out. Use the Reset camera button to restore the view."
-      aria-label={`Interactive 3D preview of your CMF Speaker ${model.toUpperCase()} ${assembly === 'knob' ? 'volume knob' : assembly === 'panel' ? 'front panel' : `with ${bodyColor} body, ${grilleColor} grille, custom front panel and volume knob`}. Drag to rotate and scroll to zoom.`}
+      aria-label={`Interactive 3D preview of your CMF Speaker ${model.toUpperCase()} ${assembly === 'knob' ? 'volume knob' : assembly === 'panel' ? 'front panel' : `with ${bodyColor} body, ${grilleColor} grille, custom front panel, volume knob and power button`}. Drag to rotate and scroll to zoom.`}
       style={{
         position: 'relative',
         width: '100%',
@@ -781,6 +808,8 @@ export function SpeakerPreview({
                 materials={materials}
                 knobColor={knobColor}
                 knobGeometry={knobGeometry}
+                powerButtonColor={powerButtonColor}
+                powerButtonGeometry={powerButtonGeometry}
                 view={view}
                 assembly={assembly}
                 resetKey={resetKey}

@@ -4,6 +4,7 @@ import type { Design } from './design'
 import { loadPanelGeometry, getPanelDimensions } from './panels'
 import { usePanelGeometry } from './use-panel-geometry'
 import { useKnobGeometry } from './use-knob-geometry'
+import { usePowerButtonGeometry } from './use-power-button-geometry'
 import { useMulticolorGeometry } from './use-multicolor-geometry'
 
 export function useDesignGeometry(design: Design, retryKey: number) {
@@ -31,6 +32,22 @@ export function useDesignGeometry(design: Design, retryKey: number) {
     error: knobError,
     generating: knobGenerating,
   } = useKnobGeometry(design.knob, retryKey)
+  const {
+    geometry: powerButtonGeometry,
+    previewGeometry: previewPowerButtonGeometry,
+    error: powerButtonError,
+    generating: powerButtonGenerating,
+  } = usePowerButtonGeometry(retryKey)
+  const powerButtonBounds = previewPowerButtonGeometry?.boundingBox
+  const powerButtonDimensions = powerButtonBounds
+    ? [
+        powerButtonBounds.max.x - powerButtonBounds.min.x,
+        powerButtonBounds.max.y - powerButtonBounds.min.y,
+        powerButtonBounds.max.z - powerButtonBounds.min.z,
+      ]
+        .map((value) => Number(value.toFixed(2)))
+        .join(' × ')
+    : null
   const knobBounds = previewKnobGeometry?.boundingBox
   const knobDimensions = knobBounds
     ? `Ø${Number(Math.max(knobBounds.max.x - knobBounds.min.x, knobBounds.max.y - knobBounds.min.y).toFixed(2))} × ${Number((knobBounds.max.z - knobBounds.min.z).toFixed(2))}`
@@ -81,13 +98,18 @@ export function useDesignGeometry(design: Design, retryKey: number) {
     previewGeometry,
     knobGeometry,
     previewKnobGeometry,
+    powerButtonGeometry,
+    previewPowerButtonGeometry,
     error,
     knobError,
+    powerButtonError,
     generating,
     knobGenerating,
+    powerButtonGenerating,
     panelWidth,
     panelHeight,
     knobDimensions,
+    powerButtonDimensions,
     materialParts: multicolor.parts,
     previewMaterialParts: multicolor.previewParts,
     multicolorGenerating: multicolor.generating,

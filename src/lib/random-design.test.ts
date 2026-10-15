@@ -48,6 +48,9 @@ describe('random designs', () => {
         expect(PALETTE.some(({ value }) => value === design.panelColor)).toBe(
           true,
         )
+        expect(
+          PALETTE.some(({ value }) => value === design.powerButtonColor),
+        ).toBe(true)
         expect(PALETTE.some(({ value }) => value === design.knobColor)).toBe(
           true,
         )
@@ -74,12 +77,19 @@ describe('random designs', () => {
       'bodyColor',
       'bodyGrilleColor',
       'panelColor',
+      'powerButtonColor',
       'knobColor',
       'relief',
     ] as const)
       expect(
         new Set(designs.map((design) => design[key])).size,
       ).toBeGreaterThan(1)
+    expect(
+      designs.some(
+        ({ panelColor, powerButtonColor, knobColor }) =>
+          powerButtonColor !== panelColor && powerButtonColor !== knobColor,
+      ),
+    ).toBe(true)
     for (const component of ['handle', 'grille', 'halo', 'knob'] as const) {
       for (const key of Object.keys(designs[0][component])) {
         // Uploaded artwork is provided by the user, never generated at random.

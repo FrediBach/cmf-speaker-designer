@@ -128,6 +128,11 @@ export function PanelEditor({
           onChange={(panelColor) => update({ panelColor })}
         />
         <ColorPicker
+          label="Power button"
+          value={design.powerButtonColor}
+          onChange={(powerButtonColor) => update({ powerButtonColor })}
+        />
+        <ColorPicker
           label="Volume knob"
           value={design.knobColor}
           onChange={(knobColor) => update({ knobColor })}
@@ -135,7 +140,7 @@ export function PanelEditor({
         <p className="subtle-note">
           {design.multicolor.enabled
             ? 'Assign these colors to filaments in your slicer.'
-            : 'Preview colors only. Match with your filament.'}
+            : 'Choose matching filament in your slicer. 3MF includes these colors.'}
         </p>
         {design.multicolor.enabled && (
           <>
@@ -271,6 +276,7 @@ export function PanelEditor({
               key={look.name}
               className={
                 design.panelColor === look.panelColor &&
+                design.powerButtonColor === look.panelColor &&
                 design.knobColor === look.knobColor
                   ? 'look selected'
                   : 'look'
@@ -278,6 +284,7 @@ export function PanelEditor({
               onClick={() =>
                 update({
                   panelColor: look.panelColor,
+                  powerButtonColor: look.panelColor,
                   knobColor: look.knobColor,
                 })
               }
@@ -285,6 +292,7 @@ export function PanelEditor({
               aria-label={`Apply ${look.name} colors`}
               aria-pressed={
                 design.panelColor === look.panelColor &&
+                design.powerButtonColor === look.panelColor &&
                 design.knobColor === look.knobColor
               }
             >

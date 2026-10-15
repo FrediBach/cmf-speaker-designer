@@ -14,6 +14,81 @@ import type { SvgCutout } from './svg-cutout'
 
 afterEach(() => vi.unstubAllGlobals())
 
+describe('power button colors', () => {
+  it.each(['s', 'm'] as const)(
+    'preserves an independent custom color for speaker %s through storage, sharing, and JSON import',
+    (model) => {
+      const design = validateDesign({
+        ...DEFAULT_DESIGN,
+        model,
+        panelColor: '#123abc',
+        powerButtonColor: '#A47Ce1',
+        knobColor: '#abcdef',
+      })
+      expect(design).toMatchObject({
+        panelColor: '#123abc',
+        powerButtonColor: '#A47Ce1',
+        knobColor: '#abcdef',
+      })
+      const serialized = JSON.stringify(design)
+      expect(parseDesignJson(serialized)).toEqual(design)
+      vi.stubGlobal('window', { location: { search: '' } })
+      vi.stubGlobal('localStorage', { getItem: () => serialized })
+      expect(readDesign()).toEqual(design)
+      vi.stubGlobal('window', {
+        location: designShareUrl(design, 'https://example.com/designer/'),
+      })
+      expect(readDesign()).toEqual(design)
+      expect(
+        validateDesign({ ...design, panelColor: '#e4b8b4' }).powerButtonColor,
+      ).toBe('#A47Ce1')
+    },
+  )
+
+  it('preserves the original panel-matched button color when importing legacy designs', () => {
+    for (const model of ['s', 'm']) {
+      const restored = parseDesignJson(
+        JSON.stringify({ model, panelColor: '#13b7b1' }),
+      )
+      expect(restored.powerButtonColor).toBe('#13b7b1')
+      expect(restored.panelColor).toBe('#13b7b1')
+    }
+  })
+
+  it('falls back to a valid panel color or the default for missing and malformed colors', () => {
+    expect(DEFAULT_DESIGN.powerButtonColor).toBe('#f45427')
+    for (const powerButtonColor of [
+      undefined,
+      null,
+      'red',
+      '#123',
+      '#12345678',
+      '#zzzzzz',
+      1,
+      {},
+    ]) {
+      expect(
+        validateDesign({ panelColor: '#5573ce', powerButtonColor })
+          .powerButtonColor,
+      ).toBe('#5573ce')
+      expect(
+        validateDesign({ panelColor: 'invalid', powerButtonColor })
+          .powerButtonColor,
+      ).toBe(DEFAULT_DESIGN.powerButtonColor)
+      expect(validateDesign({ powerButtonColor }).powerButtonColor).toBe(
+        DEFAULT_DESIGN.powerButtonColor,
+      )
+    }
+  })
+
+  it('recognizes a design containing only the power button color', () => {
+    expect(parseDesignJson('{"powerButtonColor":"#abcdef"}')).toEqual({
+      ...DEFAULT_DESIGN,
+      powerButtonColor: '#abcdef',
+    })
+  })
+})
+
 describe('speaker body grille colors', () => {
   it.each(['black', 'orange', 'turquoise'] as const)(
     'preserves a %s grille through storage, sharing, and JSON import independently of printable settings',

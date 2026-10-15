@@ -297,7 +297,7 @@ test('preserves upper grip settings and colors in saved links and the printable 
   await expect(
     dialog
       .getByRole('group', { name: 'Export parts' })
-      .getByRole('button', { name: 'Panel + knob', exact: true }),
+      .getByRole('button', { name: 'All parts', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true')
   const zipStarted = page.waitForEvent('download')
   await dialog.getByRole('button', { name: /^Download ZIP/ }).click()
@@ -306,10 +306,12 @@ test('preserves upper grip settings and colors in saved links and the printable 
   const zipPath = testInfo.outputPath(zip.suggestedFilename())
   await zip.saveAs(zipPath)
   const entries = unzipStored(await readFile(zipPath))
-  expect(entries.size).toBe(3)
+  expect(entries.size).toBe(4)
   const settings = JSON.parse(entries.get('design.json')!.toString('utf8'))
   expect(settings).toMatchObject(shared)
   expect(settings.export.units).toBe('mm')
+  expect(settings.export.files.powerButton).toMatch(/power-button.*\.stl$/)
+  expect(entries.has(settings.export.files.powerButton)).toBe(true)
   const panel = inspectBinaryStl(entries.get(settings.export.files.panel)!)
   const knobBytes = entries.get(settings.export.files.knob)!
   const knob = inspectBinaryStl(knobBytes)
@@ -372,7 +374,7 @@ test('chooses STL or STP for individual parts and the design ZIP', async ({
   const zipPath = testInfo.outputPath(zip.suggestedFilename())
   await zip.saveAs(zipPath)
   const entries = unzipStored(await readFile(zipPath))
-  expect(entries.size).toBe(3)
+  expect(entries.size).toBe(4)
   const settings = JSON.parse(entries.get('design.json')!.toString('utf8'))
   expect(settings.export).toMatchObject({
     format: 'stp',
@@ -382,6 +384,14 @@ test('chooses STL or STP for individual parts and the design ZIP', async ({
   })
   expect(settings.export.files.panel).toMatch(/\.stp$/)
   expect(settings.export.files.knob).toMatch(/\.stp$/)
+  expect(settings.export.files.powerButton).toMatch(/power-button.*\.stp$/)
+  const archivedPowerButton = inspectFacetedStep(
+    entries.get(settings.export.files.powerButton)!,
+  )
+  expect(Math.abs(archivedPowerButton.minimum[2])).toBeLessThanOrEqual(
+    settings.export.toleranceMm,
+  )
+  expect(archivedPowerButton.maximum[2]).toBeGreaterThan(0)
   const panel = inspectFacetedStep(entries.get(settings.export.files.panel)!)
   const archivedKnob = inspectFacetedStep(
     entries.get(settings.export.files.knob)!,

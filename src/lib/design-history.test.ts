@@ -32,6 +32,37 @@ const svgCutout = (): SvgCutout => ({
 })
 
 describe('design history', () => {
+  it('records independent power button color edits and restores them with undo and redo', () => {
+    const start = initial()
+    const changed = designHistoryReducer(start, {
+      type: 'set',
+      update: (design) => ({ ...design, powerButtonColor: '#123abc' }),
+    })
+    expect(changed.present).toEqual({
+      ...DEFAULT_DESIGN,
+      powerButtonColor: '#123abc',
+    })
+    expect(changed.past).toHaveLength(1)
+    expect(start.present).toEqual(DEFAULT_DESIGN)
+    expect(
+      designHistoryReducer(changed, { type: 'set', update: changed.present }),
+    ).toBe(changed)
+    const undone = designHistoryReducer(changed, { type: 'undo' })
+    expect(undone.present).toEqual(DEFAULT_DESIGN)
+    expect(designHistoryReducer(undone, { type: 'redo' }).present).toEqual(
+      changed.present,
+    )
+    const panelChanged = designHistoryReducer(changed, {
+      type: 'set',
+      update: (design) => ({ ...design, panelColor: '#13b7b1' }),
+    })
+    expect(panelChanged.present.powerButtonColor).toBe('#123abc')
+    expect(panelChanged.past).toHaveLength(2)
+    expect(
+      designHistoryReducer(panelChanged, { type: 'undo' }).present,
+    ).toEqual(changed.present)
+  })
+
   it('records stripe-only edits and restores isolated settings with undo and redo', () => {
     const design = validateDesign({
       ...DEFAULT_DESIGN,

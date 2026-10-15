@@ -29,8 +29,8 @@ export function PrintGuide({ open, onOpenChange, triggerRef }: Props) {
         <span className="eyebrow">REFERENCE / 01</span>
         <DialogTitle>Print guide</DialogTitle>
         <DialogDescription>
-          Export your panel and knob, prepare them in a slicer, and check the
-          first print.
+          Export your panel, knob, and power button, prepare them in a slicer,
+          and check the first print.
         </DialogDescription>
         <ol className="print-steps">
           <li>
@@ -75,12 +75,18 @@ export function PrintGuide({ open, onOpenChange, triggerRef }: Props) {
               <h4>Slice at 100% scale</h4>
               <p>
                 Choose STL in the export dialog for slicing. Unzip a full design
-                download to find separate panel and knob files and your saved
-                colors and settings. Import the STLs in millimeters; each part
-                is placed on the build plate. Review overhangs and supports in
-                your slicer before printing. Choose STP for faceted STEP
-                geometry in CAD applications; these files preserve the mesh
-                without parametric feature history.
+                download to find separate panel, knob, and power button files
+                and your saved colors and settings. Import the STLs in
+                millimeters; each part is placed on the build plate. Review
+                overhangs and supports in your slicer before printing. Choose
+                STP for faceted STEP geometry in CAD applications; these files
+                preserve the mesh without parametric feature history.
+              </p>
+              <p>
+                The power button uses the supplied original shape for both
+                speaker sizes. Its color is independent of the panel and knob.
+                The white factory indicator shown in the preview is not part of
+                the printable button.
               </p>
               <p>
                 Multicolor designs default to 3MF, with one assembled panel and

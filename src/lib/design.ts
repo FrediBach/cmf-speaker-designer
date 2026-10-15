@@ -69,6 +69,7 @@ export type Design = {
   bodyGrilleColor: BodyGrilleColor
   style: PanelStyle
   panelColor: string
+  powerButtonColor: string
   knobColor: string
   relief: number
   panelExtension: number
@@ -86,6 +87,7 @@ export const DEFAULT_DESIGN: Design = {
   bodyGrilleColor: 'black',
   style: 'original',
   panelColor: '#f45427',
+  powerButtonColor: '#f45427',
   knobColor: '#303538',
   relief: 0,
   panelExtension: 0,
@@ -132,6 +134,12 @@ export function validateDesign(value: unknown): Design {
     panelColor: isColor(data.panelColor)
       ? data.panelColor
       : DEFAULT_DESIGN.panelColor,
+    // Older designs used the panel color for the front power button.
+    powerButtonColor: isColor(data.powerButtonColor)
+      ? data.powerButtonColor
+      : isColor(data.panelColor)
+        ? data.panelColor
+        : DEFAULT_DESIGN.powerButtonColor,
     knobColor: isColor(data.knobColor)
       ? data.knobColor
       : DEFAULT_DESIGN.knobColor,
@@ -196,6 +204,7 @@ export function parseDesignJson(text: string): Design {
     ![
       'model',
       'panelColor',
+      'powerButtonColor',
       'knobColor',
       'handle',
       'grille',

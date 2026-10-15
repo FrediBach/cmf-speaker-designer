@@ -1,5 +1,5 @@
 import { useState, type RefObject } from 'react'
-import { ArrowDownToLine, Check, LoaderCircle } from 'lucide-react'
+import { ArrowDownToLine, Check, LoaderCircle, Power } from 'lucide-react'
 import { Button } from './ui/button'
 import { PanelIcon } from './PanelIcon'
 import { KnobIcon } from './KnobIcon'
@@ -42,7 +42,11 @@ export function ExportDialog({
   onNotify,
 }: Props) {
   const [busy, setBusy] = useState(false)
-  const [exportTarget, setExportTarget] = useState<DesignExportTarget>('both')
+  const [exportTarget, setExportTarget] = useState<DesignExportTarget>('all')
+  const includesPanel = exportTarget === 'all' || exportTarget === 'panel'
+  const includesKnob = exportTarget === 'all' || exportTarget === 'knob'
+  const includesPowerButton =
+    exportTarget === 'all' || exportTarget === 'power-button'
   const [formatChoice, setFormatChoice] = useState<{
     multicolor: boolean
     format: DesignExportFormat
@@ -70,21 +74,30 @@ export function ExportDialog({
   const {
     geometry,
     knobGeometry,
+    powerButtonGeometry,
     panelWidth,
     panelHeight,
     knobDimensions,
+    powerButtonDimensions,
     materialParts,
     multicolorError,
     multicolorDiagnostics,
   } = meshes
   const regionsReady =
     !design.multicolor.enabled ||
-    exportTarget === 'knob' ||
+    !includesPanel ||
     !isMaterialExport ||
     !!materialParts
   const { knobLabel } = getDesignSummary(design)
   async function exportDesign() {
-    if (!geometry || !knobGeometry || !regionsReady || busy) return
+    if (
+      !geometry ||
+      !knobGeometry ||
+      !powerButtonGeometry ||
+      !regionsReady ||
+      busy
+    )
+      return
     setBusy(true)
     try {
       await new Promise<void>((resolve) =>
@@ -94,6 +107,7 @@ export function ExportDialog({
       await downloadDesignExport({
         panel: geometry,
         knob: knobGeometry,
+        powerButton: powerButtonGeometry,
         design,
         target: exportTarget,
         format: exportFormat,
@@ -101,8 +115,8 @@ export function ExportDialog({
       })
       onOpenChange(false)
       onNotify(
-        exportTarget === 'both'
-          ? 'Panel, knob, and design settings downloaded.'
+        exportTarget === 'all'
+          ? 'Panel, knob, power button, and design settings downloaded.'
           : `${formatLabel} downloaded.`,
       )
     } catch (error) {
@@ -151,7 +165,7 @@ export function ExportDialog({
           {(
             [
               '3mf',
-              ...(design.multicolor.enabled && exportTarget !== 'knob'
+              ...(design.multicolor.enabled && includesPanel
                 ? ['stl-parts' as const]
                 : []),
               'stl',
@@ -176,9 +190,10 @@ export function ExportDialog({
         >
           {(
             [
-              { id: 'both', label: 'Panel + knob' },
+              { id: 'all', label: 'All parts' },
               { id: 'panel', label: 'Panel only' },
               { id: 'knob', label: 'Knob only' },
+              { id: 'power-button', label: 'Power button only' },
             ] as const
           ).map((target) => (
             <button
@@ -188,7 +203,10 @@ export function ExportDialog({
               disabled={busy}
               onClick={() => {
                 setExportTarget(target.id)
-                if (target.id === 'knob' && exportFormat === 'stl-parts')
+                if (
+                  (target.id === 'knob' || target.id === 'power-button') &&
+                  exportFormat === 'stl-parts'
+                )
                   setExportFormat('3mf')
               }}
             >
@@ -196,7 +214,7 @@ export function ExportDialog({
             </button>
           ))}
         </div>
-        {exportTarget !== 'knob' && (
+        {includesPanel && (
           <PanelExportSummary
             design={design}
             panelWidth={panelWidth}
@@ -204,7 +222,7 @@ export function ExportDialog({
             geometryLabel={geometryLabel}
           />
         )}
-        {exportTarget !== 'panel' && (
+        {includesKnob && (
           <div className="download-summary knob-download-summary">
             <KnobIcon style={design.knob.style} />
             <div>
@@ -221,7 +239,27 @@ export function ExportDialog({
             />
           </div>
         )}
-        {design.multicolor.enabled && exportTarget !== 'knob' && (
+        {includesPowerButton && (
+          <div className="download-summary power-button-download-summary">
+            <Power aria-hidden="true" />
+            <div>
+              <strong>Original power button</strong>
+              <span>
+                {powerButtonDimensions ? `${powerButtonDimensions} mm · ` : ''}
+                {geometryLabel}
+              </span>
+              <span>
+                {colorName(design.powerButtonColor)} · Fits Speaker S & M
+              </span>
+              <span>Factory indicator marking is preview only.</span>
+            </div>
+            <span
+              className="summary-swatch"
+              style={{ background: design.powerButtonColor }}
+            />
+          </div>
+        )}
+        {design.multicolor.enabled && includesPanel && (
           <div className="multicolor-export-summary">
             {isMaterialExport ? (
               <>
@@ -270,19 +308,19 @@ export function ExportDialog({
         <div className="download-notes">
           <p>
             <Check size={15} />{' '}
-            {design.panelGap > 0
+            {includesPanel && design.panelGap > 0
               ? 'Extended attachments and rear support posts'
               : 'Original mounting features retained'}
           </p>
           <p>
             <Check size={15} />{' '}
-            {isMaterialExport
+            {isMaterialExport && includesPanel
               ? 'Panel regions share one assembly position'
               : 'Separate parts, positioned on the build plate'}
           </p>
-          {exportTarget === 'both' && !isMaterialExport && (
+          {exportTarget === 'all' && !isMaterialExport && (
             <p>
-              <Check size={15} /> ZIP includes both {formatLabel} files and
+              <Check size={15} /> ZIP includes all three {formatLabel} files and
               design.json with your colors and settings
             </p>
           )}
@@ -291,7 +329,7 @@ export function ExportDialog({
           {isMaterialExport
             ? 'Confirm filament assignments in your slicer. Use compatible materials, inspect sliced boundaries and supports, and test fit and bonding before using the panel. 3MF display colors do not select printer filament slots.'
             : exportFormat === 'stp'
-              ? `Faceted STEP with ${STEP_TOLERANCE_MM} mm surface tolerance, without smooth CAD surfaces or parametric feature history. ${exportTarget === 'both' ? 'Colors are saved in the ZIP’s design.json.' : 'Choose Panel + knob to include colors and settings in a ZIP.'}`
+              ? `Faceted STEP with ${STEP_TOLERANCE_MM} mm surface tolerance, without smooth CAD surfaces or parametric feature history. ${exportTarget === 'all' ? 'Colors are saved in the ZIP’s design.json.' : 'Choose All parts to include colors and settings in a ZIP.'}`
               : 'STL files don’t store colors. Match your selected colors with filament. Review supports in your slicer and test-fit your first print.'}
         </p>
         <Button
@@ -301,8 +339,9 @@ export function ExportDialog({
             busy ||
             !geometry ||
             !knobGeometry ||
+            !powerButtonGeometry ||
             !regionsReady ||
-            (isMaterialExport && exportTarget !== 'knob' && !!multicolorError)
+            (isMaterialExport && includesPanel && !!multicolorError)
           }
         >
           {busy ? (
@@ -314,7 +353,7 @@ export function ExportDialog({
             ? 'Preparing files…'
             : exportFormat === '3mf'
               ? 'Download 3MF'
-              : exportFormat === 'stl-parts' || exportTarget === 'both'
+              : exportFormat === 'stl-parts' || exportTarget === 'all'
                 ? 'Download ZIP'
                 : `Download ${formatLabel}`}
           <span>Speaker {design.model.toUpperCase()}</span>
