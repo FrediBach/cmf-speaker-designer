@@ -23,6 +23,7 @@ export function randomizeDesign(
   const design = validateDesign({
     model,
     bodyColor: pick(['black', 'gray'] as const),
+    bodyGrilleColor: pick(['black', 'orange', 'turquoise'] as const),
     style: 'custom',
     panelColor: pick(PALETTE).value,
     knobColor: pick(PALETTE).value,

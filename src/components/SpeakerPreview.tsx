@@ -1,7 +1,13 @@
 import { Component, useEffect, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
-import { BODY_COLORS, type BodyColor } from '@/lib/design'
+import {
+  BODY_COLORS,
+  BODY_GRILLE_COLORS,
+  normalizeBodyGrilleColor,
+  type BodyColor,
+  type BodyGrilleColor,
+} from '@/lib/design'
 import type { MaterialGeometry } from '@/lib/multicolor-geometry'
 import type { PatternMaterial } from '@/lib/multicolor-settings'
 import {
@@ -34,6 +40,7 @@ export interface SpeakerPreviewProps {
   error?: string | null
   model: 's' | 'm'
   bodyColor: BodyColor
+  bodyGrilleColor: BodyGrilleColor
   style: 'original' | 'custom'
   panelColor: string
   materialParts?: MaterialGeometry[] | null
@@ -105,8 +112,16 @@ class PreviewBoundary extends Component<
 }
 
 /** A repeating, locally generated textile texture: no external textures or HDR files. */
-function createGrilleTexture(width: number, height: number) {
+function createGrilleTexture(
+  width: number,
+  height: number,
+  color: BodyGrilleColor,
+) {
   const size = 64
+  const rgb = Number.parseInt(BODY_GRILLE_COLORS[color].value.slice(1), 16)
+  const red = (rgb >> 16) & 255
+  const green = (rgb >> 8) & 255
+  const blue = rgb & 255
   const data = new Uint8Array(size * size * 4)
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
@@ -114,11 +129,13 @@ function createGrilleTexture(width: number, height: number) {
       const holeX = ((x + (row % 2) * 4) % 8) - 3.5
       const holeY = (y % 8) - 3.5
       const distance = Math.sqrt(holeX * holeX + holeY * holeY)
-      const value = distance < 2.3 ? 15 : distance < 3.1 && holeY < 0 ? 69 : 44
+      const hole = distance < 2.3
+      const highlight = distance < 3.1 && holeY < 0 ? 25 : 0
       const offset = (y * size + x) * 4
-      data[offset] = value
-      data[offset + 1] = value + 2
-      data[offset + 2] = value + 3
+      // Only the woven strands change color; the openings remain dark.
+      data[offset] = hole ? 15 : Math.min(255, red + highlight)
+      data[offset + 1] = hole ? 17 : Math.min(255, green + highlight)
+      data[offset + 2] = hole ? 18 : Math.min(255, blue + highlight)
       data[offset + 3] = 255
     }
   }
@@ -168,11 +185,13 @@ function SpeakerBody({
   height,
   model,
   bodyColor,
+  bodyGrilleColor,
 }: {
   width: number
   height: number
   model: 's' | 'm'
   bodyColor: BodyColor
+  bodyGrilleColor: BodyGrilleColor
 }) {
   const colors = BODY_COLORS[bodyColor]
   const depth = model === 's' ? 55 : 64
@@ -201,8 +220,8 @@ function SpeakerBody({
   }, [width, height, depth, model, faceTop, roofHeight])
   const grilleHeight = height / 2 + faceTop
   const grille = useMemo(
-    () => createGrilleTexture(width, grilleHeight),
-    [width, grilleHeight],
+    () => createGrilleTexture(width, grilleHeight, bodyGrilleColor),
+    [width, grilleHeight, bodyGrilleColor],
   )
   const radiatorHeight = Math.min(height - 72, 115)
   const radiatorRim = useMemo(
@@ -481,6 +500,7 @@ function SpeakerScene({
   geometry,
   model,
   bodyColor,
+  bodyGrilleColor,
   panelColor,
   materialParts,
   materials,
@@ -493,6 +513,7 @@ function SpeakerScene({
   geometry: BufferGeometry
   model: 's' | 'm'
   bodyColor: BodyColor
+  bodyGrilleColor: BodyGrilleColor
   panelColor: string
   materialParts?: MaterialGeometry[] | null
   materials?: PatternMaterial[]
@@ -581,6 +602,7 @@ function SpeakerScene({
           height={height}
           model={model}
           bodyColor={bodyColor}
+          bodyGrilleColor={bodyGrilleColor}
         />
       )}
       {assembly !== 'knob' && (
@@ -665,6 +687,7 @@ export function SpeakerPreview({
   error,
   model,
   bodyColor,
+  bodyGrilleColor,
   style,
   panelColor,
   materialParts,
@@ -679,6 +702,7 @@ export function SpeakerPreview({
   onReady,
   onError,
 }: SpeakerPreviewProps) {
+  const grilleColor = normalizeBodyGrilleColor(bodyColor, bodyGrilleColor)
   const readyCallback = useRef(onReady)
   useEffect(() => {
     readyCallback.current = onReady
@@ -692,6 +716,7 @@ export function SpeakerPreview({
     <div
       className={className}
       data-panel-style={style}
+      data-body-grille-color={grilleColor}
       data-knob-style={knobStyle}
       data-knob-ready={!!knobGeometry}
       data-material-count={materialParts?.length ?? 0}
@@ -699,7 +724,7 @@ export function SpeakerPreview({
       data-preview-controls
       tabIndex={0}
       aria-description="Use arrow keys to rotate, plus to zoom in, and minus to zoom out. Use the Reset camera button to restore the view."
-      aria-label={`Interactive 3D preview of your CMF Speaker ${model.toUpperCase()} ${assembly === 'knob' ? 'volume knob' : assembly === 'panel' ? 'front panel' : `with ${bodyColor} body, custom front panel and volume knob`}. Drag to rotate and scroll to zoom.`}
+      aria-label={`Interactive 3D preview of your CMF Speaker ${model.toUpperCase()} ${assembly === 'knob' ? 'volume knob' : assembly === 'panel' ? 'front panel' : `with ${bodyColor} body, ${grilleColor} grille, custom front panel and volume knob`}. Drag to rotate and scroll to zoom.`}
       style={{
         position: 'relative',
         width: '100%',
@@ -733,6 +758,7 @@ export function SpeakerPreview({
                 geometry={geometry}
                 model={model}
                 bodyColor={bodyColor}
+                bodyGrilleColor={grilleColor}
                 panelColor={panelColor}
                 materialParts={materialParts}
                 materials={materials}

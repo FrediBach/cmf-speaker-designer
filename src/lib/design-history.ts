@@ -85,6 +85,7 @@ function designsEqual(left: Design, right: Design) {
   return (
     left.model === right.model &&
     left.bodyColor === right.bodyColor &&
+    left.bodyGrilleColor === right.bodyGrilleColor &&
     left.style === right.style &&
     left.panelColor === right.panelColor &&
     left.knobColor === right.knobColor &&

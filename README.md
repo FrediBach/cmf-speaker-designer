@@ -65,7 +65,7 @@ Controls use larger text and targets, high-contrast selected states, and visible
 
 ## What the POC does
 
-Choose **Black** or **Gray** under **Speaker body**, next to the model selection. Gray approximates the body and side radiator faces of the white speaker variant; panel and knob colors remain independent. The body choice is saved locally, shared in design links, and recorded as `bodyColor` in the ZIP's `design.json`. Older designs default to black. The body is preview context only and is not exported.
+Choose **Black** or **Gray** under **Speaker body**, next to the model selection. The adjacent **Speaker grille** swatches offer black, orange, and turquoise for the black body. Gray approximates the body and side radiator faces of the white speaker variant and always uses a black grille. Panel and knob colors remain independent. Body and grille choices are saved locally, shared in design links, and recorded as `bodyColor` and `bodyGrilleColor` in design JSON. Older designs default to a black grille. The body and its grille are preview context only and are not exported as printable parts.
 
 - Switch between Speaker S and M.
 - Choose the original front panel or build a custom panel with parametric halos and grilles.

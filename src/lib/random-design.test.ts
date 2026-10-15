@@ -30,6 +30,11 @@ describe('random designs', () => {
         expect(design.model).toBe(model)
         expect(design.handle.svgCutout).toBeNull()
         expect(['black', 'gray']).toContain(design.bodyColor)
+        expect(
+          design.bodyColor === 'gray'
+            ? ['black']
+            : ['black', 'orange', 'turquoise'],
+        ).toContain(design.bodyGrilleColor)
         expect(validateDesign(design)).toEqual(design)
         expect(design.style).toBe('custom')
         expect(
@@ -67,6 +72,7 @@ describe('random designs', () => {
     const designs = sampleDesigns('s')
     for (const key of [
       'bodyColor',
+      'bodyGrilleColor',
       'panelColor',
       'knobColor',
       'relief',
@@ -88,10 +94,18 @@ describe('random designs', () => {
     expect(new Set(designs.map(({ knob }) => knob.style))).toEqual(
       new Set(KNOB_STYLES.map(({ id }) => id)),
     )
-    for (const model of ['s', 'm'] as const)
+    for (const model of ['s', 'm'] as const) {
       expect(
         new Set(sampleDesigns(model).map(({ bodyColor }) => bodyColor)),
       ).toEqual(new Set(['black', 'gray']))
+      expect(
+        new Set(
+          sampleDesigns(model)
+            .filter(({ bodyColor }) => bodyColor === 'black')
+            .map(({ bodyGrilleColor }) => bodyGrilleColor),
+        ),
+      ).toEqual(new Set(['black', 'orange', 'turquoise']))
+    }
     expect(new Set(designs.map(({ handle }) => handle.cutout))).toEqual(
       new Set(['none', 'circle', 'slot']),
     )

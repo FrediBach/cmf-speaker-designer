@@ -46,9 +46,27 @@ export const BODY_COLORS = {
 
 export type BodyColor = keyof typeof BODY_COLORS
 
+export const BODY_GRILLE_COLORS = {
+  black: { label: 'Black', value: '#2c2e2f' },
+  orange: { label: 'Orange', value: '#f45427' },
+  turquoise: { label: 'Turquoise', value: '#13b7b1' },
+} as const
+
+export type BodyGrilleColor = keyof typeof BODY_GRILLE_COLORS
+
+export function normalizeBodyGrilleColor(
+  bodyColor: BodyColor,
+  value: unknown,
+): BodyGrilleColor {
+  return bodyColor === 'black' && (value === 'orange' || value === 'turquoise')
+    ? value
+    : 'black'
+}
+
 export type Design = {
   model: 's' | 'm'
   bodyColor: BodyColor
+  bodyGrilleColor: BodyGrilleColor
   style: PanelStyle
   panelColor: string
   knobColor: string
@@ -65,6 +83,7 @@ export type Design = {
 export const DEFAULT_DESIGN: Design = {
   model: 's',
   bodyColor: 'black',
+  bodyGrilleColor: 'black',
   style: 'original',
   panelColor: '#f45427',
   knobColor: '#303538',
@@ -86,12 +105,14 @@ export function validateDesign(value: unknown): Design {
   const data =
     value && typeof value === 'object' ? (value as Partial<Design>) : {}
   const model = data.model === 'm' ? 'm' : 's'
+  const bodyColor = data.bodyColor === 'gray' ? 'gray' : 'black'
   const grille = normalizeGrilleSettings(data.grille ?? {})
   const halo = normalizeHaloSettings(data.halo ?? {})
   const raceStripes = normalizeRaceStripeSettings(data.raceStripes ?? {})
   return {
     model,
-    bodyColor: data.bodyColor === 'gray' ? 'gray' : 'black',
+    bodyColor,
+    bodyGrilleColor: normalizeBodyGrilleColor(bodyColor, data.bodyGrilleColor),
     knob: normalizeKnobSettings(data.knob ?? {}),
     grille,
     halo,

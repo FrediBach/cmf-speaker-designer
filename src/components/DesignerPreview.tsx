@@ -107,6 +107,7 @@ export function DesignerPreview({
                 key={retryKey}
                 model={design.model}
                 bodyColor={design.bodyColor}
+                bodyGrilleColor={design.bodyGrilleColor}
                 style="original"
                 panelColor={design.panelColor}
                 materialParts={previewMaterialParts}

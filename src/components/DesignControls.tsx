@@ -15,7 +15,7 @@ import { HaloEditor } from './HaloEditor'
 import { GrilleEditor } from './GrilleEditor'
 import { HandleEditor } from './HandleEditor'
 import { KnobEditor } from './KnobEditor'
-import { BODY_COLORS, type Design } from '@/lib/design'
+import { BODY_COLORS, BODY_GRILLE_COLORS, type Design } from '@/lib/design'
 import type { useDesignGeometry } from '@/lib/use-design-geometry'
 import type { useDesignInteractions } from '@/lib/use-design-interactions'
 import type { SpeakerPreviewProps } from './SpeakerPreview'
@@ -132,36 +132,76 @@ export function DesignControls({
             </button>
           ))}
         </div>
-        <div className="body-color-control">
-          <span id="body-color-label">Speaker body</span>
-          <div
-            className="body-color-options"
-            role="group"
-            aria-labelledby="body-color-label"
-          >
-            {(['black', 'gray'] as const).map((bodyColor) => (
-              <button
-                key={bodyColor}
-                type="button"
-                aria-label={`Speaker body: ${BODY_COLORS[bodyColor].label}`}
-                aria-pressed={design.bodyColor === bodyColor}
-                title={
-                  bodyColor === 'gray'
-                    ? 'Gray body (white speaker)'
-                    : 'Black body'
-                }
-                onClick={() => update({ bodyColor })}
-              >
-                <span
-                  className="body-color-swatch"
-                  style={{ background: BODY_COLORS[bodyColor].shell }}
-                  aria-hidden="true"
-                />
-                {BODY_COLORS[bodyColor].label}
-              </button>
-            ))}
+        <div className="speaker-color-controls">
+          <div className="body-color-control">
+            <span id="body-color-label">Speaker body</span>
+            <div
+              className="body-color-options"
+              role="group"
+              aria-labelledby="body-color-label"
+            >
+              {(['black', 'gray'] as const).map((bodyColor) => (
+                <button
+                  key={bodyColor}
+                  type="button"
+                  aria-label={`Speaker body: ${BODY_COLORS[bodyColor].label}`}
+                  aria-pressed={design.bodyColor === bodyColor}
+                  title={
+                    bodyColor === 'gray'
+                      ? 'Gray body (white speaker)'
+                      : 'Black body'
+                  }
+                  onClick={() => update({ bodyColor })}
+                >
+                  <span
+                    className="body-color-swatch"
+                    style={{ background: BODY_COLORS[bodyColor].shell }}
+                    aria-hidden="true"
+                  />
+                  {BODY_COLORS[bodyColor].label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="body-color-control">
+            <span id="body-grille-color-label">Speaker grille</span>
+            <div
+              className="body-color-options body-grille-options"
+              role="group"
+              aria-labelledby="body-grille-color-label"
+              aria-describedby="body-grille-color-help"
+            >
+              {(['black', 'orange', 'turquoise'] as const).map(
+                (bodyGrilleColor) => (
+                  <button
+                    key={bodyGrilleColor}
+                    type="button"
+                    aria-label={`Speaker grille: ${BODY_GRILLE_COLORS[bodyGrilleColor].label}`}
+                    aria-pressed={design.bodyGrilleColor === bodyGrilleColor}
+                    title={`${BODY_GRILLE_COLORS[bodyGrilleColor].label} grille`}
+                    disabled={
+                      design.bodyColor === 'gray' && bodyGrilleColor !== 'black'
+                    }
+                    onClick={() => update({ bodyGrilleColor })}
+                  >
+                    <span
+                      className="body-color-swatch"
+                      style={{
+                        background: BODY_GRILLE_COLORS[bodyGrilleColor].value,
+                      }}
+                      aria-hidden="true"
+                    />
+                  </button>
+                ),
+              )}
+            </div>
           </div>
         </div>
+        <p className="body-grille-color-help" id="body-grille-color-help">
+          {design.bodyColor === 'gray'
+            ? 'Gray bodies come with a black grille.'
+            : `${BODY_GRILLE_COLORS[design.bodyGrilleColor].label} grille selected.`}
+        </p>
       </section>
       <div className="editor-tabs" role="tablist" aria-label="Design area">
         {EDITOR_TABS.map(({ id: tab, label }, index) => (

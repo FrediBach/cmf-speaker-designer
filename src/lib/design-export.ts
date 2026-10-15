@@ -131,7 +131,7 @@ export async function buildDesignExport({
       geometryType: format === 'stp' ? 'advanced-brep' : 'mesh',
       ...(format === 'stp' ? { toleranceMm: STEP_TOLERANCE_MM } : {}),
       files: { panel: panelName, knob: knobName },
-      colorNote: `${format.toUpperCase()} files contain geometry only. Match panelColor and knobColor to filament or material colors in your slicer or CAD application. bodyColor identifies the existing speaker body, which is preview context only.`,
+      colorNote: `${format.toUpperCase()} files contain geometry only. Match panelColor and knobColor to filament or material colors in your slicer or CAD application. bodyColor and bodyGrilleColor identify the existing speaker body and grille, which are preview context only.`,
     },
   }
   return {

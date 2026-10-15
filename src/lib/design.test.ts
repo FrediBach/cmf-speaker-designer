@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_DESIGN,
   designShareUrl,
+  parseDesignJson,
   readDesign,
   STORAGE_KEY,
   validateDesign,
@@ -12,6 +13,80 @@ import { DEFAULT_RACE_STRIPE_SETTINGS } from './race-stripe-settings'
 import type { SvgCutout } from './svg-cutout'
 
 afterEach(() => vi.unstubAllGlobals())
+
+describe('speaker body grille colors', () => {
+  it.each(['black', 'orange', 'turquoise'] as const)(
+    'preserves a %s grille through storage, sharing, and JSON import independently of printable settings',
+    (bodyGrilleColor) => {
+      const design = validateDesign({
+        ...DEFAULT_DESIGN,
+        model: 'm',
+        bodyGrilleColor,
+        panelColor: '#123abc',
+        knobColor: '#abcdef',
+        grille: { ...DEFAULT_DESIGN.grille, mode: 'custom', pattern: 'hex' },
+      })
+      expect(design).toMatchObject({
+        bodyColor: 'black',
+        bodyGrilleColor,
+        panelColor: '#123abc',
+        knobColor: '#abcdef',
+        grille: { mode: 'custom', pattern: 'hex' },
+      })
+      const serialized = JSON.stringify(design)
+      expect(parseDesignJson(serialized)).toEqual(design)
+      vi.stubGlobal('window', { location: { search: '' } })
+      vi.stubGlobal('localStorage', { getItem: () => serialized })
+      expect(readDesign()).toEqual(design)
+      vi.stubGlobal('window', {
+        location: designShareUrl(design, 'https://example.com/designer/'),
+      })
+      expect(readDesign()).toEqual(design)
+    },
+  )
+
+  it.each(['black', 'orange', 'turquoise'])(
+    'normalizes a gray body with a %s grille to black on import',
+    (bodyGrilleColor) => {
+      const design = parseDesignJson(
+        JSON.stringify({
+          ...DEFAULT_DESIGN,
+          bodyColor: 'gray',
+          bodyGrilleColor,
+        }),
+      )
+      expect(design).toEqual({
+        ...DEFAULT_DESIGN,
+        bodyColor: 'gray',
+        bodyGrilleColor: 'black',
+      })
+    },
+  )
+
+  it('keeps legacy grilles black and rejects unsupported colors', () => {
+    expect(DEFAULT_DESIGN.bodyGrilleColor).toBe('black')
+    for (const bodyGrilleColor of [
+      undefined,
+      null,
+      'gray',
+      'Orange',
+      '#f45427',
+      1,
+      {},
+    ]) {
+      expect(validateDesign({ bodyGrilleColor }).bodyGrilleColor).toBe('black')
+    }
+    for (const bodyColor of ['black', 'gray']) {
+      expect(
+        parseDesignJson(JSON.stringify({ model: 's', bodyColor })),
+      ).toEqual({
+        ...DEFAULT_DESIGN,
+        bodyColor,
+        bodyGrilleColor: 'black',
+      })
+    }
+  })
+})
 
 describe('saved and shared race stripes', () => {
   it('keeps legacy designs unchanged when stripe settings are absent or malformed', () => {

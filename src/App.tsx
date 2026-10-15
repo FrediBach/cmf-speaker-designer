@@ -17,6 +17,7 @@ import {
   designShareUrl,
   readDesign,
   validateDesign,
+  normalizeBodyGrilleColor,
   type Design,
   allowDesignSave,
   getDesignLoadFailure,
@@ -78,6 +79,10 @@ function App() {
       const next = { ...current, ...patch }
       return {
         ...next,
+        bodyGrilleColor: normalizeBodyGrilleColor(
+          next.bodyColor,
+          next.bodyGrilleColor,
+        ),
         style:
           next.halo.mode === 'custom' ||
           next.grille.mode === 'custom' ||

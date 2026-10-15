@@ -612,12 +612,17 @@ main {
   background: var(--surface-selected);
   box-shadow: inset 0 -2px var(--foreground);
 }
+.speaker-color-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-top: 10px;
+}
 .body-color-control {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
   font-size: 14px;
 }
 .body-color-options {
@@ -628,20 +633,39 @@ main {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 4px;
   min-height: 44px;
-  padding: 6px 10px;
+  padding: 6px;
+  font-size: 13px;
   border: 1px solid var(--control-border);
   border-radius: 3px;
   background: transparent;
 }
-.body-color-options button:hover {
+.body-color-options button:hover:not(:disabled) {
   background: var(--surface-hover);
 }
 .body-color-options button[aria-pressed='true'] {
   border-color: var(--foreground);
   background: var(--surface-selected);
   box-shadow: inset 0 -2px var(--foreground);
+}
+.body-color-options button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.body-grille-options button {
+  width: 44px;
+  padding: 6px;
+}
+.body-grille-options .body-color-swatch {
+  width: 20px;
+  height: 20px;
+}
+.body-grille-color-help {
+  margin: 6px 0 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.4;
 }
 .body-color-swatch {
   width: 14px;
@@ -2179,7 +2203,7 @@ main {
   .model-section h3 {
     display: none;
   }
-  .body-color-control {
+  .speaker-color-controls {
     margin-top: 6px;
   }
   .model-option {

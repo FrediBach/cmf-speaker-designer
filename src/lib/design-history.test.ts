@@ -170,6 +170,29 @@ describe('design history', () => {
     )
   })
 
+  it('records body grille color independently of the printable grille and restores it with undo and redo', () => {
+    const design = validateDesign({
+      ...DEFAULT_DESIGN,
+      grille: { ...DEFAULT_DESIGN.grille, mode: 'custom', pattern: 'hex' },
+    })
+    const start = createDesignHistory(design)
+    const changed = designHistoryReducer(start, {
+      type: 'set',
+      update: (current) => ({ ...current, bodyGrilleColor: 'turquoise' }),
+    })
+    expect(changed.present).toEqual({ ...design, bodyGrilleColor: 'turquoise' })
+    expect(changed.past).toHaveLength(1)
+    expect(start.present).toEqual(design)
+    expect(
+      designHistoryReducer(changed, { type: 'set', update: changed.present }),
+    ).toBe(changed)
+    const undone = designHistoryReducer(changed, { type: 'undo' })
+    expect(undone.present).toEqual(design)
+    expect(designHistoryReducer(undone, { type: 'redo' }).present).toEqual(
+      changed.present,
+    )
+  })
+
   it('undoes and redoes multiple edits in order, including speaker selection', () => {
     const start = initial()
     const first = setRelief(start, 0.5)
