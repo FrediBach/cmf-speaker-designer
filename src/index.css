@@ -274,6 +274,7 @@ main {
 .preview-card {
   position: relative;
   height: 100%;
+  /* Grid rows position the overlays; the canvas fills the entire card. */
   display: grid;
   grid-template-rows: 64px minmax(0, 1fr) auto auto;
   border: 1px solid var(--stage-border);
@@ -283,13 +284,24 @@ main {
   isolation: isolate;
 }
 .preview-topbar {
+  grid-row: 1;
   z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 0 20px;
-  border-bottom: 1px solid var(--stage-border);
+  pointer-events: none;
+}
+.preview-topbar .eyebrow {
+  padding: 8px 10px;
+  border-radius: 3px;
+  background: var(--stage-overlay);
+}
+.preview-topbar button,
+.preview-bottom button,
+.preview-toolbar button {
+  pointer-events: auto;
 }
 .eyebrow {
   display: inline-flex;
@@ -313,6 +325,8 @@ main {
 .view-switch {
   display: flex;
   gap: 2px;
+  border-radius: 3px;
+  background: var(--stage-overlay);
 }
 .view-switch button,
 .assembly-switch button {
@@ -356,7 +370,9 @@ main {
   white-space: nowrap;
 }
 .preview-stage {
-  position: relative;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   min-height: 0;
   width: 100%;
   background: radial-gradient(circle, var(--stage-grid) 0.75px, transparent 1px)
@@ -393,7 +409,7 @@ main {
 .camera-keyboard-hint {
   display: none;
   position: absolute;
-  top: 8px;
+  top: 64px;
   left: 50%;
   transform: translateX(-50%);
   width: max-content;
@@ -409,18 +425,23 @@ main {
   display: block;
 }
 .preview-bottom {
+  grid-row: 3;
   z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 16px 22px;
+  pointer-events: none;
 }
 .preview-bottom > div:first-child {
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+  padding: 6px 8px;
+  border-radius: 3px;
+  background: var(--stage-overlay);
 }
 .preview-model {
   font-size: 16px;
@@ -449,26 +470,29 @@ main {
   place-items: center;
   border: 1px solid var(--control-border);
   border-radius: 50%;
-  background: transparent;
+  background: var(--stage-overlay);
 }
 .preview-actions button:hover {
   background: var(--card);
 }
 .preview-toolbar {
+  grid-row: 4;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 12px 16px;
-  border-top: 1px solid var(--stage-border);
-  background: var(--stage-toolbar);
+  pointer-events: none;
 }
 .assembly-switch {
   display: flex;
   gap: 4px;
+  padding: 2px;
 }
 .assembly-switch button {
   padding: 8px 12px;
+  background: var(--stage-overlay);
 }
 .assembly-switch button.active {
   background: var(--card);
@@ -483,6 +507,9 @@ main {
   font-size: 12px;
   max-width: 180px;
   line-height: 1.5;
+  padding: 6px 8px;
+  border-radius: 3px;
+  background: var(--stage-overlay);
 }
 .geometry-updating {
   position: absolute;
@@ -2071,11 +2098,6 @@ main {
     border-radius: 0;
     grid-template-rows: minmax(0, 1fr) 44px;
   }
-  .preview-stage {
-    padding-bottom: 34px;
-    grid-row: 1;
-    grid-column: 1;
-  }
   .preview-topbar {
     position: absolute;
     top: 6px;
@@ -2087,13 +2109,11 @@ main {
     pointer-events: none;
   }
   .preview-topbar .eyebrow {
-    margin-top: 13px;
+    margin-top: 5px;
     font-size: 10px;
   }
   .view-switch {
     flex-direction: column;
-    background: var(--stage-overlay);
-    pointer-events: auto;
   }
   .view-switch button {
     font-size: 12px;
@@ -2130,9 +2150,6 @@ main {
   .preview-dimensions {
     font-size: 10px;
   }
-  .preview-actions {
-    pointer-events: auto;
-  }
   .preview-actions button {
     width: 36px;
     height: 44px;
@@ -2148,12 +2165,12 @@ main {
     grid-row: 2;
     grid-column: 1;
     padding: 0 10px;
-    border-top: 1px solid var(--stage-border);
     z-index: 3;
   }
   .assembly-switch {
     width: 100%;
     gap: 8px;
+    padding: 0;
   }
   .assembly-switch button {
     flex: 1;
@@ -2165,7 +2182,7 @@ main {
   }
   .assembly-switch button.active {
     box-shadow: inset 0 -2px var(--foreground);
-    background: transparent;
+    background: var(--stage-overlay);
     border-color: transparent;
   }
   .geometry-updating {
@@ -2176,6 +2193,10 @@ main {
     font-size: 11px;
     padding: 6px 8px;
     white-space: nowrap;
+  }
+  .camera-keyboard-hint {
+    top: 94px;
+    font-size: 11px;
   }
   .controls {
     border: 0;
@@ -2353,9 +2374,6 @@ main {
   }
   .designer {
     grid-template-rows: 170px minmax(0, 1fr);
-  }
-  .preview-stage {
-    padding-bottom: 4px;
   }
   .preview-bottom > div:first-child {
     max-width: 112px;
@@ -2560,6 +2578,25 @@ main {
   border-color: var(--accent-ink);
   color: var(--accent-ink);
   box-shadow: inset 0 -2px var(--accent-ink);
+}
+.dialog-content.export-content {
+  --export-dialog-padding: 28px;
+  padding: var(--export-dialog-padding);
+}
+.export-actions {
+  position: sticky;
+  bottom: calc(-1 * var(--export-dialog-padding));
+  z-index: 1;
+  margin: 20px calc(-1 * var(--export-dialog-padding))
+    calc(-1 * var(--export-dialog-padding));
+  padding: 16px var(--export-dialog-padding) var(--export-dialog-padding);
+  border-top: 1px solid var(--border);
+  background: var(--card);
+}
+@media (max-width: 800px) {
+  .dialog-content.export-content {
+    --export-dialog-padding: 22px;
+  }
 }
 .export-targets {
   display: grid;

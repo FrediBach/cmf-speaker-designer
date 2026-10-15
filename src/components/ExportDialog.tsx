@@ -140,6 +140,7 @@ export function ExportDialog({
       }}
     >
       <DialogContent
+        className="export-content"
         onCloseAutoFocus={(event) => {
           event.preventDefault()
           triggerRef.current?.focus()
@@ -332,32 +333,34 @@ export function ExportDialog({
               ? `Faceted STEP with ${STEP_TOLERANCE_MM} mm surface tolerance, without smooth CAD surfaces or parametric feature history. ${exportTarget === 'all' ? 'Colors are saved in the ZIP’s design.json.' : 'Choose All parts to include colors and settings in a ZIP.'}`
               : 'STL files don’t store colors. Match your selected colors with filament. Review supports in your slicer and test-fit your first print.'}
         </p>
-        <Button
-          className="confirm-download"
-          onClick={exportDesign}
-          disabled={
-            busy ||
-            !geometry ||
-            !knobGeometry ||
-            !powerButtonGeometry ||
-            !regionsReady ||
-            (isMaterialExport && includesPanel && !!multicolorError)
-          }
-        >
-          {busy ? (
-            <LoaderCircle size={17} className="spin" />
-          ) : (
-            <ArrowDownToLine size={17} />
-          )}{' '}
-          {busy
-            ? 'Preparing files…'
-            : exportFormat === '3mf'
-              ? 'Download 3MF'
-              : exportFormat === 'stl-parts' || exportTarget === 'all'
-                ? 'Download ZIP'
-                : `Download ${formatLabel}`}
-          <span>Speaker {design.model.toUpperCase()}</span>
-        </Button>
+        <div className="export-actions">
+          <Button
+            className="confirm-download"
+            onClick={exportDesign}
+            disabled={
+              busy ||
+              !geometry ||
+              !knobGeometry ||
+              !powerButtonGeometry ||
+              !regionsReady ||
+              (isMaterialExport && includesPanel && !!multicolorError)
+            }
+          >
+            {busy ? (
+              <LoaderCircle size={17} className="spin" />
+            ) : (
+              <ArrowDownToLine size={17} />
+            )}{' '}
+            {busy
+              ? 'Preparing files…'
+              : exportFormat === '3mf'
+                ? 'Download 3MF'
+                : exportFormat === 'stl-parts' || exportTarget === 'all'
+                  ? 'Download ZIP'
+                  : `Download ${formatLabel}`}
+            <span>Speaker {design.model.toUpperCase()}</span>
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )
