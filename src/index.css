@@ -753,6 +753,8 @@ main {
   background: var(--surface-hover);
 }
 .controls-scroll {
+  /* Keep absolutely positioned editor content inside this scroll area. */
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
