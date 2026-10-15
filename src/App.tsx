@@ -252,6 +252,8 @@ function App() {
               setResetKey((value) => value + 1)
             }}
             onShare={shareDesign}
+            onSaveDesign={() => downloadDesignJson(design)}
+            onLoadDesign={() => designFileRef.current?.click()}
           />
           <DesignControls
             design={design}
@@ -280,8 +282,6 @@ function App() {
               history.beginTransaction()
             }}
             onEndTransaction={endTransaction}
-            onSaveDesign={() => downloadDesignJson(design)}
-            onLoadDesign={() => designFileRef.current?.click()}
           />
         </section>
       </main>

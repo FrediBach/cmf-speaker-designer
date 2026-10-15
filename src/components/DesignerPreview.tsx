@@ -2,6 +2,8 @@ import { lazy, Suspense } from 'react'
 import {
   Box,
   Copy,
+  FileDown,
+  FolderOpen,
   Layers3,
   LoaderCircle,
   MousePointer2,
@@ -36,6 +38,8 @@ interface Props {
   retryKey: number
   onResetCamera: () => void
   onShare: () => void
+  onSaveDesign: () => void
+  onLoadDesign: () => void
 }
 
 export function DesignerPreview({
@@ -51,6 +55,8 @@ export function DesignerPreview({
   retryKey,
   onResetCamera,
   onShare,
+  onSaveDesign,
+  onLoadDesign,
 }: Props) {
   const {
     previewGeometry,
@@ -76,9 +82,25 @@ export function DesignerPreview({
     >
       <div className="preview-card">
         <div className="preview-topbar">
-          <span className="eyebrow">
-            <span className="live-dot" /> PREVIEW
-          </span>
+          <div className="preview-status">
+            <span className="eyebrow">
+              <span className="live-dot" /> PREVIEW
+            </span>
+            <button
+              className="presentation-toggle"
+              title={presentation ? 'Stop presentation' : 'Start presentation'}
+              aria-label="Presentation mode"
+              aria-pressed={presentation}
+              aria-description="Automatically circle the speaker from changing heights. Drag the preview to take control."
+              disabled={!previewGeometry || !!error}
+              onClick={() => setPresentation(!presentation)}
+            >
+              {presentation ? <Pause size={16} /> : <Play size={16} />}
+              <span className="presentation-label">
+                {presentation ? 'Pause' : 'Present'}
+              </span>
+            </button>
+          </div>
           <div className="view-switch" role="group" aria-label="Camera view">
             <button
               className={
@@ -175,20 +197,6 @@ export function DesignerPreview({
           </div>
           <div className="preview-actions">
             <button
-              className="presentation-toggle"
-              title={presentation ? 'Stop presentation' : 'Start presentation'}
-              aria-label="Presentation mode"
-              aria-pressed={presentation}
-              aria-description="Automatically circle the speaker from changing heights. Drag the preview to take control."
-              disabled={!previewGeometry || !!error}
-              onClick={() => setPresentation(!presentation)}
-            >
-              {presentation ? <Pause size={16} /> : <Play size={16} />}
-              <span className="presentation-label">
-                {presentation ? 'Pause' : 'Present'}
-              </span>
-            </button>
-            <button
               title="Reset camera"
               aria-label="Reset camera"
               onClick={onResetCamera}
@@ -201,6 +209,20 @@ export function DesignerPreview({
               onClick={onShare}
             >
               <Copy size={16} />
+            </button>
+            <button
+              title="Save design JSON"
+              aria-label="Save design JSON"
+              onClick={onSaveDesign}
+            >
+              <FileDown size={16} aria-hidden="true" />
+            </button>
+            <button
+              title="Load design JSON"
+              aria-label="Load design JSON"
+              onClick={onLoadDesign}
+            >
+              <FolderOpen size={16} aria-hidden="true" />
             </button>
           </div>
         </div>

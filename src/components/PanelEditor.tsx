@@ -40,140 +40,21 @@ export function PanelEditor({
   onBeginTransaction,
   onEndTransaction,
 }: Props) {
-  const { styles, currentStyle, customHalo, customGrille, haloLabel } =
-    getDesignSummary(design)
-  const panelStyleSelected = (style: Design['style']) => design.style === style
   const panelExtensionCm = design.panelExtension / 10
   const panelGapCm = design.panelGap / 10
   return (
     <>
-      <section className="control-section">
-        <h3>
-          <span>01</span> Panel shape
-        </h3>
-        <div className="style-options">
-          {styles.map((style) => (
-            <button
-              key={style.id}
-              className={`style-option ${panelStyleSelected(style.id) ? 'selected' : ''}`}
-              onClick={() => {
-                if (style.id === 'original') {
-                  update({
-                    style: style.id,
-                    halo: { ...design.halo, mode: 'original' },
-                    grille: { ...design.grille, mode: 'original' },
-                    raceStripes: { ...design.raceStripes, enabled: false },
-                  })
-                } else {
-                  update({ style: style.id })
-                }
-              }}
-              aria-pressed={panelStyleSelected(style.id)}
-            >
-              <PanelIcon model={design.model} style={style.id} />
-              <span>{style.label}</span>
-              {panelStyleSelected(style.id) && (
-                <Check className="style-check" size={12} />
-              )}
-            </button>
-          ))}
-        </div>
-        <p className="style-description">
-          {customHalo
-            ? `${haloLabel}${customGrille ? ' and grille' : ''} active. Edit the profile in Halo, or choose Original to restore the open panel.`
-            : customGrille
-              ? 'Custom grille active. Edit the pattern in Grille, or choose Original to restore the open panel.'
-              : design.raceStripes.enabled
-                ? 'Recessed race stripes active. Edit their width and spacing below, or choose Original to restore the open panel.'
-                : currentStyle.description}
-        </p>
-      </section>
-      <section className="control-section">
-        <h3>
-          <span>02</span> Colors
-        </h3>
-        <div className="handle-mode" role="group" aria-label="Panel color mode">
-          {[false, true].map((enabled) => (
-            <button
-              key={String(enabled)}
-              aria-pressed={design.multicolor.enabled === enabled}
-              className={design.multicolor.enabled === enabled ? 'active' : ''}
-              onClick={() => {
-                const empty =
-                  !design.multicolor.elements.length &&
-                  !design.multicolor.groups.length &&
-                  !design.multicolor.materials.length
-                const untouched = ['s', 'm'].some(
-                  (model) =>
-                    JSON.stringify(design.multicolor.frame) ===
-                    JSON.stringify(
-                      getDefaultMulticolorSettings(model as Design['model'])
-                        .frame,
-                    ),
-                )
-                const frame =
-                  enabled && empty && untouched
-                    ? getDefaultMulticolorSettings(design.model).frame
-                    : design.multicolor.frame
-                update({ multicolor: { ...design.multicolor, frame, enabled } })
-              }}
-            >
-              {enabled ? 'Multicolor' : 'Single color'}
-            </button>
-          ))}
-        </div>
-        <ColorPicker
-          label={design.multicolor.enabled ? 'Background' : 'Front panel'}
-          value={design.panelColor}
-          onChange={(panelColor) => update({ panelColor })}
-        />
-        <ColorPicker
-          label="Power button"
-          value={design.powerButtonColor}
-          onChange={(powerButtonColor) => update({ powerButtonColor })}
-        />
-        <ColorPicker
-          label="Volume knob"
-          value={design.knobColor}
-          onChange={(knobColor) => update({ knobColor })}
-        />
-        <p className="subtle-note">
-          {design.multicolor.enabled
-            ? 'Assign these colors to filaments in your slicer.'
-            : 'Choose matching filament in your slicer. 3MF includes these colors.'}
-        </p>
-        {design.multicolor.enabled && (
-          <>
-            <p className="subtle-note" role="status">
-              {patternError
-                ? 'Material regions could not update. Adjust the pattern or use Retry below.'
-                : materialCount === null
-                  ? 'Updating printable material regions…'
-                  : `${materialCount} printable material${materialCount === 1 ? '' : 's'} on this panel. Match these to your printer’s available filament slots.`}
-            </p>
-            {!!patternNotes.length && (
-              <details className="multicolor-pattern-notes">
-                <summary>Pattern notes ({patternNotes.length})</summary>
-                {patternNotes.map((note, index) => (
-                  <p className="subtle-note" key={index}>
-                    {note}
-                  </p>
-                ))}
-              </details>
-            )}
-            <MulticolorEditor
-              value={design.multicolor}
-              onChange={(multicolor) => update({ multicolor })}
-              panelColor={design.panelColor}
-              onPanelColorChange={(panelColor) => update({ panelColor })}
-              model={design.model}
-              geometry={geometry}
-              onBeginTransaction={onBeginTransaction}
-              onEndTransaction={onEndTransaction}
-            />
-          </>
-        )}
-      </section>
+      <PanelShapeControls design={design} update={update} />
+      <PanelColorControls
+        design={design}
+        update={update}
+        geometry={geometry}
+        materialCount={materialCount}
+        patternNotes={patternNotes}
+        patternError={patternError}
+        onBeginTransaction={onBeginTransaction}
+        onEndTransaction={onEndTransaction}
+      />
       <section className="control-section relief-section">
         <h3>
           <span>03</span> Face depth{' '}
@@ -309,5 +190,157 @@ export function PanelEditor({
         </div>
       </div>
     </>
+  )
+}
+
+function PanelShapeControls({
+  design,
+  update,
+}: Pick<Props, 'design' | 'update'>) {
+  const { styles, currentStyle, customHalo, customGrille, haloLabel } =
+    getDesignSummary(design)
+  const panelStyleSelected = (style: Design['style']) => design.style === style
+  return (
+    <section className="control-section">
+      <h3>
+        <span>01</span> Panel shape
+      </h3>
+      <div className="style-options">
+        {styles.map((style) => (
+          <button
+            key={style.id}
+            className={`style-option ${panelStyleSelected(style.id) ? 'selected' : ''}`}
+            onClick={() => {
+              if (style.id === 'original') {
+                update({
+                  style: style.id,
+                  halo: { ...design.halo, mode: 'original' },
+                  grille: { ...design.grille, mode: 'original' },
+                  raceStripes: { ...design.raceStripes, enabled: false },
+                })
+              } else {
+                update({ style: style.id })
+              }
+            }}
+            aria-pressed={panelStyleSelected(style.id)}
+          >
+            <PanelIcon model={design.model} style={style.id} />
+            <span>{style.label}</span>
+            {panelStyleSelected(style.id) && (
+              <Check className="style-check" size={12} />
+            )}
+          </button>
+        ))}
+      </div>
+      <p className="style-description">
+        {customHalo
+          ? `${haloLabel}${customGrille ? ' and grille' : ''} active. Edit the profile in Halo, or choose Original to restore the open panel.`
+          : customGrille
+            ? 'Custom grille active. Edit the pattern in Grille, or choose Original to restore the open panel.'
+            : design.raceStripes.enabled
+              ? 'Recessed race stripes active. Edit their width and spacing below, or choose Original to restore the open panel.'
+              : currentStyle.description}
+      </p>
+    </section>
+  )
+}
+
+function PanelColorControls({
+  design,
+  update,
+  geometry,
+  materialCount,
+  patternNotes,
+  patternError,
+  onBeginTransaction,
+  onEndTransaction,
+}: Omit<Props, 'onOpenGuide'>) {
+  return (
+    <section className="control-section">
+      <h3>
+        <span>02</span> Colors
+      </h3>
+      <div className="handle-mode" role="group" aria-label="Panel color mode">
+        {[false, true].map((enabled) => (
+          <button
+            key={String(enabled)}
+            aria-pressed={design.multicolor.enabled === enabled}
+            className={design.multicolor.enabled === enabled ? 'active' : ''}
+            onClick={() => {
+              const empty =
+                !design.multicolor.elements.length &&
+                !design.multicolor.groups.length &&
+                !design.multicolor.materials.length
+              const untouched = ['s', 'm'].some(
+                (model) =>
+                  JSON.stringify(design.multicolor.frame) ===
+                  JSON.stringify(
+                    getDefaultMulticolorSettings(model as Design['model'])
+                      .frame,
+                  ),
+              )
+              const frame =
+                enabled && empty && untouched
+                  ? getDefaultMulticolorSettings(design.model).frame
+                  : design.multicolor.frame
+              update({ multicolor: { ...design.multicolor, frame, enabled } })
+            }}
+          >
+            {enabled ? 'Multicolor' : 'Single color'}
+          </button>
+        ))}
+      </div>
+      <ColorPicker
+        label={design.multicolor.enabled ? 'Background' : 'Front panel'}
+        value={design.panelColor}
+        onChange={(panelColor) => update({ panelColor })}
+      />
+      <ColorPicker
+        label="Power button"
+        value={design.powerButtonColor}
+        onChange={(powerButtonColor) => update({ powerButtonColor })}
+      />
+      <ColorPicker
+        label="Volume knob"
+        value={design.knobColor}
+        onChange={(knobColor) => update({ knobColor })}
+      />
+      <p className="subtle-note">
+        {design.multicolor.enabled
+          ? 'Assign these colors to filaments in your slicer.'
+          : 'Choose matching filament in your slicer. 3MF includes these colors.'}
+      </p>
+      {design.multicolor.enabled && (
+        <>
+          <p className="subtle-note" role="status">
+            {patternError
+              ? 'Material regions could not update. Adjust the pattern or use Retry below.'
+              : materialCount === null
+                ? 'Updating printable material regions…'
+                : `${materialCount} printable material${materialCount === 1 ? '' : 's'} on this panel. Match these to your printer’s available filament slots.`}
+          </p>
+          {!!patternNotes.length && (
+            <details className="multicolor-pattern-notes">
+              <summary>Pattern notes ({patternNotes.length})</summary>
+              {patternNotes.map((note, index) => (
+                <p className="subtle-note" key={index}>
+                  {note}
+                </p>
+              ))}
+            </details>
+          )}
+          <MulticolorEditor
+            value={design.multicolor}
+            onChange={(multicolor) => update({ multicolor })}
+            panelColor={design.panelColor}
+            onPanelColorChange={(panelColor) => update({ panelColor })}
+            model={design.model}
+            geometry={geometry}
+            onBeginTransaction={onBeginTransaction}
+            onEndTransaction={onEndTransaction}
+          />
+        </>
+      )}
+    </section>
   )
 }

@@ -46,8 +46,6 @@ interface Props {
   onRetry: () => void
   onBeginTransaction: () => void
   onEndTransaction: () => void
-  onSaveDesign: () => void
-  onLoadDesign: () => void
 }
 
 export function DesignControls({
@@ -66,8 +64,6 @@ export function DesignControls({
   onRetry,
   onBeginTransaction,
   onEndTransaction,
-  onSaveDesign,
-  onLoadDesign,
 }: Props) {
   const [speakerCollapsed, setSpeakerCollapsed] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -397,14 +393,6 @@ export function DesignControls({
             onBeginTransaction={onBeginTransaction}
             onEndTransaction={onEndTransaction}
           />
-          <div className="design-file-actions">
-            <button className="text-button" onClick={onSaveDesign}>
-              Save design JSON
-            </button>
-            <button className="text-button" onClick={onLoadDesign}>
-              Load design JSON
-            </button>
-          </div>
         </div>
         <div
           id="halo-editor"

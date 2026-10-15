@@ -33,6 +33,62 @@ interface Props {
   onNotify: (message: string) => void
 }
 
+const EXPORT_FORMAT_DETAILS = {
+  stl: {
+    label: 'STL',
+    materialExport: false,
+    geometryLabel: 'Binary STL',
+    description:
+      'Full-size parts in millimeters. Open each STL in your slicer at 100% scale.',
+  },
+  stp: {
+    label: 'STP',
+    materialExport: false,
+    geometryLabel: 'Faceted STEP',
+    description:
+      'Full-size STEP parts in millimeters for your CAD application.',
+  },
+  '3mf': {
+    label: '3MF',
+    materialExport: true,
+    geometryLabel: 'Multipart 3MF',
+    description:
+      'Full-size material regions in millimeters. Keep the panel assembled and assign a filament to each named part in your slicer.',
+  },
+  'stl-parts': {
+    label: 'STL parts',
+    materialExport: true,
+    geometryLabel: 'Aligned material STLs',
+    description:
+      'Full-size material regions in millimeters. Keep the panel assembled and assign a filament to each named part in your slicer.',
+  },
+} satisfies Record<
+  DesignExportFormat,
+  {
+    label: string
+    materialExport: boolean
+    geometryLabel: string
+    description: string
+  }
+>
+
+/** Remember a format choice only for the color mode in which it was selected. */
+function useExportFormat(multicolor: boolean) {
+  const [formatChoice, setFormatChoice] = useState<{
+    multicolor: boolean
+    format: DesignExportFormat
+  } | null>(null)
+  const exportFormat =
+    formatChoice?.multicolor === multicolor
+      ? formatChoice.format
+      : multicolor
+        ? '3mf'
+        : 'stl'
+  const setExportFormat = (format: DesignExportFormat) =>
+    setFormatChoice({ multicolor: multicolor, format })
+  return { exportFormat, setExportFormat }
+}
+
 export function ExportDialog({
   open,
   onOpenChange,
@@ -44,60 +100,35 @@ export function ExportDialog({
   const [busy, setBusy] = useState(false)
   const [exportTarget, setExportTarget] = useState<DesignExportTarget>('all')
   const includesPanel = exportTarget === 'all' || exportTarget === 'panel'
-  const includesKnob = exportTarget === 'all' || exportTarget === 'knob'
-  const includesPowerButton =
-    exportTarget === 'all' || exportTarget === 'power-button'
-  const [formatChoice, setFormatChoice] = useState<{
-    multicolor: boolean
-    format: DesignExportFormat
-  } | null>(null)
-  const exportFormat =
-    formatChoice?.multicolor === design.multicolor.enabled
-      ? formatChoice.format
-      : design.multicolor.enabled
-        ? '3mf'
-        : 'stl'
-  const setExportFormat = (format: DesignExportFormat) =>
-    setFormatChoice({ multicolor: design.multicolor.enabled, format })
-  const formatLabel =
-    exportFormat === 'stl-parts' ? 'STL parts' : exportFormat.toUpperCase()
-  const isMaterialExport =
-    exportFormat === '3mf' || exportFormat === 'stl-parts'
-  const geometryLabel =
-    exportFormat === 'stp'
-      ? 'Faceted STEP'
-      : exportFormat === '3mf'
-        ? 'Multipart 3MF'
-        : exportFormat === 'stl-parts'
-          ? 'Aligned material STLs'
-          : 'Binary STL'
+  const { exportFormat, setExportFormat } = useExportFormat(
+    design.multicolor.enabled,
+  )
+  const {
+    label: formatLabel,
+    materialExport: isMaterialExport,
+    geometryLabel,
+    description,
+  } = EXPORT_FORMAT_DETAILS[exportFormat]
   const {
     geometry,
     knobGeometry,
     powerButtonGeometry,
-    panelWidth,
-    panelHeight,
-    knobDimensions,
-    powerButtonDimensions,
     materialParts,
     multicolorError,
-    multicolorDiagnostics,
   } = meshes
   const regionsReady =
     !design.multicolor.enabled ||
     !includesPanel ||
     !isMaterialExport ||
     !!materialParts
-  const { knobLabel } = getDesignSummary(design)
+  const ready =
+    !!geometry &&
+    !!knobGeometry &&
+    !!powerButtonGeometry &&
+    regionsReady &&
+    !busy
   async function exportDesign() {
-    if (
-      !geometry ||
-      !knobGeometry ||
-      !powerButtonGeometry ||
-      !regionsReady ||
-      busy
-    )
-      return
+    if (!ready) return
     setBusy(true)
     try {
       await new Promise<void>((resolve) =>
@@ -151,218 +182,342 @@ export function ExportDialog({
         </div>
         <span className="eyebrow">EXPORT / {formatLabel}</span>
         <DialogTitle>Export design</DialogTitle>
-        <DialogDescription>
-          {isMaterialExport
-            ? 'Full-size material regions in millimeters. Keep the panel assembled and assign a filament to each named part in your slicer.'
-            : exportFormat === 'stp'
-              ? 'Full-size STEP parts in millimeters for your CAD application.'
-              : 'Full-size parts in millimeters. Open each STL in your slicer at 100% scale.'}
-        </DialogDescription>
-        <div
-          className="handle-mode export-formats"
-          role="group"
-          aria-label="Export format"
-        >
-          {(
-            [
-              '3mf',
-              ...(design.multicolor.enabled && includesPanel
-                ? ['stl-parts' as const]
-                : []),
-              'stl',
-              'stp',
-            ] as const
-          ).map((format) => (
-            <button
-              key={format}
-              aria-pressed={exportFormat === format}
-              className={exportFormat === format ? 'active' : ''}
-              disabled={busy}
-              onClick={() => setExportFormat(format)}
-            >
-              {format === 'stl-parts' ? 'STL parts' : format.toUpperCase()}
-            </button>
-          ))}
-        </div>
-        <div
-          className="handle-mode export-targets"
-          role="group"
-          aria-label="Export parts"
-        >
-          {(
-            [
-              { id: 'all', label: 'All parts' },
-              { id: 'panel', label: 'Panel only' },
-              { id: 'knob', label: 'Knob only' },
-              { id: 'power-button', label: 'Power button only' },
-            ] as const
-          ).map((target) => (
-            <button
-              key={target.id}
-              aria-pressed={exportTarget === target.id}
-              className={exportTarget === target.id ? 'active' : ''}
-              disabled={busy}
-              onClick={() => {
-                setExportTarget(target.id)
-                if (
-                  (target.id === 'knob' || target.id === 'power-button') &&
-                  exportFormat === 'stl-parts'
-                )
-                  setExportFormat('3mf')
-              }}
-            >
-              {target.label}
-            </button>
-          ))}
-        </div>
-        {includesPanel && (
-          <PanelExportSummary
+        <DialogDescription>{description}</DialogDescription>
+        <ExportChoices
+          multicolor={design.multicolor.enabled}
+          target={exportTarget}
+          format={exportFormat}
+          busy={busy}
+          onTargetChange={setExportTarget}
+          onFormatChange={setExportFormat}
+        />
+        <ExportPartSummaries
+          design={design}
+          meshes={meshes}
+          target={exportTarget}
+          geometryLabel={geometryLabel}
+        />
+        {design.multicolor.enabled && includesPanel && (
+          <MaterialExportSummary
             design={design}
-            panelWidth={panelWidth}
-            panelHeight={panelHeight}
-            geometryLabel={geometryLabel}
+            meshes={meshes}
+            isMaterialExport={isMaterialExport}
+            formatLabel={formatLabel}
           />
         )}
-        {includesKnob && (
-          <div className="download-summary knob-download-summary">
-            <KnobIcon style={design.knob.style} />
-            <div>
-              <strong>{knobLabel} volume knob</strong>
-              <span>
-                {knobDimensions ? `${knobDimensions} mm · ` : ''}
-                {geometryLabel}
-              </span>
-              <span>{colorName(design.knobColor)} · Fits Speaker S & M</span>
-            </div>
-            <span
-              className="summary-swatch"
-              style={{ background: design.knobColor }}
-            />
-          </div>
-        )}
-        {includesPowerButton && (
-          <div className="download-summary power-button-download-summary">
-            <Power aria-hidden="true" />
-            <div>
-              <strong>Original power button</strong>
-              <span>
-                {powerButtonDimensions ? `${powerButtonDimensions} mm · ` : ''}
-                {geometryLabel}
-              </span>
-              <span>
-                {colorName(design.powerButtonColor)} · Fits Speaker S & M
-              </span>
-              <span>Factory indicator marking is preview only.</span>
-            </div>
-            <span
-              className="summary-swatch"
-              style={{ background: design.powerButtonColor }}
-            />
-          </div>
-        )}
-        {design.multicolor.enabled && includesPanel && (
-          <div className="multicolor-export-summary">
-            {isMaterialExport ? (
-              <>
-                <strong>
-                  {materialParts?.length ?? '…'} used materials · Full-depth
-                  regions
-                </strong>
-                <div className="multicolor-export-materials">
-                  {materialParts?.map((part) => {
-                    const material =
-                      part.materialId === 'base'
-                        ? { name: 'Background', color: design.panelColor }
-                        : design.multicolor.materials.find(
-                            (item) => item.id === part.materialId,
-                          )
-                    return (
-                      material && (
-                        <span key={part.materialId}>
-                          <i style={{ background: material.color }} />
-                          {material.name}
-                        </span>
-                      )
-                    )
-                  })}
-                </div>
-                {!!multicolorDiagnostics.length && (
-                  <details>
-                    <summary>
-                      Pattern notes ({multicolorDiagnostics.length})
-                    </summary>
-                    {multicolorDiagnostics.map((note, index) => (
-                      <p key={index}>{note}</p>
-                    ))}
-                  </details>
-                )}
-              </>
-            ) : (
-              <p>
-                <strong>Combined geometry only.</strong> This {formatLabel}{' '}
-                joins the panel into one solid and discards material separation.
-                Choose 3MF or STL parts for multicolor printing.
-              </p>
-            )}
-          </div>
-        )}
-        <div className="download-notes">
-          <p>
-            <Check size={15} />{' '}
-            {includesPanel && design.panelGap > 0
-              ? 'Extended attachments and rear support posts'
-              : 'Original mounting features retained'}
-          </p>
-          <p>
-            <Check size={15} />{' '}
-            {isMaterialExport && includesPanel
-              ? 'Panel regions share one assembly position'
-              : 'Separate parts, positioned on the build plate'}
-          </p>
-          {exportTarget === 'all' && !isMaterialExport && (
-            <p>
-              <Check size={15} /> ZIP includes all three {formatLabel} files and
-              design.json with your colors and settings
-            </p>
-          )}
-        </div>
-        <p className="export-caveat">
-          {isMaterialExport
-            ? 'Confirm filament assignments in your slicer. Use compatible materials, inspect sliced boundaries and supports, and test fit and bonding before using the panel. 3MF display colors do not select printer filament slots.'
-            : exportFormat === 'stp'
-              ? `Faceted STEP with ${STEP_TOLERANCE_MM} mm surface tolerance, without smooth CAD surfaces or parametric feature history. ${exportTarget === 'all' ? 'Colors are saved in the ZIP’s design.json.' : 'Choose All parts to include colors and settings in a ZIP.'}`
-              : 'STL files don’t store colors. Match your selected colors with filament. Review supports in your slicer and test-fit your first print.'}
-        </p>
-        <div className="export-actions">
-          <Button
-            className="confirm-download"
-            onClick={exportDesign}
-            disabled={
-              busy ||
-              !geometry ||
-              !knobGeometry ||
-              !powerButtonGeometry ||
-              !regionsReady ||
-              (isMaterialExport && includesPanel && !!multicolorError)
-            }
-          >
-            {busy ? (
-              <LoaderCircle size={17} className="spin" />
-            ) : (
-              <ArrowDownToLine size={17} />
-            )}{' '}
-            {busy
-              ? 'Preparing files…'
-              : exportFormat === '3mf'
-                ? 'Download 3MF'
-                : exportFormat === 'stl-parts' || exportTarget === 'all'
-                  ? 'Download ZIP'
-                  : `Download ${formatLabel}`}
-            <span>Speaker {design.model.toUpperCase()}</span>
-          </Button>
-        </div>
+        <ExportNotes
+          extendedAttachments={includesPanel && design.panelGap > 0}
+          includesPanel={includesPanel}
+          isMaterialExport={isMaterialExport}
+          exportTarget={exportTarget}
+          exportFormat={exportFormat}
+          formatLabel={formatLabel}
+        />
+        <ExportDownloadButton
+          busy={busy}
+          disabled={
+            !ready || (isMaterialExport && includesPanel && !!multicolorError)
+          }
+          onClick={exportDesign}
+          exportFormat={exportFormat}
+          exportTarget={exportTarget}
+          formatLabel={formatLabel}
+          model={design.model}
+        />
       </DialogContent>
     </Dialog>
+  )
+}
+
+function ExportDownloadButton({
+  busy,
+  disabled,
+  onClick,
+  exportFormat,
+  exportTarget,
+  formatLabel,
+  model,
+}: {
+  busy: boolean
+  disabled: boolean
+  onClick: () => void
+  exportFormat: DesignExportFormat
+  exportTarget: DesignExportTarget
+  formatLabel: string
+  model: Design['model']
+}) {
+  return (
+    <div className="export-actions">
+      <Button
+        className="confirm-download"
+        onClick={onClick}
+        disabled={disabled}
+      >
+        {busy ? (
+          <LoaderCircle size={17} className="spin" />
+        ) : (
+          <ArrowDownToLine size={17} />
+        )}{' '}
+        {busy
+          ? 'Preparing files…'
+          : exportFormat === '3mf'
+            ? 'Download 3MF'
+            : exportFormat === 'stl-parts' || exportTarget === 'all'
+              ? 'Download ZIP'
+              : `Download ${formatLabel}`}
+        <span>Speaker {model.toUpperCase()}</span>
+      </Button>
+    </div>
+  )
+}
+
+function ExportChoices({
+  multicolor,
+  target: selectedTarget,
+  format: selectedFormat,
+  busy,
+  onTargetChange,
+  onFormatChange,
+}: {
+  multicolor: boolean
+  target: DesignExportTarget
+  format: DesignExportFormat
+  busy: boolean
+  onTargetChange: (target: DesignExportTarget) => void
+  onFormatChange: (format: DesignExportFormat) => void
+}) {
+  const includesPanel = selectedTarget === 'all' || selectedTarget === 'panel'
+  return (
+    <>
+      <div
+        className="handle-mode export-formats"
+        role="group"
+        aria-label="Export format"
+      >
+        {(
+          [
+            '3mf',
+            ...(multicolor && includesPanel ? ['stl-parts' as const] : []),
+            'stl',
+            'stp',
+          ] as const
+        ).map((format) => (
+          <button
+            key={format}
+            aria-pressed={selectedFormat === format}
+            className={selectedFormat === format ? 'active' : ''}
+            disabled={busy}
+            onClick={() => onFormatChange(format)}
+          >
+            {format === 'stl-parts' ? 'STL parts' : format.toUpperCase()}
+          </button>
+        ))}
+      </div>
+      <div
+        className="handle-mode export-targets"
+        role="group"
+        aria-label="Export parts"
+      >
+        {(
+          [
+            { id: 'all', label: 'All parts' },
+            { id: 'panel', label: 'Panel only' },
+            { id: 'knob', label: 'Knob only' },
+            { id: 'power-button', label: 'Power button only' },
+          ] as const
+        ).map((target) => (
+          <button
+            key={target.id}
+            aria-pressed={selectedTarget === target.id}
+            className={selectedTarget === target.id ? 'active' : ''}
+            disabled={busy}
+            onClick={() => {
+              onTargetChange(target.id)
+              if (
+                (target.id === 'knob' || target.id === 'power-button') &&
+                selectedFormat === 'stl-parts'
+              )
+                onFormatChange('3mf')
+            }}
+          >
+            {target.label}
+          </button>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function ExportNotes({
+  extendedAttachments,
+  includesPanel,
+  isMaterialExport,
+  exportTarget,
+  exportFormat,
+  formatLabel,
+}: {
+  extendedAttachments: boolean
+  includesPanel: boolean
+  isMaterialExport: boolean
+  exportTarget: DesignExportTarget
+  exportFormat: DesignExportFormat
+  formatLabel: string
+}) {
+  return (
+    <>
+      <div className="download-notes">
+        <p>
+          <Check size={15} />{' '}
+          {extendedAttachments
+            ? 'Extended attachments and rear support posts'
+            : 'Original mounting features retained'}
+        </p>
+        <p>
+          <Check size={15} />{' '}
+          {isMaterialExport && includesPanel
+            ? 'Panel regions share one assembly position'
+            : 'Separate parts, positioned on the build plate'}
+        </p>
+        {exportTarget === 'all' && !isMaterialExport && (
+          <p>
+            <Check size={15} /> ZIP includes all three {formatLabel} files and
+            design.json with your colors and settings
+          </p>
+        )}
+      </div>
+      <p className="export-caveat">
+        {isMaterialExport
+          ? 'Confirm filament assignments in your slicer. Use compatible materials, inspect sliced boundaries and supports, and test fit and bonding before using the panel. 3MF display colors do not select printer filament slots.'
+          : exportFormat === 'stp'
+            ? `Faceted STEP with ${STEP_TOLERANCE_MM} mm surface tolerance, without smooth CAD surfaces or parametric feature history. ${exportTarget === 'all' ? 'Colors are saved in the ZIP’s design.json.' : 'Choose All parts to include colors and settings in a ZIP.'}`
+            : 'STL files don’t store colors. Match your selected colors with filament. Review supports in your slicer and test-fit your first print.'}
+      </p>
+    </>
+  )
+}
+
+function ExportPartSummaries({
+  design,
+  meshes,
+  target,
+  geometryLabel,
+}: {
+  design: Design
+  meshes: Props['meshes']
+  target: DesignExportTarget
+  geometryLabel: string
+}) {
+  const includesPanel = target === 'all' || target === 'panel'
+  const includesKnob = target === 'all' || target === 'knob'
+  const includesPowerButton = target === 'all' || target === 'power-button'
+  const { panelWidth, panelHeight, knobDimensions, powerButtonDimensions } =
+    meshes
+  const { knobLabel } = getDesignSummary(design)
+  return (
+    <>
+      {includesPanel && (
+        <PanelExportSummary
+          design={design}
+          panelWidth={panelWidth}
+          panelHeight={panelHeight}
+          geometryLabel={geometryLabel}
+        />
+      )}
+      {includesKnob && (
+        <div className="download-summary knob-download-summary">
+          <KnobIcon style={design.knob.style} />
+          <div>
+            <strong>{knobLabel} volume knob</strong>
+            <span>
+              {knobDimensions ? `${knobDimensions} mm · ` : ''}
+              {geometryLabel}
+            </span>
+            <span>{colorName(design.knobColor)} · Fits Speaker S & M</span>
+          </div>
+          <span
+            className="summary-swatch"
+            style={{ background: design.knobColor }}
+          />
+        </div>
+      )}
+      {includesPowerButton && (
+        <div className="download-summary power-button-download-summary">
+          <Power aria-hidden="true" />
+          <div>
+            <strong>Original power button</strong>
+            <span>
+              {powerButtonDimensions ? `${powerButtonDimensions} mm · ` : ''}
+              {geometryLabel}
+            </span>
+            <span>
+              {colorName(design.powerButtonColor)} · Fits Speaker S & M
+            </span>
+            <span>Factory indicator marking is preview only.</span>
+          </div>
+          <span
+            className="summary-swatch"
+            style={{ background: design.powerButtonColor }}
+          />
+        </div>
+      )}
+    </>
+  )
+}
+
+function MaterialExportSummary({
+  design,
+  meshes,
+  isMaterialExport,
+  formatLabel,
+}: {
+  design: Design
+  meshes: Props['meshes']
+  isMaterialExport: boolean
+  formatLabel: string
+}) {
+  const { materialParts, multicolorDiagnostics } = meshes
+  return (
+    <div className="multicolor-export-summary">
+      {isMaterialExport ? (
+        <>
+          <strong>
+            {materialParts?.length ?? '…'} used materials · Full-depth regions
+          </strong>
+          <div className="multicolor-export-materials">
+            {materialParts?.map((part) => {
+              const material =
+                part.materialId === 'base'
+                  ? { name: 'Background', color: design.panelColor }
+                  : design.multicolor.materials.find(
+                      (item) => item.id === part.materialId,
+                    )
+              return (
+                material && (
+                  <span key={part.materialId}>
+                    <i style={{ background: material.color }} />
+                    {material.name}
+                  </span>
+                )
+              )
+            })}
+          </div>
+          {!!multicolorDiagnostics.length && (
+            <details>
+              <summary>Pattern notes ({multicolorDiagnostics.length})</summary>
+              {multicolorDiagnostics.map((note, index) => (
+                <p key={index}>{note}</p>
+              ))}
+            </details>
+          )}
+        </>
+      ) : (
+        <p>
+          <strong>Combined geometry only.</strong> This {formatLabel} joins the
+          panel into one solid and discards material separation. Choose 3MF or
+          STL parts for multicolor printing.
+        </p>
+      )}
+    </div>
   )
 }
 

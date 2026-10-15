@@ -1,12 +1,5 @@
 @import 'tailwindcss';
 
-.design-file-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 16px 0;
-}
-
 .multicolor-export-summary {
   margin-block: 14px;
   font-size: 13px;
@@ -298,6 +291,12 @@ main {
   border-radius: 3px;
   background: var(--stage-overlay);
 }
+.preview-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
 .preview-topbar button,
 .preview-bottom button,
 .preview-toolbar button {
@@ -428,6 +427,7 @@ main {
   grid-row: 3;
   z-index: 2;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -462,6 +462,7 @@ main {
   display: flex;
   gap: 8px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 .preview-actions button {
   width: 44px;
@@ -472,20 +473,24 @@ main {
   border-radius: 50%;
   background: var(--stage-overlay);
 }
-.preview-actions button:hover {
+.preview-actions button:hover,
+.presentation-toggle:hover {
   background: var(--card);
 }
-.preview-actions .presentation-toggle {
+.presentation-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
   width: auto;
+  height: 44px;
   padding: 0 14px;
+  border: 1px solid var(--control-border);
   border-radius: 22px;
+  background: var(--stage-overlay);
   font-size: 13px;
 }
-.preview-actions .presentation-toggle[aria-pressed='true'] {
+.presentation-toggle[aria-pressed='true'] {
   background: var(--foreground);
   border-color: var(--foreground);
   color: var(--inverse);
@@ -2133,6 +2138,13 @@ main {
   .preview-actions {
     gap: 4px;
   }
+  .presentation-toggle {
+    width: 44px;
+    padding: 0;
+  }
+  .presentation-label {
+    display: none;
+  }
   .preview-dimensions {
     font-size: 11px;
   }
@@ -2208,7 +2220,6 @@ main {
     pointer-events: none;
   }
   .preview-topbar .eyebrow {
-    margin-top: 5px;
     font-size: 10px;
   }
   .view-switch {
@@ -2226,6 +2237,7 @@ main {
   }
   .preview-bottom {
     position: absolute;
+    flex-wrap: nowrap;
     left: 12px;
     right: 10px;
     bottom: 49px;
@@ -2260,13 +2272,10 @@ main {
     width: 16px;
     height: 16px;
   }
-  .preview-actions .presentation-toggle {
+  .presentation-toggle {
     width: 36px;
-    padding: 0;
+    border: 0;
     border-radius: 3px;
-  }
-  .presentation-label {
-    display: none;
   }
   .preview-toolbar {
     grid-row: 2;
@@ -2768,6 +2777,9 @@ main {
   }
 }
 @media (max-width: 380px) {
+  .preview-dimensions {
+    display: none;
+  }
   .editor-tabs button {
     font-size: 13px;
     padding-right: 3px;
