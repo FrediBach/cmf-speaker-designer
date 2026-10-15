@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useNumericDraft } from '@/lib/use-numeric-draft'
 import {
   Circle,
@@ -394,23 +394,8 @@ export function HandleEditor({
   raceStripes,
   onChange,
 }: Props) {
-  const studsLabelId = useId()
-  const studsDescriptionId = useId()
   const limits = getHandleLimits(model, value)
   const isSlits = value.cutout === 'slits'
-  const studCount = getHandleStudCenters(model, value, raceStripes).length
-  const cutoutCount = isSlits
-    ? getHandleSlits(model, value).length
-    : value.cutout === 'svg'
-      ? getHandleSvgPaths(model, value).length
-      : getHandleHoleCenters(model, value).length
-  const requestedCutouts =
-    value.cutout === 'none'
-      ? 0
-      : value.cutout === 'svg'
-        ? (value.svgCutout?.paths.length ?? 0)
-        : value.holeCount
-  const hiddenCutouts = requestedCutouts - cutoutCount
   const set = (patch: Partial<HandleSettings>) =>
     onChange(normalizeHandleSettings(model, { ...value, ...patch }))
   const parameter = (key: HandleNumericKey, label: string, step = 1) => (
@@ -479,97 +464,7 @@ export function HandleEditor({
             panelExtension={panelExtension}
             raceStripes={raceStripes}
           />
-          <div
-            className="handle-presets"
-            role="group"
-            aria-label="Handle starting points"
-          >
-            <span>PRESETS</span>
-            <button
-              type="button"
-              onClick={() =>
-                set({
-                  height: 35,
-                  width: 85,
-                  cornerRadius: 8,
-                  topAngle: 0,
-                  topShape: 'straight',
-                  topCurve: 10,
-                  cutout: 'slot',
-                  holeCount: 1,
-                  holeWidth: 48,
-                  holeHeight: 16,
-                  holeGap: 6,
-                  offsetX: 0,
-                  offsetY: 0,
-                })
-              }
-            >
-              Carry loop
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                set({
-                  height: 30,
-                  width: 85,
-                  cornerRadius: 4,
-                  topAngle: 0,
-                  topShape: 'straight',
-                  topCurve: 10,
-                  cutout: 'circle',
-                  holeCount: 3,
-                  holeWidth: 15,
-                  holeHeight: 15,
-                  holeGap: 7,
-                  offsetX: 0,
-                  offsetY: 0,
-                })
-              }
-            >
-              Three dots
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                set({
-                  height: 35,
-                  width: 85,
-                  cornerRadius: 8,
-                  topAngle: 0,
-                  topShape: 'straight',
-                  topCurve: 10,
-                  cutout: 'slits',
-                  holeCount: 5,
-                  holeWidth: 5,
-                  holeHeight: 23,
-                  holeGap: 8,
-                  offsetX: 0,
-                  offsetY: 0,
-                })
-              }
-            >
-              Hair
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                set({
-                  height: 22,
-                  width: 85,
-                  cornerRadius: 10,
-                  topAngle: 0,
-                  topShape: 'straight',
-                  topCurve: 10,
-                  cutout: 'none',
-                  offsetX: 0,
-                  offsetY: 0,
-                })
-              }
-            >
-              Solid
-            </button>
-          </div>
+          <HandlePresets set={set} />
           <section className="control-section handle-shape">
             <h3>
               <span aria-hidden="true">01</span> Dimensions
@@ -617,190 +512,18 @@ export function HandleEditor({
               side. Width is independent of the panel’s side extension.
             </p>
           </section>
-          <section className="control-section handle-cutouts">
-            <h3>
-              <span aria-hidden="true">02</span> Cutouts
-            </h3>
-            <div
-              className="cutout-options handle-cutout-options"
-              role="group"
-              aria-label="Hole shape"
-            >
-              {(
-                [
-                  { id: 'none', label: 'None', Icon: Minus },
-                  { id: 'circle', label: 'Round', Icon: Circle },
-                  { id: 'slot', label: 'Slot', Icon: RectangleHorizontal },
-                  { id: 'slits', label: 'Top slits', Icon: TopSlitsIcon },
-                  { id: 'svg', label: 'SVG', Icon: FileUp },
-                ] as const
-              ).map(({ id, label, Icon }) => (
-                <button
-                  type="button"
-                  key={id}
-                  aria-pressed={value.cutout === id}
-                  className={value.cutout === id ? 'selected' : ''}
-                  onClick={() =>
-                    set(
-                      id === 'slits' && !isSlits
-                        ? {
-                            cutout: id,
-                            holeCount: 5,
-                            holeWidth: 5,
-                            holeHeight: Math.round(value.height * 0.65),
-                            holeGap: 8,
-                            offsetX: 0,
-                            offsetY: 0,
-                          }
-                        : { cutout: id },
-                    )
-                  }
-                >
-                  <Icon size={17} strokeWidth={1.4} aria-hidden="true" />
-                  {label}
-                </button>
-              ))}
-            </div>
-            {value.cutout === 'svg' && (
-              <>
-                <SvgUpload
-                  key={model}
-                  value={value.svgCutout}
-                  onChange={(svgCutout) =>
-                    set({
-                      svgCutout,
-                      holeWidth: value.svgCutout ? value.holeWidth : 40,
-                      offsetX: 0,
-                      offsetY: 0,
-                    })
-                  }
-                />
-                {value.svgCutout && (
-                  <>
-                    {parameter('holeWidth', 'Cutout width', 0.5)}
-                    <p className="svg-cutout-size">
-                      {Number(value.holeWidth.toFixed(2))} ×{' '}
-                      {Number(value.holeHeight.toFixed(2))} mm · proportions
-                      locked
-                    </p>
-                    <details className="handle-placement">
-                      <summary>
-                        Position <span aria-hidden="true">+</span>
-                      </summary>
-                      <div>
-                        {parameter('offsetX', 'Horizontal offset', 0.5)}
-                        {parameter('offsetY', 'Vertical offset', 0.5)}
-                      </div>
-                    </details>
-                  </>
-                )}
-              </>
-            )}
-            {(value.cutout === 'circle' ||
-              value.cutout === 'slot' ||
-              isSlits) && (
-              <>
-                {isSlits && (
-                  <p className="subtle-note">
-                    Rounded slits follow the top profile to give the panel a
-                    hair-like silhouette.
-                  </p>
-                )}
-                <div className={`hole-count${isSlits ? ' slit-count' : ''}`}>
-                  <span>{isSlits ? 'Number of slits' : 'Number of holes'}</span>
-                  <div
-                    role="group"
-                    aria-label={isSlits ? 'Number of slits' : 'Number of holes'}
-                  >
-                    {Array.from(
-                      { length: limits.holeCount.max },
-                      (_, index) => index + 1,
-                    ).map((count) => (
-                      <button
-                        type="button"
-                        key={count}
-                        aria-label={`${count} ${isSlits ? (count === 1 ? 'slit' : 'slits') : count === 1 ? 'hole' : 'holes'}`}
-                        aria-pressed={value.holeCount === count}
-                        className={value.holeCount === count ? 'selected' : ''}
-                        onClick={() => set({ holeCount: count })}
-                      >
-                        {count}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {parameter(
-                  'holeWidth',
-                  isSlits
-                    ? 'Slit width'
-                    : value.cutout === 'circle'
-                      ? 'Hole diameter'
-                      : 'Hole width',
-                )}
-                {(value.cutout === 'slot' || isSlits) &&
-                  parameter(
-                    'holeHeight',
-                    isSlits ? 'Slit depth' : 'Hole height',
-                  )}
-                <details className="handle-placement">
-                  <summary>
-                    Position & spacing <span aria-hidden="true">+</span>
-                  </summary>
-                  <div>
-                    {value.holeCount > 1 &&
-                      parameter(
-                        'holeGap',
-                        isSlits ? 'Slit spacing' : 'Hole spacing',
-                      )}
-                    {parameter('offsetX', 'Horizontal offset')}
-                    {!isSlits && parameter('offsetY', 'Vertical offset')}
-                  </div>
-                </details>
-              </>
-            )}
-            {hiddenCutouts > 0 && (
-              <p className="subtle-note" role="status">
-                {cutoutCount} of {requestedCutouts}{' '}
-                {isSlits ? 'slits' : 'cutouts'} fit this profile. Unsafe
-                openings are hidden individually and return when there is enough
-                room.
-              </p>
-            )}
-          </section>
-          <section className="control-section handle-studs">
-            <h3>
-              <span aria-hidden="true">03</span> Surface studs
-            </h3>
-            <label className="handle-studs-toggle">
-              <input
-                type="checkbox"
-                aria-labelledby={studsLabelId}
-                aria-describedby={studsDescriptionId}
-                checked={value.legoStuds}
-                onChange={(event) => set({ legoStuds: event.target.checked })}
-              />
-              <span className="handle-checkbox" aria-hidden="true">
-                {value.legoStuds && <Check size={11} strokeWidth={2.5} />}
-              </span>
-              <span>
-                <strong id={studsLabelId}>LEGO-compatible studs</strong>
-                <small id={studsDescriptionId}>
-                  Add studs to the front of the handle, avoiding{' '}
-                  {raceStripes.enabled
-                    ? 'edges, cutouts, and race stripes'
-                    : 'edges and cutouts'}
-                  .
-                </small>
-              </span>
-            </label>
-            {value.legoStuds && (
-              <p className="handle-studs-detail" role="status">
-                {studCount > 0
-                  ? `${studCount} studs · ${HANDLE_STUD_DIAMETER} mm diameter · ${HANDLE_STUD_HEIGHT} mm high · ${HANDLE_STUD_PITCH} mm spacing`
-                  : 'No studs fit this shape. Enlarge the handle or reduce the cutout or stripes.'}
-              </p>
-            )}
-          </section>
+          <HandleCutoutControls
+            model={model}
+            value={value}
+            set={set}
+            parameter={parameter}
+          />
+          <HandleStudControls
+            model={model}
+            value={value}
+            raceStripes={raceStripes}
+            set={set}
+          />
           <p className="handle-footnote">
             {value.cutout === 'svg'
               ? 'Your SVG fits inside a 3 mm outer border. Use a stencil shape without floating islands, and leave enough material between its details.'
@@ -811,5 +534,321 @@ export function HandleEditor({
         </>
       )}
     </div>
+  )
+}
+
+function HandlePresets({
+  set,
+}: {
+  set: (patch: Partial<HandleSettings>) => void
+}) {
+  return (
+    <div
+      className="handle-presets"
+      role="group"
+      aria-label="Handle starting points"
+    >
+      <span>PRESETS</span>
+      <button
+        type="button"
+        onClick={() =>
+          set({
+            height: 35,
+            width: 85,
+            cornerRadius: 8,
+            topAngle: 0,
+            topShape: 'straight',
+            topCurve: 10,
+            cutout: 'slot',
+            holeCount: 1,
+            holeWidth: 48,
+            holeHeight: 16,
+            holeGap: 6,
+            offsetX: 0,
+            offsetY: 0,
+          })
+        }
+      >
+        Carry loop
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          set({
+            height: 30,
+            width: 85,
+            cornerRadius: 4,
+            topAngle: 0,
+            topShape: 'straight',
+            topCurve: 10,
+            cutout: 'circle',
+            holeCount: 3,
+            holeWidth: 15,
+            holeHeight: 15,
+            holeGap: 7,
+            offsetX: 0,
+            offsetY: 0,
+          })
+        }
+      >
+        Three dots
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          set({
+            height: 35,
+            width: 85,
+            cornerRadius: 8,
+            topAngle: 0,
+            topShape: 'straight',
+            topCurve: 10,
+            cutout: 'slits',
+            holeCount: 5,
+            holeWidth: 5,
+            holeHeight: 23,
+            holeGap: 8,
+            offsetX: 0,
+            offsetY: 0,
+          })
+        }
+      >
+        Hair
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          set({
+            height: 22,
+            width: 85,
+            cornerRadius: 10,
+            topAngle: 0,
+            topShape: 'straight',
+            topCurve: 10,
+            cutout: 'none',
+            offsetX: 0,
+            offsetY: 0,
+          })
+        }
+      >
+        Solid
+      </button>
+    </div>
+  )
+}
+
+function HandleStudControls({
+  model,
+  value,
+  raceStripes,
+  set,
+}: Pick<Props, 'model' | 'value' | 'raceStripes'> & {
+  set: (patch: Partial<HandleSettings>) => void
+}) {
+  const studsLabelId = useId()
+  const studsDescriptionId = useId()
+  const studCount = getHandleStudCenters(model, value, raceStripes).length
+  return (
+    <section className="control-section handle-studs">
+      <h3>
+        <span aria-hidden="true">03</span> Surface studs
+      </h3>
+      <label className="handle-studs-toggle">
+        <input
+          type="checkbox"
+          aria-labelledby={studsLabelId}
+          aria-describedby={studsDescriptionId}
+          checked={value.legoStuds}
+          onChange={(event) => set({ legoStuds: event.target.checked })}
+        />
+        <span className="handle-checkbox" aria-hidden="true">
+          {value.legoStuds && <Check size={11} strokeWidth={2.5} />}
+        </span>
+        <span>
+          <strong id={studsLabelId}>LEGO-compatible studs</strong>
+          <small id={studsDescriptionId}>
+            Add studs to the front of the handle, avoiding{' '}
+            {raceStripes.enabled
+              ? 'edges, cutouts, and race stripes'
+              : 'edges and cutouts'}
+            .
+          </small>
+        </span>
+      </label>
+      {value.legoStuds && (
+        <p className="handle-studs-detail" role="status">
+          {studCount > 0
+            ? `${studCount} studs · ${HANDLE_STUD_DIAMETER} mm diameter · ${HANDLE_STUD_HEIGHT} mm high · ${HANDLE_STUD_PITCH} mm spacing`
+            : 'No studs fit this shape. Enlarge the handle or reduce the cutout or stripes.'}
+        </p>
+      )}
+    </section>
+  )
+}
+
+function HandleCutoutControls({
+  model,
+  value,
+  set,
+  parameter,
+}: Pick<Props, 'model' | 'value'> & {
+  set: (patch: Partial<HandleSettings>) => void
+  parameter: (key: HandleNumericKey, label: string, step?: number) => ReactNode
+}) {
+  const isSlits = value.cutout === 'slits'
+  const limits = getHandleLimits(model, value)
+  const cutoutCount = isSlits
+    ? getHandleSlits(model, value).length
+    : value.cutout === 'svg'
+      ? getHandleSvgPaths(model, value).length
+      : getHandleHoleCenters(model, value).length
+  const requestedCutouts =
+    value.cutout === 'none'
+      ? 0
+      : value.cutout === 'svg'
+        ? (value.svgCutout?.paths.length ?? 0)
+        : value.holeCount
+  const hiddenCutouts = requestedCutouts - cutoutCount
+  return (
+    <section className="control-section handle-cutouts">
+      <h3>
+        <span aria-hidden="true">02</span> Cutouts
+      </h3>
+      <div
+        className="cutout-options handle-cutout-options"
+        role="group"
+        aria-label="Hole shape"
+      >
+        {(
+          [
+            { id: 'none', label: 'None', Icon: Minus },
+            { id: 'circle', label: 'Round', Icon: Circle },
+            { id: 'slot', label: 'Slot', Icon: RectangleHorizontal },
+            { id: 'slits', label: 'Top slits', Icon: TopSlitsIcon },
+            { id: 'svg', label: 'SVG', Icon: FileUp },
+          ] as const
+        ).map(({ id, label, Icon }) => (
+          <button
+            type="button"
+            key={id}
+            aria-pressed={value.cutout === id}
+            className={value.cutout === id ? 'selected' : ''}
+            onClick={() =>
+              set(
+                id === 'slits' && !isSlits
+                  ? {
+                      cutout: id,
+                      holeCount: 5,
+                      holeWidth: 5,
+                      holeHeight: Math.round(value.height * 0.65),
+                      holeGap: 8,
+                      offsetX: 0,
+                      offsetY: 0,
+                    }
+                  : { cutout: id },
+              )
+            }
+          >
+            <Icon size={17} strokeWidth={1.4} aria-hidden="true" />
+            {label}
+          </button>
+        ))}
+      </div>
+      {value.cutout === 'svg' && (
+        <>
+          <SvgUpload
+            key={model}
+            value={value.svgCutout}
+            onChange={(svgCutout) =>
+              set({
+                svgCutout,
+                holeWidth: value.svgCutout ? value.holeWidth : 40,
+                offsetX: 0,
+                offsetY: 0,
+              })
+            }
+          />
+          {value.svgCutout && (
+            <>
+              {parameter('holeWidth', 'Cutout width', 0.5)}
+              <p className="svg-cutout-size">
+                {Number(value.holeWidth.toFixed(2))} ×{' '}
+                {Number(value.holeHeight.toFixed(2))} mm · proportions locked
+              </p>
+              <details className="handle-placement">
+                <summary>
+                  Position <span aria-hidden="true">+</span>
+                </summary>
+                <div>
+                  {parameter('offsetX', 'Horizontal offset', 0.5)}
+                  {parameter('offsetY', 'Vertical offset', 0.5)}
+                </div>
+              </details>
+            </>
+          )}
+        </>
+      )}
+      {(value.cutout === 'circle' || value.cutout === 'slot' || isSlits) && (
+        <>
+          {isSlits && (
+            <p className="subtle-note">
+              Rounded slits follow the top profile to give the panel a hair-like
+              silhouette.
+            </p>
+          )}
+          <div className={`hole-count${isSlits ? ' slit-count' : ''}`}>
+            <span>{isSlits ? 'Number of slits' : 'Number of holes'}</span>
+            <div
+              role="group"
+              aria-label={isSlits ? 'Number of slits' : 'Number of holes'}
+            >
+              {Array.from(
+                { length: limits.holeCount.max },
+                (_, index) => index + 1,
+              ).map((count) => (
+                <button
+                  type="button"
+                  key={count}
+                  aria-label={`${count} ${isSlits ? (count === 1 ? 'slit' : 'slits') : count === 1 ? 'hole' : 'holes'}`}
+                  aria-pressed={value.holeCount === count}
+                  className={value.holeCount === count ? 'selected' : ''}
+                  onClick={() => set({ holeCount: count })}
+                >
+                  {count}
+                </button>
+              ))}
+            </div>
+          </div>
+          {parameter(
+            'holeWidth',
+            isSlits
+              ? 'Slit width'
+              : value.cutout === 'circle'
+                ? 'Hole diameter'
+                : 'Hole width',
+          )}
+          {(value.cutout === 'slot' || isSlits) &&
+            parameter('holeHeight', isSlits ? 'Slit depth' : 'Hole height')}
+          <details className="handle-placement">
+            <summary>
+              Position & spacing <span aria-hidden="true">+</span>
+            </summary>
+            <div>
+              {value.holeCount > 1 &&
+                parameter('holeGap', isSlits ? 'Slit spacing' : 'Hole spacing')}
+              {parameter('offsetX', 'Horizontal offset')}
+              {!isSlits && parameter('offsetY', 'Vertical offset')}
+            </div>
+          </details>
+        </>
+      )}
+      {hiddenCutouts > 0 && (
+        <p className="subtle-note" role="status">
+          {cutoutCount} of {requestedCutouts} {isSlits ? 'slits' : 'cutouts'}{' '}
+          fit this profile. Unsafe openings are hidden individually and return
+          when there is enough room.
+        </p>
+      )}
+    </section>
   )
 }

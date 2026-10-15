@@ -66,13 +66,9 @@ export function DesignerPreview({
     generating,
     knobGenerating,
     powerButtonGenerating,
-    panelWidth,
-    panelHeight,
-    knobDimensions,
     previewMaterialParts,
     multicolorGenerating,
   } = meshes
-  const { panelLabel, knobLabel } = getDesignSummary(design)
   return (
     <div
       className="preview-column"
@@ -81,51 +77,14 @@ export function DesignerPreview({
       }
     >
       <div className="preview-card">
-        <div className="preview-topbar">
-          <div className="preview-status">
-            <span className="eyebrow">
-              <span className="live-dot" /> PREVIEW
-            </span>
-            <button
-              className="presentation-toggle"
-              title={presentation ? 'Stop presentation' : 'Start presentation'}
-              aria-label="Presentation mode"
-              aria-pressed={presentation}
-              aria-description="Automatically circle the speaker from changing heights. Drag the preview to take control."
-              disabled={!previewGeometry || !!error}
-              onClick={() => setPresentation(!presentation)}
-            >
-              {presentation ? <Pause size={16} /> : <Play size={16} />}
-              <span className="presentation-label">
-                {presentation ? 'Pause' : 'Present'}
-              </span>
-            </button>
-          </div>
-          <div className="view-switch" role="group" aria-label="Camera view">
-            <button
-              className={
-                !presentation && view === 'perspective' ? 'active' : ''
-              }
-              aria-pressed={!presentation && view === 'perspective'}
-              onClick={() => {
-                setView('perspective')
-                onResetCamera()
-              }}
-            >
-              <Box size={14} /> 3D view
-            </button>
-            <button
-              className={!presentation && view === 'front' ? 'active' : ''}
-              aria-pressed={!presentation && view === 'front'}
-              onClick={() => {
-                setView('front')
-                onResetCamera()
-              }}
-            >
-              Front
-            </button>
-          </div>
-        </div>
+        <PreviewCameraControls
+          view={view}
+          presentation={presentation}
+          setPresentation={setPresentation}
+          setView={setView}
+          onResetCamera={onResetCamera}
+          disabled={!previewGeometry || !!error}
+        />
         <div className="preview-watermark" aria-hidden="true">
           {design.model.toUpperCase()}-01
         </div>
@@ -175,26 +134,7 @@ export function DesignerPreview({
             </div>
           )}
         <div className="preview-bottom">
-          <div>
-            <span className="preview-model">
-              CMF Speaker {design.model.toUpperCase()}
-              <span> / </span>
-              {assembly === 'knob' ? `${knobLabel} knob` : panelLabel}
-            </span>
-            <span className="preview-dimensions">
-              {assembly === 'knob'
-                ? knobDimensions
-                  ? `${knobDimensions} MM`
-                  : 'ORIGINAL FIT'
-                : `${panelWidth} × ${panelHeight} MM`}{' '}
-              <span>·</span>{' '}
-              {design.multicolor.enabled && assembly !== 'knob'
-                ? `${meshes.materialParts?.length ?? '…'} MATERIALS`
-                : colorName(
-                    assembly === 'knob' ? design.knobColor : design.panelColor,
-                  ).toUpperCase()}
-            </span>
-          </div>
+          <PreviewSummary design={design} meshes={meshes} assembly={assembly} />
           <div className="preview-actions">
             <button
               title="Reset camera"
@@ -263,6 +203,97 @@ export function DesignerPreview({
           </span>
         </div>
       </div>
+    </div>
+  )
+}
+
+function PreviewCameraControls({
+  view,
+  presentation,
+  setPresentation,
+  setView,
+  onResetCamera,
+  disabled,
+}: Pick<
+  Props,
+  'view' | 'presentation' | 'setPresentation' | 'setView' | 'onResetCamera'
+> & {
+  disabled: boolean
+}) {
+  return (
+    <div className="preview-topbar">
+      <div className="preview-status">
+        <span className="eyebrow">
+          <span className="live-dot" /> PREVIEW
+        </span>
+        <button
+          className="presentation-toggle"
+          title={presentation ? 'Stop presentation' : 'Start presentation'}
+          aria-label="Presentation mode"
+          aria-pressed={presentation}
+          aria-description="Automatically circle the speaker from changing heights. Drag the preview to take control."
+          disabled={disabled}
+          onClick={() => setPresentation(!presentation)}
+        >
+          {presentation ? <Pause size={16} /> : <Play size={16} />}
+          <span className="presentation-label">
+            {presentation ? 'Pause' : 'Present'}
+          </span>
+        </button>
+      </div>
+      <div className="view-switch" role="group" aria-label="Camera view">
+        <button
+          className={!presentation && view === 'perspective' ? 'active' : ''}
+          aria-pressed={!presentation && view === 'perspective'}
+          onClick={() => {
+            setView('perspective')
+            onResetCamera()
+          }}
+        >
+          <Box size={14} /> 3D view
+        </button>
+        <button
+          className={!presentation && view === 'front' ? 'active' : ''}
+          aria-pressed={!presentation && view === 'front'}
+          onClick={() => {
+            setView('front')
+            onResetCamera()
+          }}
+        >
+          Front
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function PreviewSummary({
+  design,
+  meshes,
+  assembly,
+}: Pick<Props, 'design' | 'meshes' | 'assembly'>) {
+  const { panelLabel, knobLabel } = getDesignSummary(design)
+  const { panelWidth, panelHeight, knobDimensions } = meshes
+  return (
+    <div>
+      <span className="preview-model">
+        CMF Speaker {design.model.toUpperCase()}
+        <span> / </span>
+        {assembly === 'knob' ? `${knobLabel} knob` : panelLabel}
+      </span>
+      <span className="preview-dimensions">
+        {assembly === 'knob'
+          ? knobDimensions
+            ? `${knobDimensions} MM`
+            : 'ORIGINAL FIT'
+          : `${panelWidth} × ${panelHeight} MM`}{' '}
+        <span>·</span>{' '}
+        {design.multicolor.enabled && assembly !== 'knob'
+          ? `${meshes.materialParts?.length ?? '…'} MATERIALS`
+          : colorName(
+              assembly === 'knob' ? design.knobColor : design.panelColor,
+            ).toUpperCase()}
+      </span>
     </div>
   )
 }
