@@ -105,6 +105,29 @@
   display: flex;
   gap: 8px;
 }
+.variation-camera-modes,
+.variation-framing {
+  display: flex;
+  gap: 8px;
+}
+.variation-camera-modes {
+  gap: 0;
+}
+.variation-camera-modes .variation-button:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.variation-camera-modes .variation-button:last-child {
+  margin-left: -1px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.variation-camera-modes .variation-button[aria-pressed='true'] {
+  position: relative;
+  background: var(--foreground);
+  border-color: var(--foreground);
+  color: var(--inverse);
+}
 .variation-footer {
   display: flex;
   flex-wrap: wrap;
@@ -198,8 +221,10 @@
 }
 .variation-camera-hint {
   position: absolute;
+  top: auto;
   bottom: 12px;
   left: 14px;
+  transform: none;
   color: var(--stage-muted);
   font-size: 11px;
   background: var(--stage-overlay);
@@ -261,6 +286,16 @@
     right: 8px;
     gap: 6px;
   }
+  .variation-framing {
+    gap: 6px;
+  }
+  .variation-framing .variation-button {
+    width: 44px;
+    padding: 0;
+  }
+  .variation-framing .variation-button span {
+    display: none;
+  }
   .variation-footer {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -296,7 +331,8 @@
     font-size: 10px;
     line-height: 1.5;
   }
-  .variation-camera-hint {
+  .variation-camera-hint,
+  [data-variation-controls]:focus-visible .variation-camera-hint {
     display: none;
   }
 }

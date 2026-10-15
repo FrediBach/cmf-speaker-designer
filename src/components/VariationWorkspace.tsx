@@ -4,6 +4,8 @@ import {
   Focus,
   LoaderCircle,
   Maximize,
+  Move,
+  Rotate3d,
   Shuffle,
   Sparkles,
   X,
@@ -16,6 +18,7 @@ import {
 } from '@/lib/design-variations'
 import type { useDesignGeometry } from '@/lib/use-design-geometry'
 import { PreviewLoadBoundary } from './PreviewLoadBoundary'
+import type { VariationCameraMode } from './VariationExplorer'
 import './variations.css'
 
 const VariationExplorer = lazy(() =>
@@ -48,6 +51,7 @@ export function VariationWorkspace({
   const [generation, setGeneration] = useState(0)
   const [resetKey, setResetKey] = useState(0)
   const [focusKey, setFocusKey] = useState(0)
+  const [cameraMode, setCameraMode] = useState<VariationCameraMode>('rotate')
   const [previewFailed, setPreviewFailed] = useState(false)
   const cancelRef = useRef<HTMLButtonElement>(null)
   const retried = useRef(new Set<string>())
@@ -164,6 +168,7 @@ export function VariationWorkspace({
               onCandidateFallback={onCandidateFallback}
               resetKey={resetKey}
               focusKey={focusKey}
+              cameraMode={cameraMode}
               originalMeshes={meshes}
               onError={onPreviewError}
             />
@@ -179,25 +184,53 @@ export function VariationWorkspace({
           <span>Bold</span>
         </div>
         <div className="variation-navigation">
-          <button
-            className="variation-button"
-            onClick={() => setResetKey((value) => value + 1)}
-            aria-label="Fit all variations"
-            title="Fit all variations"
+          <div
+            className="variation-camera-modes"
+            role="group"
+            aria-label="Camera movement"
           >
-            <Maximize size={16} />
-            <span>Fit all</span>
-          </button>
-          <button
-            className="variation-button"
-            disabled={!ready}
-            onClick={() => setFocusKey((value) => value + 1)}
-            aria-label="Focus variation"
-            title="Look closer at this variation"
-          >
-            <Focus size={16} />
-            <span>Look closer</span>
-          </button>
+            <button
+              className="variation-button"
+              onClick={() => setCameraMode('rotate')}
+              aria-label="Rotate camera"
+              aria-pressed={cameraMode === 'rotate'}
+              title="Drag to rotate the camera"
+            >
+              <Rotate3d size={16} aria-hidden="true" />
+              <span>Rotate</span>
+            </button>
+            <button
+              className="variation-button"
+              onClick={() => setCameraMode('pan')}
+              aria-label="Pan camera"
+              aria-pressed={cameraMode === 'pan'}
+              title="Drag to pan the camera"
+            >
+              <Move size={16} aria-hidden="true" />
+              <span>Pan</span>
+            </button>
+          </div>
+          <div className="variation-framing">
+            <button
+              className="variation-button"
+              onClick={() => setResetKey((value) => value + 1)}
+              aria-label="Fit all variations"
+              title="Fit all variations"
+            >
+              <Maximize size={16} aria-hidden="true" />
+              <span>Fit all</span>
+            </button>
+            <button
+              className="variation-button"
+              disabled={!ready}
+              onClick={() => setFocusKey((value) => value + 1)}
+              aria-label="Focus variation"
+              title="Look closer at this variation"
+            >
+              <Focus size={16} aria-hidden="true" />
+              <span>Look closer</span>
+            </button>
+          </div>
         </div>
       </div>
       <div className="variation-footer">
@@ -258,8 +291,8 @@ export function VariationWorkspace({
           </button>
         </div>
         <p className="variation-help">
-          Drag to pan · Scroll or pinch to zoom · Click a speaker to inspect ·
-          Esc to cancel
+          Drag to {cameraMode} · Scroll or pinch to zoom · Click a speaker to
+          inspect · Esc to cancel
         </p>
       </div>
     </section>

@@ -102,6 +102,74 @@ async function shortcut(page: Page, keys: string) {
   await page.keyboard.press(keys)
 }
 
+type MarkerPosition = { id: string; x: number; y: number }
+
+async function settledMarkerPositions(page: Page) {
+  let previous: Map<string, MarkerPosition> | undefined
+  let positions: MarkerPosition[] = []
+  await expect
+    .poll(
+      async () => {
+        positions = await explorer(page)
+          .locator('button[data-variation-id]')
+          .evaluateAll((markers) =>
+            markers
+              .map((marker) => {
+                const bounds = marker.getBoundingClientRect()
+                return {
+                  id: marker.getAttribute('data-variation-id')!,
+                  x: bounds.x + bounds.width / 2,
+                  y: bounds.y + bounds.height / 2,
+                }
+              })
+              .sort((a, b) => a.id.localeCompare(b.id)),
+          )
+        const current = new Map(
+          positions.map((position) => [position.id, position]),
+        )
+        if (positions.length !== 25 || current.size !== 25) {
+          previous = undefined
+          return Infinity
+        }
+        const sameMarkers =
+          previous && positions.every(({ id }) => previous!.has(id))
+        const movement = sameMarkers
+          ? Math.max(
+              ...positions.map((position) => {
+                const before = previous!.get(position.id)!
+                return Math.hypot(position.x - before.x, position.y - before.y)
+              }),
+            )
+          : Infinity
+        previous = current
+        return movement
+      },
+      { message: 'The camera should finish moving before comparing views' },
+    )
+    .toBeLessThan(0.25)
+  return positions
+}
+
+function relativeMarkerPositions(positions: MarkerPosition[]) {
+  const original = positions.find(({ id }) => id === 'original')!
+  return positions.map(({ id, x, y }) => ({
+    id,
+    x: x - original.x,
+    y: y - original.y,
+  }))
+}
+
+function maximumMarkerMovement(
+  before: MarkerPosition[],
+  after: MarkerPosition[],
+) {
+  return Math.max(
+    ...before.map((position, index) =>
+      Math.hypot(position.x - after[index].x, position.y - after[index].y),
+    ),
+  )
+}
+
 test('opening, inspecting, regenerating, and cancelling preserve the saved design, shared URL, and redo history', async ({
   page,
 }) => {
@@ -222,6 +290,115 @@ for (const model of ['s', 'm'] as const) {
   })
 }
 
+test('camera modes rotate and pan the army without changing the selected or saved design', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(180_000)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+  await ready(page)
+  const original = await savedSnapshot(page)
+  await openExplorer(page, 4281)
+  await expect(
+    explorer(page).locator('button[data-variation-id][data-status="ready"]'),
+  ).toHaveCount(25, { timeout: 120_000 })
+
+  const rotate = explorer(page).getByRole('button', {
+    name: 'Rotate camera',
+    exact: true,
+  })
+  const pan = explorer(page).getByRole('button', {
+    name: 'Pan camera',
+    exact: true,
+  })
+  await expect(rotate).toHaveAttribute('aria-pressed', 'true')
+  await expect(pan).toHaveAttribute('aria-pressed', 'false')
+  const initialView = await settledMarkerPositions(page)
+  const canvasBounds = (await explorer(page).locator('canvas').boundingBox())!
+  const drag = async (horizontal: number, vertical: number) => {
+    const x = canvasBounds.x + canvasBounds.width * 0.82
+    const y = canvasBounds.y + canvasBounds.height * 0.25
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(x + horizontal, y + vertical, { steps: 16 })
+    await page.mouse.up()
+  }
+
+  await drag(-150, 30)
+  const rotatedView = await settledMarkerPositions(page)
+  expect(
+    maximumMarkerMovement(
+      relativeMarkerPositions(initialView),
+      relativeMarkerPositions(rotatedView),
+    ),
+    'Rotating should change the relative positions of the speaker rows',
+  ).toBeGreaterThan(20)
+  await page.screenshot({
+    path: testInfo.outputPath('variation-camera-rotate.png'),
+  })
+  await pan.click()
+  await expect(pan).toHaveAttribute('aria-pressed', 'true')
+  await expect(rotate).toHaveAttribute('aria-pressed', 'false')
+  const switchedView = await settledMarkerPositions(page)
+  expect(
+    maximumMarkerMovement(rotatedView, switchedView),
+    'Changing the movement mode should preserve the viewing angle and framing',
+  ).toBeLessThan(1)
+
+  await drag(-100, 0)
+  const pannedView = await settledMarkerPositions(page)
+  const beforeOriginal = switchedView.find(({ id }) => id === 'original')!
+  const afterOriginal = pannedView.find(({ id }) => id === 'original')!
+  expect(
+    beforeOriginal.x - afterOriginal.x,
+    'Panning left should move the speakers left across the preview',
+  ).toBeGreaterThan(40)
+  expect(
+    maximumMarkerMovement(
+      relativeMarkerPositions(switchedView),
+      relativeMarkerPositions(pannedView),
+    ),
+    'Panning should preserve the projected formation apart from perspective',
+  ).toBeLessThan(30)
+  await expect(variationSelect(page)).toHaveValue('original')
+  expect(await savedSnapshot(page)).toEqual(original)
+  await page.screenshot({
+    path: testInfo.outputPath('variation-camera-pan.png'),
+  })
+
+  // Keyboard arrows obey the selected camera mode as well as pointer drags.
+  const surface = explorer(page).locator('[data-variation-controls]')
+  await surface.focus()
+  await page.keyboard.press('ArrowRight')
+  const keyboardPanView = await settledMarkerPositions(page)
+  expect(maximumMarkerMovement(pannedView, keyboardPanView)).toBeGreaterThan(5)
+  await rotate.click()
+  await surface.focus()
+  await page.keyboard.press('ArrowRight')
+  const keyboardRotateView = await settledMarkerPositions(page)
+  expect(
+    maximumMarkerMovement(
+      relativeMarkerPositions(keyboardPanView),
+      relativeMarkerPositions(keyboardRotateView),
+    ),
+  ).toBeGreaterThan(5)
+
+  const spread = (positions: MarkerPosition[]) =>
+    Math.max(
+      ...relativeMarkerPositions(positions).map(({ x, y }) => Math.hypot(x, y)),
+    )
+  await page.keyboard.press('+')
+  const zoomedView = await settledMarkerPositions(page)
+  expect(spread(zoomedView)).toBeGreaterThan(spread(keyboardRotateView) * 1.08)
+  await page.keyboard.press('-')
+  const zoomedOutView = await settledMarkerPositions(page)
+  expect(maximumMarkerMovement(keyboardRotateView, zoomedOutView)).toBeLessThan(
+    1,
+  )
+  expect(await savedSnapshot(page)).toEqual(original)
+  await expect(variationSelect(page)).toHaveValue('original')
+})
+
 test('the explorer is keyboard accessible and its controls fit at 320 pixels', async ({
   page,
 }, testInfo) => {
@@ -249,6 +426,12 @@ test('the explorer is keyboard accessible and its controls fit at 320 pixels', a
 
   for (const control of [
     variationSelect(page),
+    ...[
+      'Rotate camera',
+      'Pan camera',
+      'Fit all variations',
+      'Focus variation',
+    ].map((name) => explorer(page).getByRole('button', { name, exact: true })),
     explorer(page).getByRole('button', {
       name: 'New variations',
       exact: true,
@@ -278,6 +461,56 @@ test('the explorer is keyboard accessible and its controls fit at 320 pixels', a
   await page.screenshot({
     path: testInfo.outputPath('variation-explorer-320px.png'),
   })
+
+  // Exercise real touch input: one finger follows the visible movement mode.
+  const touchSession = await page.context().newCDPSession(page)
+  await touchSession.send('Emulation.setTouchEmulationEnabled', {
+    enabled: true,
+    maxTouchPoints: 2,
+  })
+  const canvasBounds = (await explorer(page).locator('canvas').boundingBox())!
+  const touchDrag = async (horizontal: number) => {
+    const x = canvasBounds.x + canvasBounds.width * 0.82
+    const y = canvasBounds.y + canvasBounds.height * 0.25
+    await touchSession.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x, y }],
+    })
+    for (let step = 1; step <= 8; step += 1)
+      await touchSession.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x: x + (horizontal * step) / 8, y }],
+      })
+    await touchSession.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: [],
+    })
+  }
+  await expect(explorer(page).locator('button[data-variation-id]')).toHaveCount(
+    25,
+  )
+  const beforeTouchRotate = await settledMarkerPositions(page)
+  await touchDrag(-40)
+  const afterTouchRotate = await settledMarkerPositions(page)
+  expect(
+    maximumMarkerMovement(
+      relativeMarkerPositions(beforeTouchRotate),
+      relativeMarkerPositions(afterTouchRotate),
+    ),
+    'A one-finger drag should rotate the speaker formation',
+  ).toBeGreaterThan(4)
+  await explorer(page)
+    .getByRole('button', { name: 'Pan camera', exact: true })
+    .click()
+  const beforeTouchPan = await settledMarkerPositions(page)
+  await touchDrag(-30)
+  const afterTouchPan = await settledMarkerPositions(page)
+  expect(
+    beforeTouchPan.find(({ id }) => id === 'original')!.x -
+      afterTouchPan.find(({ id }) => id === 'original')!.x,
+    'A one-finger drag in Pan mode should move the speaker formation left',
+  ).toBeGreaterThan(8)
+  await touchSession.detach()
   expect(await savedSnapshot(page)).toEqual(original)
   await variationSelect(page).focus()
   await page.keyboard.press('Escape')

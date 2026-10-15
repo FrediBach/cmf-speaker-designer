@@ -22,6 +22,7 @@ import {
   MOUSE,
   PerspectiveCamera,
   RGBAFormat,
+  Spherical,
   TOUCH,
   Vector3,
 } from 'three'
@@ -31,8 +32,11 @@ import type { DesignVariation } from '@/lib/design-variations'
 import { useDesignGeometry } from '@/lib/use-design-geometry'
 
 export type VariationStatus = 'loading' | 'ready' | 'error'
+export type VariationCameraMode = 'rotate' | 'pan'
 type DesignMeshes = ReturnType<typeof useDesignGeometry>
 const ARMY_VIEW = new Vector3(0.3, 1.5, 1).normalize()
+const MIN_POLAR_ANGLE = 0.2
+const MAX_POLAR_ANGLE = Math.PI / 2 - 0.08
 
 interface Props {
   variations: DesignVariation[]
@@ -43,6 +47,7 @@ interface Props {
   originalMeshes: DesignMeshes
   resetKey: number
   focusKey?: number
+  cameraMode: VariationCameraMode
   onError?: (error: Error) => void
 }
 
@@ -109,7 +114,7 @@ export function VariationExplorer(props: Props) {
       data-variation-controls
       tabIndex={0}
       aria-label="Interactive speaker variations"
-      aria-description="Drag to pan, scroll or pinch to zoom, and right-drag to rotate. Arrow keys pan, plus and minus zoom. Select a numbered speaker to inspect it, then use the Use variation button to apply it."
+      aria-description={`Drag with a mouse or one finger to ${props.cameraMode}, scroll or pinch to zoom, and right-drag to ${props.cameraMode === 'rotate' ? 'pan' : 'rotate'}. Arrow keys ${props.cameraMode}, plus and minus zoom. Select a numbered speaker to inspect it, then use the Use variation button to apply it.`}
       style={{
         position: 'relative',
         height: '100%',
@@ -128,7 +133,7 @@ export function VariationExplorer(props: Props) {
             powerPreference: 'high-performance',
           }}
           fallback={<ExplorerFallback onError={props.onError} />}
-          style={{ cursor: 'grab' }}
+          style={{ cursor: props.cameraMode === 'rotate' ? 'grab' : 'move' }}
         >
           <VariationScene {...props} />
         </Canvas>
@@ -137,7 +142,7 @@ export function VariationExplorer(props: Props) {
         className="variation-camera-hint camera-keyboard-hint"
         aria-hidden="true"
       >
-        Arrow keys: pan · + / −: zoom
+        Arrow keys: {props.cameraMode} · + / −: zoom
       </span>
     </div>
   )
@@ -152,6 +157,7 @@ function VariationScene({
   originalMeshes,
   resetKey,
   focusKey = 0,
+  cameraMode,
 }: Props) {
   const [statuses, setStatuses] = useState<Record<string, VariationStatus>>({})
   const [admitted, setAdmitted] = useState(1)
@@ -267,6 +273,7 @@ function VariationScene({
         selected={selected}
         resetKey={resetKey}
         focusKey={focusKey}
+        cameraMode={cameraMode}
       />
     </>
   )
@@ -477,11 +484,13 @@ function ExplorerCamera({
   selected,
   resetKey,
   focusKey,
+  cameraMode,
 }: {
   bounds: Box3
   selected?: DesignVariation
   resetKey: number
   focusKey: number
+  cameraMode: VariationCameraMode
 }) {
   const { camera, size, invalidate, gl } = useThree()
   const orbit = useRef<{ target: Vector3; update: () => void } | null>(null)
@@ -539,7 +548,11 @@ function ExplorerCamera({
       const tangent = Math.tan((camera.fov * Math.PI) / 360)
       const distance =
         Math.max(height / tangent, 190 / (tangent * aspect)) * 0.65
-      camera.position.copy(target).addScaledVector(ARMY_VIEW, distance)
+      const direction = camera.position
+        .clone()
+        .sub(orbit.current?.target ?? new Vector3())
+        .normalize()
+      camera.position.copy(target).addScaledVector(direction, distance)
     } else {
       camera.position.add(
         target.clone().sub(orbit.current?.target ?? new Vector3()),
@@ -588,6 +601,17 @@ function ExplorerCamera({
           ),
         )
         camera.position.copy(target).add(offset.setLength(distance))
+      } else if (cameraMode === 'rotate') {
+        const spherical = new Spherical().setFromVector3(offset)
+        if (event.key === 'ArrowLeft') spherical.theta -= 0.12
+        if (event.key === 'ArrowRight') spherical.theta += 0.12
+        if (event.key === 'ArrowUp') spherical.phi -= 0.12
+        if (event.key === 'ArrowDown') spherical.phi += 0.12
+        spherical.phi = Math.max(
+          MIN_POLAR_ANGLE,
+          Math.min(MAX_POLAR_ANGLE, spherical.phi),
+        )
+        camera.position.copy(target).add(offset.setFromSpherical(spherical))
       } else {
         const step = offset.length() * 0.055
         const movement = new Vector3()
@@ -604,7 +628,7 @@ function ExplorerCamera({
     }
     surface.addEventListener('keydown', onKeyDown)
     return () => surface.removeEventListener('keydown', onKeyDown)
-  }, [camera, gl, invalidate])
+  }, [camera, cameraMode, gl, invalidate])
 
   return (
     <OrbitControls
@@ -620,14 +644,17 @@ function ExplorerCamera({
       rotateSpeed={0.5}
       minDistance={180}
       maxDistance={30000}
-      minPolarAngle={0.2}
-      maxPolarAngle={Math.PI / 2 - 0.08}
+      minPolarAngle={MIN_POLAR_ANGLE}
+      maxPolarAngle={MAX_POLAR_ANGLE}
       mouseButtons={{
-        LEFT: MOUSE.PAN,
+        LEFT: cameraMode === 'rotate' ? MOUSE.ROTATE : MOUSE.PAN,
         MIDDLE: MOUSE.DOLLY,
-        RIGHT: MOUSE.ROTATE,
+        RIGHT: cameraMode === 'rotate' ? MOUSE.PAN : MOUSE.ROTATE,
       }}
-      touches={{ ONE: TOUCH.PAN, TWO: TOUCH.DOLLY_PAN }}
+      touches={{
+        ONE: cameraMode === 'rotate' ? TOUCH.ROTATE : TOUCH.PAN,
+        TWO: TOUCH.DOLLY_PAN,
+      }}
     />
   )
 }
