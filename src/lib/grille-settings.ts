@@ -38,14 +38,8 @@ export const GRILLE_LIMITS = {
   slotLength: { min: 4, max: 24 },
   rotation: { min: 0, max: 90 },
   thickness: { min: 2, max: 4 },
-  recessDepth: { min: 0.2, max: 3 },
+  recessDepth: { min: -3, max: 6 },
 } as const
-
-const maxRecessDepth = (thickness: number) =>
-  Math.min(
-    GRILLE_LIMITS.recessDepth.max,
-    Number((thickness - GRILLE_MIN_BACKING).toFixed(6)),
-  )
 
 const bounded = (value: unknown, fallback: number, min: number, max: number) =>
   typeof value === 'number' && Number.isFinite(value)
@@ -67,10 +61,6 @@ export function normalizeGrilleSettings(
     ]),
   ) as Pick<GrilleSettings, keyof typeof GRILLE_LIMITS>
   values.slotLength = Math.max(values.slotLength, values.size)
-  values.recessDepth = Math.min(
-    values.recessDepth,
-    maxRecessDepth(values.thickness),
-  )
   return {
     ...values,
     mode: input.mode === 'custom' ? 'custom' : 'original',
@@ -88,10 +78,6 @@ export function getGrilleLimits(input: Partial<GrilleSettings> = {}) {
   return {
     ...GRILLE_LIMITS,
     slotLength: { min: Math.max(4, settings.size), max: 24 },
-    recessDepth: {
-      min: GRILLE_LIMITS.recessDepth.min,
-      max: maxRecessDepth(settings.thickness),
-    },
   }
 }
 
@@ -220,9 +206,9 @@ export function getGrillePattern(
         )
       ) {
         holes.push({ x, y, points, kind: 'through' })
-      } else if (settings.extendPattern) {
-        // Keep decorative pockets clear of the full stripe, including its
-        // edge. Overlapping recesses could consume the minimum solid backing.
+      } else if (settings.extendPattern && settings.recessDepth !== 0) {
+        // Keep raised and recessed surface patterns clear of each stripe,
+        // including its edge.
         const minX = Math.min(...points.map(([px]) => px))
         const maxX = Math.max(...points.map(([px]) => px))
         if (

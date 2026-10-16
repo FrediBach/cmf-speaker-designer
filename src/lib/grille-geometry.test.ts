@@ -18,6 +18,7 @@ import {
 } from './grille-settings'
 import { createHandleEngine } from './handle-geometry'
 import { getDefaultHandleSettings } from './handle-settings'
+import { createPanelGapEngine } from './panel-gap'
 import {
   buildPanelGeometry,
   exportPanelStl,
@@ -99,7 +100,7 @@ function hits(geometry: BufferGeometry, x: number, y: number) {
   return result
 }
 
-describe('real perforated grilles and blind surrounding pattern', () => {
+describe('real perforated grilles and signed surrounding pattern depth', () => {
   let engine: Awaited<ReturnType<typeof createGrilleEngine>>
   beforeAll(async () => {
     engine = await createGrilleEngine()
@@ -109,6 +110,159 @@ describe('real perforated grilles and blind surrounding pattern', () => {
   const cases = (['s', 'm'] as const).flatMap((model) =>
     (['round', 'hex', 'slot'] as const).map((pattern) => ({ model, pattern })),
   )
+  it.each(
+    cases.flatMap((entry) => [6, -3].map((depth) => ({ ...entry, depth }))),
+  )(
+    '$model / $pattern stays closed and connected at $depth mm surface depth',
+    ({ model, pattern, depth }) => {
+      const source = readPanel(model)
+      const settings = normalizeGrilleSettings({
+        mode: 'custom',
+        pattern,
+        extendPattern: true,
+        recessDepth: depth,
+        thickness: 2,
+        rotation: 37,
+      })
+      const result = engine.build(model, settings, positionsOf(source))
+      const geometry = geometryOf(result.positions)
+      expect(topology(geometry)).toEqual({ invalid: 0, components: 1 })
+      for (const hole of result.metadata.holes.filter(
+        (hole) => hole.kind === 'through',
+      ))
+        expect(hits(geometry, hole.x, hole.y)).toEqual([])
+      const surface = result.metadata.holes.filter(
+        (hole) => hole.kind === 'recess',
+      )
+      if (depth > 0) {
+        expect(
+          surface.filter((hole) => hits(geometry, hole.x, hole.y).length === 0)
+            .length,
+        ).toBeGreaterThan(10)
+      } else {
+        for (const hole of surface) {
+          const column = hits(geometry, hole.x, hole.y)
+          // Keep every source rear surface, including roots and latch gaps.
+          // Within the original aperture, the insert supplies the rear face.
+          const sourceColumn = hits(source, hole.x, hole.y)
+          const rear = sourceColumn.length
+            ? sourceColumn.slice(0, -1)
+            : [4 - settings.thickness]
+          expect(column).toHaveLength(rear.length + 1)
+          rear.forEach((z, index) => expect(column[index]).toBeCloseTo(z, 3))
+          expect(column.at(-1)).toBeCloseTo(4 - depth, 3)
+        }
+      }
+      const exported = new STLLoader().parse(exportPanelStl(geometry))
+      expect(topology(exported)).toEqual({ invalid: 0, components: 1 })
+      exported.dispose()
+      geometry.dispose()
+      source.dispose()
+    },
+    30_000,
+  )
+
+  it.each(
+    (['s', 'm'] as const).flatMap((model) =>
+      [0, 5].map((gap) => ({ model, gap })),
+    ),
+  )(
+    'perforates the $model face while retaining attachment backing at $gap mm gap',
+    async ({ model, gap }) => {
+      const source = readPanel(model)
+      const deeper = buildPanelGeometry(source, model, 'original', 2, 7.5)
+      const gaps = await createPanelGapEngine()
+      const spaced = geometryOf(
+        gaps.build(model, positionsOf(deeper), gap, 2).positions,
+      )
+      const settings = normalizeGrilleSettings({
+        mode: 'custom',
+        layout: 'grid',
+        extendPattern: true,
+        recessDepth: 6,
+        thickness: 4,
+      })
+      const geometry = geometryOf(
+        engine.build(model, settings, positionsOf(spaced), gap).positions,
+      )
+      expect(topology(geometry)).toEqual({ invalid: 0, components: 1 })
+      // Solid face and former insert rim both open all the way through.
+      for (const [x, y] of model === 's'
+        ? [
+            [36, 0],
+            [0, 6],
+          ]
+        : [
+            [36, 0],
+            [0, -18],
+          ])
+        expect(hits(geometry, x, y)).toEqual([])
+      // A full-depth pattern at each latch still leaves its root and backing.
+      for (const x of [-36, 36])
+        for (const y of model === 's' ? [-54, 6] : [-102, -30, 30]) {
+          const before = hits(spaced, x, y)
+          const after = hits(geometry, x, y)
+          expect(before.length).toBeGreaterThanOrEqual(2)
+          expect(before[0]).toBeLessThan(0.5 + gap)
+          expect(after.filter((z) => z < 0.5 + gap)).toEqual(
+            before.filter((z) => z < 0.5 + gap),
+          )
+          expect(after.at(-1)).toBeCloseTo(1 + gap, 3)
+        }
+      // Material between neighboring cuts is unchanged.
+      expect(hits(geometry, 33, 0)).toEqual(hits(spaced, 33, 0))
+      geometry.dispose()
+      spaced.dispose()
+      deeper.dispose()
+      source.dispose()
+      gaps.dispose()
+    },
+    30_000,
+  )
+
+  it('raises the local face and aperture bevel while zero leaves a flat face', () => {
+    const source = readPanel('s')
+    const deeper = buildPanelGeometry(source, 's', 'original', 2)
+    const settings = normalizeGrilleSettings({
+      mode: 'custom',
+      layout: 'grid',
+      extendPattern: true,
+      recessDepth: 0,
+      thickness: 2,
+    })
+    const flat = engine.build('s', settings, positionsOf(deeper))
+    const plain = engine.build(
+      's',
+      { ...settings, extendPattern: false },
+      positionsOf(deeper),
+    )
+    expect(flat.positions).toEqual(plain.positions)
+    const flatGeometry = geometryOf(flat.positions)
+    const raised = geometryOf(
+      engine.build('s', { ...settings, recessDepth: -3 }, positionsOf(deeper))
+        .positions,
+    )
+    expect(topology(raised)).toEqual({ invalid: 0, components: 1 })
+    for (const [x, y] of [
+      [36, 0],
+      [0, 6],
+      [30, -12],
+      [31.5, -12],
+    ]) {
+      const before = hits(flatGeometry, x, y)
+      const after = hits(raised, x, y)
+      expect(after).toHaveLength(2)
+      expect(after[0]).toBe(before[0])
+      expect(after[1]).toBeCloseTo(before[1] + 3, 3)
+    }
+    expect(hits(raised, 0, 0)).toEqual([])
+    expect(hits(raised, 33, 0)).toEqual(hits(flatGeometry, 33, 0))
+    raised.dispose()
+    flatGeometry.dispose()
+    deeper.dispose()
+    source.dispose()
+  })
+
   it.each(cases)(
     '$model / $pattern is connected, closed, and perforated with 3 mm deep recesses',
     ({ model, pattern }) => {

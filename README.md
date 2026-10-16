@@ -38,7 +38,7 @@ Browser regression checks use Playwright with a locally installed Google Chrome:
 npm run test:e2e
 ```
 
-The tests start Vite automatically when needed and cover the WebGL preview, model and style changes, saved colors, keyboard face-depth controls, generated handles, grilles, and halos, actual STL and STP downloads, and a narrow mobile layout. Downloads are inspected independently for closed edges, one connected component, hole topology, clear passages through each opening, solid backing behind face recesses, and the projection of an angled halo cover. STEP download checks verify the selected format, millimeter units, part bounds, and ZIP contents. Screenshots, downloaded files, and failure traces are written to the ignored `test-results/` directory. GitHub Actions runs the unit checks and full production browser suite on Node.js 24 for pushes and pull requests, retaining browser artifacts when a run fails.
+The tests start Vite automatically when needed and cover the WebGL preview, model and style changes, saved colors, keyboard face-depth controls, generated handles, grilles, and halos, actual STL and STP downloads, and a narrow mobile layout. Downloads are inspected independently for closed edges, one connected component, hole topology, clear passages through each opening, protected case attachments, and the projection of an angled halo cover. STEP download checks verify the selected format, millimeter units, part bounds, and ZIP contents. Screenshots, downloaded files, and failure traces are written to the ignored `test-results/` directory. GitHub Actions runs the unit checks and full production browser suite on Node.js 24 for pushes and pull requests, retaining browser artifacts when a run fails.
 
 Multicolor suites add editable preset coverage, JSON/share/history checks, material partition topology, and actual 3MF and aligned STL ZIP inspection. Individual material regions may contain disconnected islands; their assembled union must reproduce the complete panel. Browser coverage includes the canvas, material editing, JSON round trips, and downloads. The implementation's current validation status and outstanding slicer/print checks are recorded in [the multicolor plan](plans/multicolor-extension.md#implementation-status--2026-10-15).
 
@@ -77,14 +77,14 @@ Choose **Black** or **Gray** under **Speaker body**, next to the model selection
 - Choose the original front panel or build a custom panel with parametric halos and grilles.
 - Generate a halo around each driver with adjustable outward angle, depth, wall thickness, and an angled cut that can turn the ring into a rain-cover shape.
 - Generate round, hexagonal, or slotted grilles with adjustable opening size, material spacing, arrangement, rotation, and thickness.
-- Continue the grille pattern onto the surrounding front face as recesses up to 3 mm deep, with solid material behind them.
+- Continue the grille pattern onto the surrounding front face as recesses up to 6 mm deep, including through-openings away from case attachments, or raised patterns up to 3 mm high.
 - Preview independent front panel, power button, and volume knob colors with a black or gray speaker body in an interactive Three.js scene, including panel-only and exploded views.
 - Add up to 2 mm of face depth while retaining the original mounting region and overall face dimensions.
 - Extend the front and angled panel edges by up to 1 cm per side, with an independently sized handle.
 - Add a 0–0.5 cm panel gap with extended attachment necks and cylindrical rear supports on the front and angled section. The knob and button remain at their original height in recessed openings.
 - Generate a custom upper handle: adjust its height, width, rounded corners, top angle, and straight or inward/outward rounded top, then choose a solid face, one to three circular or slotted openings, one to seven rounded slits open at the top, or an uploaded SVG cutout.
 - Add LEGO-compatible studs to the custom handle's front face.
-- Recess one to three centered vertical race stripes into the panel, with adjustable stripe width and gap. Studs and decorative face recesses leave the stripes clear.
+- Recess one to three centered vertical race stripes into the panel, with adjustable stripe width and gap. Studs and decorative face patterns leave the stripes clear.
 - Compose multicolor stripes, crosses, circles/rings, polygons, imported SVGs, and text with arbitrary colors, editable flag presets, a front-view canvas, and numeric controls.
 - Change built-in cutout size, spacing, and position, with dependent dimensions constrained to retain at least 3 mm of material between openings and around their closed edges.
 - Keep your current design locally and copy a link to share a configuration.
@@ -106,9 +106,9 @@ In **Handle → Custom handle → SVG**, upload a filled SVG (up to 256 KB) to u
 
 The **Grille** tab generates a perforated grille over the original driver openings: one on S and both on M. Custom grilles use the original open panel as their base and can be combined with a custom handle, halo, and added face depth. Selecting **Original grille** removes the generated grille; a custom halo can remain active.
 
-**Continue across the face** continues the same pattern seamlessly from the through-holes into matching blind recesses across the front face, including along the driver opening rims. These are real surface geometry in the STL, with solid material behind each recess. The outside edges, control deck, and mounting regions are preserved. Preview and export share the same generated mesh, and grille dimensions are applied after added face depth so their selected thickness and recess depth stay in millimeters.
+**Continue across the face** continues the same pattern seamlessly from the driver through-holes into matching recessed or raised shapes across the front face, including along the driver opening rims. These are real surface geometry in the STL. The outside edges, control deck, and case attachments are preserved. Preview and export share the same generated mesh, and grille dimensions are applied after added face depth so their selected thickness and recess depth stay in millimeters.
 
-Recess depth ranges from 0.2 to 3 mm and is limited to the grille thickness minus 0.5 mm to retain a solid floor. A 2 mm grille allows recesses up to 1.5 mm; the default 3.5 mm grille allows the full 3 mm. Reducing grille thickness also reduces the recess depth when needed.
+**Recess depth** ranges from −3 to 6 mm, independently of grille thickness. Positive values recess the pattern and can cut completely through the panel where there is no case attachment; attachment regions retain at least 0.5 mm of backing. Zero leaves the surrounding face flat. Negative values raise the shapes above the face, like studs, by the absolute depth. Driver openings remain through-holes at every depth.
 
 ## Multicolor patterns
 
@@ -147,7 +147,7 @@ In **Front panel → Race stripes**, enable **Recessed race stripes** and choose
 
 **Stripe width** and **Stripe gap** each range from 1 to 20 mm. Their limits adjust together to keep the complete group within 54 mm, leaving room at the sides of the narrowest handle. Gap is inactive for one stripe. Changing the count can reduce the width to keep the group inside these limits.
 
-LEGO-compatible studs leave clearance around each stripe. Decorative grille recesses skip the stripe bands, while driver and grille openings remain open. Halos, control seats, and mounting geometry are preserved. Stripes follow added face depth, side extension, and panel spacing and appear in the shared preview and STL/STP exports. Settings are retained in saved designs, shared links, undo/redo, and the ZIP's `design.json`. Selecting **Original** in Panel shape turns stripes off while keeping their dimensions for later use.
+LEGO-compatible studs leave clearance around each stripe. Raised and recessed grille surface patterns skip the stripe bands, while driver and grille openings remain open. Halos, control seats, and mounting geometry are preserved. Stripes follow added face depth, side extension, and panel spacing and appear in the shared preview and STL/STP exports. Settings are retained in saved designs, shared links, undo/redo, and the ZIP's `design.json`. Selecting **Original** in Panel shape turns stripes off while keeping their dimensions for later use.
 
 ## Generative halo
 
@@ -168,7 +168,7 @@ The cut passes through the longest outer tip at the selected halo depth, leaving
 
 **Original** removes the generated halos while keeping a custom grille. Selecting **Custom** restores the retained halo dimensions. Halo parameters are saved locally, included in shared design links and the exported `design.json`, and retained when switching speaker models.
 
-The generated halo uses the original open panel as its base and combines with a custom handle, face depth, and a generated grille, including recessed face patterns. Preview and STL export use the same connected solid. The rain-cover shape is a geometric option; weather resistance and print supports still require physical evaluation.
+The generated halo uses the original open panel as its base and combines with a custom handle, face depth, and a generated grille, including raised or recessed face patterns. Preview and STL export use the same connected solid. The rain-cover shape is a geometric option; weather resistance and print supports still require physical evaluation.
 
 ## Source models and printing
 
@@ -180,7 +180,7 @@ The original panels measure approximately 85 × 131 mm for S and 85 × 225 mm fo
 
 The generated upper section is joined with a Boolean union into one connected solid above the preserved control deck. Boolean operations can retessellate the original lower mesh; the generator uses a 0.00005 mm simplification tolerance to resolve numerical slivers. Downloads orient the front toward the print bed and place the lowest point at Z=0, with coordinates expressed in millimeters. Import at 100% scale and check orientation, supports, and material settings in your slicer before printing.
 
-The automated checks validate mesh topology, attachment geometry, actual openings, solid backing behind decorative recesses, and STL serialization. Physical fit, printer tolerances, carrying strength, and acoustic performance still need validation with test prints on the actual speakers. The 3 mm handle material constraint is a geometry limit, not a load rating. The speaker body shown in the preview is an approximate context model. Downloads include the selected front panel with its integrated handle, grille, and halo, the separate volume knob, and the original power button, according to the export selection. The speaker body is preview context only.
+The automated checks validate mesh topology, attachment geometry, actual openings, raised face patterns, and STL serialization. Physical fit, printer tolerances, carrying strength, and acoustic performance still need validation with test prints on the actual speakers. The 3 mm handle material constraint is a geometry limit, not a load rating. The speaker body shown in the preview is an approximate context model. Downloads include the selected front panel with its integrated handle, grille, and halo, the separate volume knob, and the original power button, according to the export selection. The speaker body is preview context only.
 
 Choose the **Power button** color in the Front panel tab using palette swatches or any custom color. It is saved as `powerButtonColor` in designs and share links, supports undo/redo, and is included as a separate material in 3MF. Legacy designs inherit their panel color for the button on first load. The source button has a plain face; the white factory indicator marking remains a preview detail and is not exported.
 
@@ -223,7 +223,7 @@ Multicolor release validation is incomplete. The production build, 390 unit/inte
 - `src/lib/panel-normals.ts` smooths curved surfaces while keeping flat faces uniformly shaded and sharp edges crisp.
 - `src/lib/handle-settings.ts` validates dependent handle dimensions and material constraints.
 - `src/lib/handle-geometry.ts` trims the source upper section and generates a connected handle with real cutouts; `handles.worker.ts` runs this kernel in the browser.
-- `src/lib/grille-settings.ts` constrains grille dimensions and defines the shared pattern layout; `grille-geometry.ts` joins perforated inserts and cuts blind decorative recesses.
+- `src/lib/grille-settings.ts` constrains grille dimensions and defines the shared pattern layout; `grille-geometry.ts` joins perforated inserts and creates recessed or raised face patterns while preserving case attachments.
 - `src/lib/halo-settings.ts` constrains halo dimensions; `halo-geometry.ts` generates a flared annular wall, trims it with the selected cutting plane, and joins it to the panel.
 - `src/lib/race-stripe-settings.ts` validates centered stripe dimensions and shares their intervals with stud placement; `race-stripe-geometry.ts` cuts the recessed bands into the panel.
 - `src/lib/multicolor-settings.ts`, `multicolor-patterns.ts`, and `multicolor-presets.ts` own the versioned artwork document, primitive contours, generators, and editable flag recipes.

@@ -149,6 +149,7 @@ export function createPanelEngine(wasmUrl?: string) {
           halo,
           positions,
           panelGap,
+          grilleMetadata?.frontZ,
         )
         positions = result.positions
         haloMetadata = result.metadata

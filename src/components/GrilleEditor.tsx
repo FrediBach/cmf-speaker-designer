@@ -195,11 +195,7 @@ function GrilleDiagram({
                   ? 'var(--card)'
                   : 'var(--diagram-recess)'
               }
-              stroke={
-                hole.kind === 'through'
-                  ? 'var(--accent-ink)'
-                  : 'var(--accent-ink)'
-              }
+              stroke="var(--accent-ink)"
               strokeWidth=".3"
             />
           ))}
@@ -224,7 +220,12 @@ function GrilleDiagram({
         </span>
         {value.extendPattern && (
           <span className="grille-diagram-key recess">
-            <i /> Surface recesses
+            {value.recessDepth !== 0 && <i />}{' '}
+            {value.recessDepth < 0
+              ? 'Raised surface pattern'
+              : value.recessDepth > 0
+                ? 'Recessed surface pattern'
+                : 'Flat surface'}
           </span>
         )}
       </div>
@@ -410,14 +411,15 @@ export function GrilleEditor({ model, value, raceStripes, onChange }: Props) {
               <span>
                 <strong id={extensionLabelId}>Continue across the face</strong>
                 <small id={extensionDescriptionId}>
-                  Continue seamlessly into recesses across the face.
+                  Continue the pattern across the surrounding face.
                 </small>
               </span>
             </label>
             {value.extendPattern &&
               parameter('recessDepth', 'Recess depth', {
                 step: 0.1,
-                description: `Up to ${Number(limits.recessDepth.max.toFixed(1))} mm with this grille thickness.`,
+                description:
+                  'Negative raises the pattern; zero is flat. Positive recesses up to 6 mm and can cut through, except at case attachments.',
               })}
           </section>
         </>

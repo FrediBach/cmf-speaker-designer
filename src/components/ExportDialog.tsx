@@ -610,8 +610,8 @@ function PanelExportSummary({
             Custom grille · {design.grille.size} mm openings ·{' '}
             {design.grille.spacing} mm spacing · {design.grille.thickness} mm
             thick
-            {design.grille.extendPattern
-              ? ` · ${design.grille.recessDepth} mm recessed face pattern`
+            {design.grille.extendPattern && design.grille.recessDepth !== 0
+              ? ` · ${Math.abs(design.grille.recessDepth)} mm ${design.grille.recessDepth < 0 ? 'raised' : 'recessed'} face pattern`
               : ''}
           </span>
         )}

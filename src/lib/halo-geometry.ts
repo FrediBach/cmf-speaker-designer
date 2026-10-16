@@ -87,11 +87,14 @@ export async function createHaloEngine(wasmUrl?: string) {
       input: HaloSettings,
       positions: Float32Array,
       panelGap = 0,
+      panelFaceZ?: number,
     ): HaloResult {
       const settings = normalizeHaloSettings(input)
-      let baseZ = -Infinity
-      for (let index = 2; index < positions.length; index += 3)
-        baseZ = Math.max(baseZ, positions[index])
+      // Raised grille details can stand above the face the halo grows from.
+      let baseZ = panelFaceZ ?? -Infinity
+      if (panelFaceZ === undefined)
+        for (let index = 2; index < positions.length; index += 3)
+          baseZ = Math.max(baseZ, positions[index])
       const centers = (model === 's' ? [-23] : [15, -70]).map((y) => ({
         x: 0,
         y,
@@ -115,7 +118,11 @@ export async function createHaloEngine(wasmUrl?: string) {
       }
       if (settings.mode === 'original')
         return { positions: positions.slice(), metadata }
-      if (baseZ - panelGap < 3.99 || baseZ - panelGap > 6.01)
+      if (
+        !Number.isFinite(baseZ) ||
+        baseZ - panelGap < 3.99 ||
+        baseZ - panelGap > 6.01
+      )
         throw new Error(
           'Custom halos require the original open front-panel shape.',
         )

@@ -557,6 +557,62 @@ describe('generative halo and planar rain hood', () => {
     30_000,
   )
 
+  it.each([
+    { model: 's' as const, relief: 0, panelGap: 0, sampleY: 12 },
+    { model: 'm' as const, relief: 2, panelGap: 5, sampleY: 48 },
+  ])(
+    'anchors the $model halo to the panel face beneath raised grille details',
+    async ({ model, relief, panelGap, sampleY }) => {
+      const source = readPanel(model)
+      const halo = normalizeHaloSettings({
+        mode: 'custom',
+        depth: 12,
+        outwardAngle: 0,
+      })
+      const geometry = await buildHandledPanelGeometry(
+        source,
+        model,
+        'original',
+        relief,
+        getDefaultHandleSettings(model),
+        normalizeGrilleSettings({
+          mode: 'custom',
+          layout: 'grid',
+          thickness: 2,
+          extendPattern: true,
+          recessDepth: -3,
+        }),
+        halo,
+        0,
+        panelGap,
+      )
+      try {
+        const faceZ = 4 + relief + panelGap
+        expect(topology(geometry)).toEqual({ invalid: 0, components: 1 })
+        expect(geometry.userData.grille.frontZ).toBeCloseTo(faceZ, 4)
+        expect(geometry.userData.halo.baseZ).toBeCloseTo(faceZ, 4)
+        expect(geometry.userData.halo.frontZ).toBeCloseTo(faceZ + halo.depth, 4)
+        expect(geometry.boundingBox!.max.z).toBeCloseTo(faceZ + halo.depth, 4)
+        // This raised detail sits outside the halo and keeps its full height.
+        expect(heights(geometry, 36, sampleY).at(-1)).toBeCloseTo(faceZ + 3, 4)
+        const opening = geometry.userData.grille.holes.find(
+          (hole: { kind: string }) => hole.kind === 'through',
+        )
+        expect(heights(geometry, opening.x, opening.y)).toEqual([])
+        const exported = new STLLoader().parse(exportPanelStl(geometry))
+        try {
+          expect(topology(exported)).toEqual({ invalid: 0, components: 1 })
+        } finally {
+          exported.dispose()
+        }
+      } finally {
+        geometry.dispose()
+        source.dispose()
+      }
+    },
+    30_000,
+  )
+
   it('preserves the source exactly in original mode', () => {
     const source = readPanel('s'),
       positions = positionsOf(source)

@@ -65,8 +65,8 @@ function equalPositions(a: Float32Array, b: Float32Array) {
 /**
  * Run after custom-handle generation and face-depth adjustment. Only the open
  * original front-panel shape is supported. Discs overlap the CAD aperture rims
- * positively; all new through-holes stay inside the original speaker openings.
- * Optional face impressions retain solid backing across the grille and panel.
+ * positively. The extended pattern can recess, perforate, or rise from the
+ * face; case attachment roots retain a solid backing even at full cut depth.
  */
 export async function createGrilleEngine(wasmUrl?: string) {
   const module = await initializeManifold(
@@ -153,23 +153,47 @@ export async function createGrilleEngine(wasmUrl?: string) {
           extrusion.translate([0, 0, frontZ - settings.thickness]),
         )
         let result = own(cached.solid.add(grille))
-        if (recesses.length) {
+        if (recesses.length && settings.recessDepth !== 0) {
           const recessProfiles = own(
             new module.CrossSection(recesses.map((hole) => hole.points)),
           )
-          // Follow the joined panel and grille face, including its tessellated
-          // face-depth transition. Using the joined solid also keeps recesses
-          // blind where the continuous pattern crosses the aperture rims.
-          // The rear face starts at Z=0.5 plus the panel gap. Extend the cutter
-          // down to its remaining backing so deeper selected recesses cut fully.
-          const minimumFloorZ = 0.5 + panelGap + GRILLE_MIN_BACKING
+          const rearZ = 0.5 + panelGap
+          const bottomZ = Math.min(rearZ, frontZ - settings.thickness) - 0.25
           const recessExtrusion = own(
-            recessProfiles.extrude(frontZ - minimumFloorZ + 0.25),
+            recessProfiles.extrude(frontZ - bottomZ + 0.25),
           )
-          const prism = own(recessExtrusion.translate([0, 0, minimumFloorZ]))
-          const depthStop = own(result.translate([0, 0, -settings.recessDepth]))
-          const cutter = own(prism.subtract(depthStop))
-          result = own(result.subtract(cutter))
+          const prism = own(recessExtrusion.translate([0, 0, bottomZ]))
+          if (settings.recessDepth > 0) {
+            // Follow the local front surface, including the aperture bevel.
+            const depthStop = own(
+              result.translate([0, 0, -settings.recessDepth]),
+            )
+            let cutter = own(prism.subtract(depthStop))
+            // Only the source attachments extend behind the flat rear face.
+            // Project their complete roots (including gap supports), with a
+            // small shoulder, and retain 0.5 mm of panel above those roots.
+            const attachments = own(
+              cached.solid.trimByPlane([0, 0, -1], -(rearZ - 0.01)),
+            )
+            const footprint = own(attachments.project())
+            const shoulder = own(footprint.offset(GRILLE_MIN_BACKING))
+            const backing = own(
+              shoulder.extrude(rearZ + GRILLE_MIN_BACKING - bottomZ),
+            )
+            const protectedRoots = own(backing.translate([0, 0, bottomZ]))
+            cutter = own(cutter.subtract(protectedRoots))
+            result = own(result.subtract(cutter))
+          } else {
+            // Sweep the existing face columns upward so raised patterns follow
+            // the local face and remain joined even on the thinnest insert.
+            const columns = own(result.intersect(prism))
+            const height = -settings.recessDepth
+            const steps = Math.ceil(height)
+            const raised = Array.from({ length: steps }, (_, index) =>
+              own(columns.translate([0, 0, (height * (index + 1)) / steps])),
+            )
+            result = own(module.Manifold.union([result, ...raised]))
+          }
         }
         if (result.status() !== 'NoError' || result.isEmpty())
           throw new Error('This grille could not be joined to the panel.')
