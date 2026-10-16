@@ -87,6 +87,7 @@ export function createPatternElement(
         kind,
         text: 'CMF',
         fontId: 'helvetiker',
+        fontWeight: 400,
         fontSize: size * 0.2,
       }
   }
@@ -169,7 +170,12 @@ export function getElementContours(element: PatternElement): PatternPoint[][] {
       )
       break
     case 'text':
-      contours = getTextContours(element.text, element.fontId, element.fontSize)
+      contours = getTextContours(
+        element.text,
+        element.fontId,
+        element.fontSize,
+        element.fontWeight,
+      )
       break
   }
   const angle = (element.rotation * Math.PI) / 180,

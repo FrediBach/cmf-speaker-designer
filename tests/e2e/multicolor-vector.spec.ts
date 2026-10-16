@@ -143,7 +143,7 @@ test('imports transformed SVG holes and preserves edits, history and invalid-imp
   expect(errors).toEqual([])
 })
 
-test('edits text and fonts as artwork and round-trips both vector types through design JSON', async ({
+test('edits font families and weights as artwork and round-trips both vector types through design JSON', async ({
   page,
 }, testInfo) => {
   test.setTimeout(180_000)
@@ -174,25 +174,61 @@ test('edits text and fonts as artwork and round-trips both vector types through 
   const artwork = page.locator('.multicolor-canvas .multicolor-shape').nth(1)
   const originalOutline = await artwork.getAttribute('d')
   const font = page.getByRole('combobox', { name: 'Text font', exact: true })
-  await font.selectOption({ label: 'Optimer' })
+  const weight = page.getByRole('combobox', {
+    name: 'Font weight',
+    exact: true,
+  })
+  expect(await font.locator('option').count()).toBeGreaterThanOrEqual(12)
+  await font.selectOption({ label: 'Inter' })
   await expect(artwork).not.toHaveAttribute('d', originalOutline!)
-  const optimer = await stored(page)
-  expect(optimer.elements[1]).toMatchObject({
+  await expect(weight).toHaveValue('400')
+  const regular = await stored(page)
+  const regularOutline = await artwork.getAttribute('d')
+  await weight.selectOption({ label: 'Bold (700)' })
+  await expect(artwork).not.toHaveAttribute('d', regularOutline!)
+  const bold = await stored(page)
+  const boldOutline = await artwork.getAttribute('d')
+  expect(bold.elements[1]).toMatchObject({
     kind: 'text',
     text: 'B8',
     fontSize: 14,
     y: 50,
-    fontId: await font.inputValue(),
+    fontId: 'inter',
+    fontWeight: 700,
   })
-  await font.selectOption({ label: 'Droid Sans Mono' })
-  const mono = await stored(page)
-  expect(mono.elements[1]).toMatchObject({ fontId: await font.inputValue() })
-  expect(mono.elements[1]).not.toEqual(optimer.elements[1])
   const canvas = page.locator('.multicolor-canvas')
   await canvas.press('Control+z')
-  await expect.poll(() => stored(page)).toEqual(optimer)
+  await expect.poll(() => stored(page)).toEqual(regular)
+  await expect(weight).toHaveValue('400')
+  await expect(artwork).toHaveAttribute('d', regularOutline!)
   await canvas.press('Control+y')
-  await expect.poll(() => stored(page)).toEqual(mono)
+  await expect.poll(() => stored(page)).toEqual(bold)
+  await expect(weight).toHaveValue('700')
+  await expect(artwork).toHaveAttribute('d', boldOutline!)
+  await font.selectOption({ label: 'Montserrat' })
+  await expect(weight).toHaveValue('700')
+  await expect(artwork).not.toHaveAttribute('d', boldOutline!)
+  expect((await stored(page)).elements[1]).toMatchObject({
+    fontId: 'montserrat',
+    fontWeight: 700,
+  })
+  await canvas.press('Control+z')
+  await expect.poll(() => stored(page)).toEqual(bold)
+  await expect(artwork).toHaveAttribute('d', boldOutline!)
+  await font.selectOption({ label: 'Droid Sans Mono' })
+  const mono = await stored(page)
+  expect(mono.elements[1]).toMatchObject({
+    fontId: 'droid-sans-mono',
+    fontWeight: 400,
+  })
+  await expect(weight).toHaveValue('400')
+  await expect(weight).toBeDisabled()
+  await expect(weight.locator('option')).toHaveCount(1)
+  await canvas.press('Control+z')
+  await expect.poll(() => stored(page)).toEqual(bold)
+  await expect(font).toHaveValue('inter')
+  await expect(weight).toHaveValue('700')
+  await expect(weight).toBeEnabled()
   await ready(page)
   await font.scrollIntoViewIfNeeded()
   await page.screenshot({
@@ -201,7 +237,7 @@ test('edits text and fonts as artwork and round-trips both vector types through 
   })
   await page.reload()
   await ready(page)
-  expect(await stored(page)).toEqual(mono)
+  expect(await stored(page)).toEqual(bold)
 
   const started = page.waitForEvent('download')
   await page
@@ -210,7 +246,7 @@ test('edits text and fonts as artwork and round-trips both vector types through 
   const download = await started
   const path = testInfo.outputPath('vector-artwork.json')
   await download.saveAs(path)
-  expect(JSON.parse(await readFile(path, 'utf8')).multicolor).toEqual(mono)
+  expect(JSON.parse(await readFile(path, 'utf8')).multicolor).toEqual(bold)
   await page.getByRole('button', { name: 'Reset', exact: true }).click()
   await ready(page)
   expect((await stored(page)).elements).toEqual([])
@@ -218,7 +254,7 @@ test('edits text and fonts as artwork and round-trips both vector types through 
     .locator('input[type="file"][accept=".json,application/json"]')
     .setInputFiles(path)
   await ready(page)
-  expect(await stored(page)).toEqual(mono)
+  expect(await stored(page)).toEqual(bold)
   await expect(
     page.locator('.multicolor-canvas .multicolor-shape'),
   ).toHaveCount(2)
@@ -230,6 +266,15 @@ test('edits text and fonts as artwork and round-trips both vector types through 
       add.getByRole('button', { name, exact: true }),
     ).toBeInViewport()
   }
+  await page
+    .locator('.multicolor-layer-select')
+    .filter({ hasText: 'Text' })
+    .click()
+  await weight.scrollIntoViewIfNeeded()
+  await expect(font).toBeInViewport()
+  await expect(weight).toBeInViewport()
+  await expect(font).toHaveValue('inter')
+  await expect(weight).toHaveValue('700')
   const dimensions = await page.evaluate(() => ({
     width: document.documentElement.scrollWidth,
     viewport: document.documentElement.clientWidth,

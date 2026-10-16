@@ -1,13 +1,22 @@
 import { validatePatternText } from './multicolor-fonts'
+import {
+  PATTERN_FONTS,
+  getPatternFont,
+  type PatternFontId,
+  type PatternFontWeight,
+} from './multicolor-font-catalog'
+
+export {
+  PATTERN_FONTS,
+  PATTERN_FONT_WEIGHT_LABELS,
+  getPatternFont,
+  nearestPatternFontWeight,
+  type PatternFontId,
+  type PatternFontWeight,
+} from './multicolor-font-catalog'
 
 export type PatternKind =
   'stripe' | 'cross' | 'circle' | 'polygon' | 'svg' | 'text'
-export const PATTERN_FONTS = [
-  { id: 'helvetiker', name: 'Helvetiker' },
-  { id: 'optimer', name: 'Optimer' },
-  { id: 'droid-sans-mono', name: 'Droid Sans Mono' },
-] as const
-export type PatternFontId = (typeof PATTERN_FONTS)[number]['id']
 export type PatternFrame = {
   centerX: number
   centerY: number
@@ -48,7 +57,13 @@ export type PatternElement = ElementCommon &
         /** Centered unit contours, with counterclockwise exteriors and clockwise holes. */
         contours: PatternPoint[][]
       }
-    | { kind: 'text'; text: string; fontId: PatternFontId; fontSize: number }
+    | {
+        kind: 'text'
+        text: string
+        fontId: PatternFontId
+        fontWeight: PatternFontWeight
+        fontSize: number
+      }
   )
 export type PatternGroup = {
   id: string
@@ -466,12 +481,20 @@ export function normalizeMulticolorSettings(
         if (!PATTERN_FONTS.some(({ id }) => id === element.fontId))
           fail('Choose a supported text font.')
         const fontId = element.fontId as PatternFontId
-        validatePatternText(content, fontId)
+        const fontWeight = number(
+          element.fontWeight,
+          'Font weight',
+          400,
+        ) as PatternFontWeight
+        if (!getPatternFont(fontId).weights.includes(fontWeight))
+          fail('Choose a weight available for the selected font.')
+        validatePatternText(content, fontId, fontWeight)
         return {
           ...common,
           kind: 'text',
           text: content,
           fontId,
+          fontWeight,
           fontSize: positive(element.fontSize, 'Font size'),
         }
       }

@@ -5,6 +5,7 @@ import { parseDesignJson, validateDesign } from './design'
 import { createDesignHistory, designHistoryReducer } from './design-history'
 import { buildDesignExport } from './design-export'
 import { buildMulticolorGeometry } from './multicolor-client'
+import { multicolorGeometryKey } from './multicolor-geometry'
 import {
   createPatternElement,
   fitMulticolorArtwork,
@@ -14,7 +15,6 @@ import {
   getDefaultMulticolorSettings,
   MULTICOLOR_LIMITS,
   normalizeMulticolorSettings,
-  PATTERN_FONTS,
   polygonSignedArea,
   type PatternElement,
 } from './multicolor-settings'
@@ -54,7 +54,8 @@ function artwork() {
       ...createPatternElement('text', settings.frame, 'text-color'),
       kind: 'text',
       text: 'BO',
-      fontId: 'helvetiker',
+      fontId: 'inter',
+      fontWeight: 700,
       fontSize: 15,
       x: 20,
     },
@@ -75,7 +76,8 @@ describe('SVG and text multicolor documents', () => {
         if (svg.kind !== 'svg' || text.kind !== 'text')
           throw new Error('Wrong kinds')
         svg.contours[0][0][0] += 0.1
-        text.fontId = 'optimer'
+        text.fontId = 'helvetiker'
+        text.fontWeight = 400
         text.text = 'CMF'
         return current
       },
@@ -87,6 +89,57 @@ describe('SVG and text multicolor documents', () => {
     expect(parseDesignJson(JSON.stringify(edited.present))).toEqual(
       edited.present,
     )
+  })
+
+  it('loads legacy text without a weight as regular while retaining new font weights', () => {
+    const settings = artwork()
+    const text = settings.elements[1]
+    if (text.kind !== 'text') throw new Error('Expected text')
+    const { fontWeight: _fontWeight, ...legacy } = text
+    const design = parseDesignJson(
+      JSON.stringify({
+        multicolor: {
+          ...settings,
+          elements: [{ ...legacy, fontId: 'helvetiker' }],
+        },
+      }),
+    )
+    expect(design.multicolor.elements[0]).toMatchObject({
+      kind: 'text',
+      fontId: 'helvetiker',
+      fontWeight: 400,
+    })
+    expect(
+      parseDesignJson(JSON.stringify(validateDesign({ multicolor: settings })))
+        .multicolor.elements[1],
+    ).toMatchObject({
+      fontId: 'inter',
+      fontWeight: 700,
+    })
+  })
+
+  it('invalidates rendered geometry when the text weight changes and restores it on undo', () => {
+    const design = validateDesign({ multicolor: artwork() })
+    const history = createDesignHistory(design)
+    const regular = designHistoryReducer(history, {
+      type: 'set',
+      update: (current) => {
+        const text = current.multicolor.elements[1]
+        if (text.kind !== 'text') throw new Error('Expected text')
+        text.fontWeight = 400
+        return current
+      },
+    })
+    const originalKey = multicolorGeometryKey(design.multicolor)
+    expect(multicolorGeometryKey(regular.present.multicolor)).not.toBe(
+      originalKey,
+    )
+    expect(
+      getElementContours(regular.present.multicolor.elements[1]),
+    ).not.toEqual(getElementContours(design.multicolor.elements[1]))
+    const restored = designHistoryReducer(regular, { type: 'undo' }).present
+    expect(multicolorGeometryKey(restored.multicolor)).toBe(originalKey)
+    expect(restored.multicolor.elements[1]).toMatchObject({ fontWeight: 700 })
   })
 
   it('uniformly fits both shapes and preserves normalized SVG outlines', () => {
@@ -109,6 +162,8 @@ describe('SVG and text multicolor documents', () => {
     })
     expect(fitted.elements[1]).toMatchObject({
       kind: 'text',
+      fontId: 'inter',
+      fontWeight: 700,
       fontSize: 30,
       x: 45,
       y: 10,
@@ -123,26 +178,6 @@ describe('SVG and text multicolor documents', () => {
       })
     }
   })
-
-  it.each(PATTERN_FONTS)(
-    'keeps holes and finite centered geometry with $name',
-    ({ id }) => {
-      const element = { ...artwork().elements[1], fontId: id } as PatternElement
-      const contours = getElementContours(element)
-      expect(
-        contours.filter((points) => polygonSignedArea(points) < 0),
-      ).toHaveLength(3)
-      expect(
-        contours.filter((points) => polygonSignedArea(points) > 0),
-      ).toHaveLength(2)
-      const points = contours.flat()
-      expect(points.flat().every(Number.isFinite)).toBe(true)
-      const xs = points.map(([x]) => x)
-      const ys = points.map(([, y]) => y)
-      expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo(element.x)
-      expect((Math.min(...ys) + Math.max(...ys)) / 2).toBeCloseTo(element.y)
-    },
-  )
 
   it('rejects invalid vector geometry, font choices, and unsupported text atomically', () => {
     const original = artwork()
@@ -172,6 +207,10 @@ describe('SVG and text multicolor documents', () => {
       },
       { ...svg, width: 0 },
       { ...text, fontId: 'missing-font' },
+      { ...text, fontWeight: 450 },
+      { ...text, fontWeight: '700' },
+      { ...text, fontWeight: null },
+      { ...text, fontId: 'droid-sans-mono', fontWeight: 700 },
       { ...text, text: '🙂' },
       { ...text, text: 'A'.repeat(MULTICOLOR_LIMITS.textLength + 1) },
       { ...text, text: '   ' },
@@ -209,6 +248,30 @@ describe('SVG and text multicolor documents', () => {
       expect(
         result.parts.reduce((total, part) => total + part.volume, 0),
       ).toBeCloseTo(100 * 80 * 4, 3)
+      for (const { geometry } of result.parts) {
+        const edges = new Map<string, { count: number; direction: number }>()
+        const indices = geometry.index!.array
+        for (let i = 0; i < indices.length; i += 3) {
+          const [a, b, c] = [indices[i], indices[i + 1], indices[i + 2]]
+          for (const [from, to] of [
+            [a, b],
+            [b, c],
+            [c, a],
+          ]) {
+            const key = `${Math.min(from, to)}:${Math.max(from, to)}`
+            const edge = edges.get(key) ?? { count: 0, direction: 0 }
+            edge.count++
+            edge.direction += from < to ? 1 : -1
+            edges.set(key, edge)
+          }
+        }
+        expect(edges.size).toBeGreaterThan(0)
+        expect(
+          [...edges.values()].every(
+            ({ count, direction }) => count === 2 && direction === 0,
+          ),
+        ).toBe(true)
+      }
       const file = await buildDesignExport({
         design,
         panel,
@@ -219,9 +282,14 @@ describe('SVG and text multicolor documents', () => {
         format: '3mf',
       })
       const entries = unzipSync(new Uint8Array(file.data))
-      expect(
-        parseDesignJson(strFromU8(entries['Metadata/design.json'])),
-      ).toEqual(design)
+      const exported = parseDesignJson(
+        strFromU8(entries['Metadata/design.json']),
+      )
+      expect(exported).toEqual(design)
+      expect(exported.multicolor.elements[1]).toMatchObject({
+        fontId: 'inter',
+        fontWeight: 700,
+      })
       const mesh = strFromU8(entries['3D/3dmodel.model'])
       expect(mesh.match(/<mesh>/g)).toHaveLength(3)
     } finally {

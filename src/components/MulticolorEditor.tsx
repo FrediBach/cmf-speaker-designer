@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { BufferGeometry } from 'three'
 import {
   ArrowDown,
@@ -18,13 +18,17 @@ import {
 import {
   MULTICOLOR_LIMITS,
   PATTERN_FONTS,
+  PATTERN_FONT_WEIGHT_LABELS,
   getDefaultMulticolorSettings,
+  getPatternFont,
+  nearestPatternFontWeight,
   normalizeMulticolorSettings,
   type MulticolorSettings,
   type PatternElement,
   type PatternFrame,
   type PatternKind,
   type PatternFontId,
+  type PatternFontWeight,
 } from '@/lib/multicolor-settings'
 import {
   createPatternElement,
@@ -41,6 +45,15 @@ import {
 import { useNumericDraft } from '@/lib/use-numeric-draft'
 import { MulticolorCanvas } from './MulticolorCanvas'
 import './multicolor.css'
+
+const PATTERN_FONT_GROUPS = Array.from(
+  new Set(PATTERN_FONTS.map((font) => font.category)),
+).map((category) => ({
+  category,
+  fonts: PATTERN_FONTS.filter((font) => font.category === category).sort(
+    (left, right) => left.name.localeCompare(right.name),
+  ),
+}))
 
 interface Props {
   value: MulticolorSettings
@@ -276,6 +289,7 @@ export function MulticolorEditor({
   onBeginTransaction,
   onEndTransaction,
 }: Props) {
+  const fontWeightHintId = useId()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [presetId, setPresetId] = useState(value.preset?.id ?? 'france')
   const [layout, setLayout] = useState<'panel' | 'proportional'>(
@@ -306,6 +320,8 @@ export function MulticolorEditor({
     [],
   )
   const selected = value.elements.find((element) => element.id === selectedId)
+  const selectedFont =
+    selected?.kind === 'text' ? getPatternFont(selected.fontId) : undefined
   const selectedGroup = selected?.groupId
     ? value.groups.find((group) => group.id === selected.groupId)
     : undefined
@@ -1175,7 +1191,7 @@ export function MulticolorEditor({
               </p>
             </>
           )}
-          {selected.kind === 'text' && (
+          {selected.kind === 'text' && selectedFont && (
             <>
               <TextField
                 label="Text content"
@@ -1188,26 +1204,75 @@ export function MulticolorEditor({
                 <select
                   aria-label="Text font"
                   value={selected.fontId}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const fontId = event.target.value as PatternFontId
                     editElement({
                       ...selected,
-                      fontId: event.target.value as PatternFontId,
+                      fontId,
+                      fontWeight: nearestPatternFontWeight(
+                        fontId,
+                        selected.fontWeight,
+                      ),
                     })
-                  }
+                  }}
                 >
-                  {PATTERN_FONTS.map((font) => (
-                    <option key={font.id} value={font.id}>
-                      {font.name}
-                    </option>
+                  {PATTERN_FONT_GROUPS.map(({ category, fonts }) => (
+                    <optgroup key={category} label={category}>
+                      {fonts.map((font) => (
+                        <option key={font.id} value={font.id}>
+                          {font.name}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </label>
-              <NumberField
-                label="Font size"
-                value={selected.fontSize}
-                min={0.1}
-                onChange={(fontSize) => editElement({ ...selected, fontSize })}
-              />
+              <div className="multicolor-field-grid">
+                <label className="multicolor-select">
+                  <span>Font weight</span>
+                  <select
+                    aria-label="Font weight"
+                    aria-describedby={
+                      selectedFont.weights.length === 1
+                        ? fontWeightHintId
+                        : undefined
+                    }
+                    value={selected.fontWeight}
+                    disabled={selectedFont.weights.length === 1}
+                    onChange={(event) =>
+                      editElement({
+                        ...selected,
+                        fontWeight: Number(
+                          event.target.value,
+                        ) as PatternFontWeight,
+                      })
+                    }
+                  >
+                    {selectedFont.weights.map((weight) => (
+                      <option key={weight} value={weight}>
+                        {PATTERN_FONT_WEIGHT_LABELS[weight]} ({weight})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <NumberField
+                  label="Font size"
+                  value={selected.fontSize}
+                  min={0.1}
+                  onChange={(fontSize) =>
+                    editElement({ ...selected, fontSize })
+                  }
+                />
+              </div>
+              {selectedFont.weights.length === 1 && (
+                <p id={fontWeightHintId} className="multicolor-hint">
+                  {selectedFont.name} is available in{' '}
+                  {PATTERN_FONT_WEIGHT_LABELS[
+                    selectedFont.weights[0]
+                  ].toLowerCase()}{' '}
+                  weight only.
+                </p>
+              )}
             </>
           )}
           {selected.kind === 'stripe' && (

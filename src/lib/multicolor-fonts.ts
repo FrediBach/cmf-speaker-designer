@@ -1,23 +1,76 @@
 import {
   FontLoader,
+  type Font,
   type FontData,
 } from 'three/examples/jsm/loaders/FontLoader.js'
+import { strFromU8, unzlibSync } from 'three/addons/libs/fflate.module.js'
 import type { Path } from 'three'
 import helvetiker from '../assets/fonts/helvetiker_regular.typeface.json' with { type: 'json' }
+import helvetikerBold from '../assets/fonts/helvetiker_bold.typeface.json' with { type: 'json' }
 import optimer from '../assets/fonts/optimer_regular.typeface.json' with { type: 'json' }
+import optimerBold from '../assets/fonts/optimer_bold.typeface.json' with { type: 'json' }
 import droidSansMono from '../assets/fonts/droid_sans_mono_regular.typeface.json' with { type: 'json' }
-import type { PatternFontId, PatternPoint } from './multicolor-settings'
+import inter from '../assets/fonts/inter.typefaces.json' with { type: 'json' }
+import roboto from '../assets/fonts/roboto.typefaces.json' with { type: 'json' }
+import montserrat from '../assets/fonts/montserrat.typefaces.json' with { type: 'json' }
+import dmSans from '../assets/fonts/dm-sans.typefaces.json' with { type: 'json' }
+import oswald from '../assets/fonts/oswald.typefaces.json' with { type: 'json' }
+import lato from '../assets/fonts/lato.typefaces.json' with { type: 'json' }
+import merriweather from '../assets/fonts/merriweather.typefaces.json' with { type: 'json' }
+import playfairDisplay from '../assets/fonts/playfair-display.typefaces.json' with { type: 'json' }
+import spaceMono from '../assets/fonts/space-mono.typefaces.json' with { type: 'json' }
+import {
+  getPatternFont,
+  type PatternFontId,
+  type PatternFontWeight,
+} from './multicolor-font-catalog'
+import type { PatternPoint } from './multicolor-settings'
 
 const loader = new FontLoader()
-const fonts = {
-  helvetiker: loader.parse(helvetiker as FontData),
-  optimer: loader.parse(optimer as FontData),
-  'droid-sans-mono': loader.parse(droidSansMono as FontData),
+const faces: Record<
+  PatternFontId,
+  Partial<Record<PatternFontWeight, FontData | string>>
+> = {
+  helvetiker: { 400: helvetiker as FontData, 700: helvetikerBold as FontData },
+  optimer: { 400: optimer as FontData, 700: optimerBold as FontData },
+  'droid-sans-mono': { 400: droidSansMono as FontData },
+  inter,
+  roboto,
+  montserrat,
+  'dm-sans': dmSans,
+  oswald,
+  lato,
+  merriweather,
+  'playfair-display': playfairDisplay,
+  'space-mono': spaceMono,
 }
-const names = {
-  helvetiker: 'Helvetiker',
-  optimer: 'Optimer',
-  'droid-sans-mono': 'Droid Sans Mono',
+const fontCache = new Map<string, Font>()
+
+/** Bundled compressed outlines are only expanded when their face is used. */
+function getFont(fontId: PatternFontId, weight: PatternFontWeight): Font {
+  const metadata = getPatternFont(fontId)
+  if (!metadata.weights.includes(weight))
+    throw new Error('Choose a weight available for the selected font.')
+  const key = `${fontId}:${weight}`
+  const cached = fontCache.get(key)
+  if (cached) return cached
+  const source = faces[fontId][weight]
+  if (!source) throw new Error('The selected font weight could not be loaded.')
+  const data =
+    typeof source === 'string'
+      ? (JSON.parse(
+          strFromU8(
+            unzlibSync(
+              Uint8Array.from(atob(source), (character) =>
+                character.charCodeAt(0),
+              ),
+            ),
+          ),
+        ) as FontData)
+      : source
+  const font = loader.parse(data)
+  fontCache.set(key, font)
+  return font
 }
 
 // Keep this module independent of settings at runtime: settings validation and
@@ -54,9 +107,12 @@ function contour(path: Path, clockwise: boolean): PatternPoint[] {
   return points
 }
 
-function textContours(text: string, fontId: PatternFontId): PatternPoint[][] {
-  const font = Object.hasOwn(fonts, fontId) ? fonts[fontId] : undefined
-  if (!font) throw new Error('Choose a supported text font.')
+function textContours(
+  text: string,
+  fontId: PatternFontId,
+  fontWeight: PatternFontWeight,
+): PatternPoint[][] {
+  const font = getFont(fontId, fontWeight)
   if (
     typeof text !== 'string' ||
     !text.trim() ||
@@ -83,10 +139,10 @@ function textContours(text: string, fontId: PatternFontId): PatternPoint[][] {
       )
       .join(', ')
     throw new Error(
-      `${names[fontId]} does not include ${characters}. Choose another font or change the text.`,
+      `${getPatternFont(fontId).name} does not include ${characters}. Choose another font or change the text.`,
     )
   }
-  const key = `${fontId}:${text}`
+  const key = `${fontId}:${fontWeight}:${text}`
   const cached = cache.get(key)
   if (cached) return cached
   const contours: PatternPoint[][] = []
@@ -134,8 +190,12 @@ function textContours(text: string, fontId: PatternFontId): PatternPoint[][] {
 }
 
 /** Validate glyph availability and bounded geometry before accepting an edit. */
-export function validatePatternText(text: string, fontId: PatternFontId): void {
-  textContours(text, fontId)
+export function validatePatternText(
+  text: string,
+  fontId: PatternFontId,
+  fontWeight: PatternFontWeight = 400,
+): void {
+  textContours(text, fontId, fontWeight)
 }
 
 /** Centered XY, y-up, in mm; CCW exteriors and CW holes, with no closing duplicate. */
@@ -143,10 +203,11 @@ export function getTextContours(
   text: string,
   fontId: PatternFontId,
   fontSize: number,
+  fontWeight: PatternFontWeight = 400,
 ): PatternPoint[][] {
   if (!Number.isFinite(fontSize) || fontSize <= 0)
     throw new Error('Font size must be greater than zero.')
-  return textContours(text, fontId).map((points) =>
+  return textContours(text, fontId, fontWeight).map((points) =>
     points.map(([x, y]): PatternPoint => [x * fontSize, y * fontSize]),
   )
 }

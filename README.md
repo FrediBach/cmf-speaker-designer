@@ -118,7 +118,20 @@ Add and independently position stripes/rectangles, crosses with unequal arms, ci
 
 Choose **SVG** to import filled vector artwork as one material layer. Compound paths retain their holes, overlapping paths combine into one silhouette, and width/height edits preserve proportions. **Replace SVG** updates the artwork within its existing layer. Imports accept SVGs up to 256 KB and 4,096 sampled points; convert strokes and embedded text to filled paths and expand clips, masks, and other effects before importing. Original SVG colors are replaced by the layer’s material.
 
-Choose **Text** to add editable lettering with **Helvetiker**, **Optimer**, or **Droid Sans Mono** and a font size in millimeters. Fonts are bundled locally, and unsupported characters report an error. Text supports up to 120 characters within the outline complexity limit. Both new shapes support layer ordering, duplication, undo, saved design JSON, and the same full-depth material geometry in the 2D canvas, 3D preview, and multicolor exports.
+Choose **Text** to add editable lettering with a font size in millimeters and a choice of 12 families, grouped into sans serif, serif, monospace, and display styles. **Font weight** lists the real weights available for the selected family:
+
+| Font                                               | Available weights                                                                       |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Inter, Roboto, Montserrat, DM Sans, CMF Book Serif | Light (300), Regular (400), Medium (500), Semi Bold (600), Bold (700), Extra Bold (800) |
+| Oswald                                             | Light (300), Regular (400), Medium (500), Semi Bold (600), Bold (700)                   |
+| CMF Editorial Serif                                | Regular (400), Medium (500), Semi Bold (600), Bold (700), Extra Bold (800)              |
+| CMF Humanist                                       | Light (300), Regular (400), Bold (700)                                                  |
+| Helvetiker, Optimer, Space Mono                    | Regular (400), Bold (700)                                                               |
+| Droid Sans Mono                                    | Regular (400)                                                                           |
+
+CMF Humanist, CMF Book Serif, and CMF Editorial Serif are outline derivatives of Lato, Merriweather, and Playfair Display, renamed to respect their reserved font names. Attribution and licensing details are in [the font notes](src/assets/fonts/README.txt).
+
+Changing families retains the selected weight when available, or chooses the nearest available weight. Fonts and their outlines are bundled locally, so preview and printing use the same lettering without a network font service. Unsupported characters report an error; the added families cover Latin-1, common additional European letters, and punctuation. Text supports up to 120 characters within the outline complexity limit. Existing saved text without a weight retains its original Regular appearance. SVG and text layers support ordering, duplication, undo, saved design JSON, and the same full-depth material geometry in the 2D canvas, 3D preview, and multicolor exports.
 
 The stripe generator supports equal or weighted widths, direction, count, gaps, and a repeating color sequence. Generated stripes remain individually editable; redistribution changes their layout as an explicit operation. Presets include **France, Italy, Germany, Switzerland, Norway, United Kingdom, Rainbow, and Japan**. Each creates ordinary shapes, including asymmetric UK diagonal arms. Choose panel adaptation or preserved flag proportions; display RGB values approximate flag colors and do not specify filament colors.
 
@@ -212,7 +225,7 @@ Multicolor release validation is incomplete. The production build, 390 unit/inte
 - `src/lib/halo-settings.ts` constrains halo dimensions; `halo-geometry.ts` generates a flared annular wall, trims it with the selected cutting plane, and joins it to the panel.
 - `src/lib/race-stripe-settings.ts` validates centered stripe dimensions and shares their intervals with stud placement; `race-stripe-geometry.ts` cuts the recessed bands into the panel.
 - `src/lib/multicolor-settings.ts`, `multicolor-patterns.ts`, and `multicolor-presets.ts` own the versioned artwork document, primitive contours, generators, and editable flag recipes.
-- `src/lib/multicolor-vector.ts` combines imported SVG paths into material outlines; `multicolor-fonts.ts` generates lettering from bundled fonts, with attribution in `src/assets/fonts/README.txt`.
+- `src/lib/multicolor-vector.ts` combines imported SVG paths into material outlines; `multicolor-fonts.ts` generates lettering from bundled fonts, with families and real weights listed in `multicolor-font-catalog.ts`. New font faces are compressed and expanded only when used. Attribution and regeneration instructions are in `src/assets/fonts/README.txt`.
 - `src/components/MulticolorEditor.tsx` and `MulticolorCanvas.tsx` provide the layer/material inspector and 2D placement editor.
 - `src/lib/multicolor-geometry.ts` partitions the final solid and reports region diagnostics; `multicolor-mesh.ts` prepares printable and smoothed preview meshes in the worker. `multicolor-client.ts`, `multicolor.worker.ts`, and `use-multicolor-geometry.ts` handle worker scheduling, disposal, and current-result gating.
 - `src/lib/panel-engine.ts` combines handle generation, the shared face-depth transformation, grille generation, and halo generation in order inside the worker.
