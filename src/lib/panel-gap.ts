@@ -232,7 +232,10 @@ function sourceSolid(module: ManifoldToplevel, positions: Float32Array) {
   )
 }
 
-function metadata(model: SpeakerModel, gapMm: number): PanelGapMetadata {
+export function getPanelGapMetadata(
+  model: SpeakerModel,
+  gapMm: number,
+): PanelGapMetadata {
   const deckBack = (model === 's' ? 23.5 : 61.5) - 3.5 * Math.SQRT2
   const frontYs = model === 's' ? [-50, 0] : [-100, -33, 33]
   const supports: PanelGapSupport[] = frontYs.flatMap((y) =>
@@ -293,7 +296,7 @@ export async function createPanelGapEngine(wasmUrl?: string) {
         throw new RangeError(
           `Panel gap must be between 0 and ${MAX_PANEL_GAP} mm.`,
         )
-      const details = metadata(model, gapMm)
+      const details = getPanelGapMetadata(model, gapMm)
       if (gapMm === 0) return { positions, metadata: details }
       const disposable: { delete(): void }[] = []
       const own = <T extends { delete(): void }>(value: T): T => {

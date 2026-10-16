@@ -52,10 +52,12 @@ export function PrintGuide({ open, onOpenChange, triggerRef }: Props) {
               <p>
                 Enable Split front and upper panel in Front panel → Print
                 assembly to separate the panel where its angled section starts.
-                Slide the upper part's tongue down into the recessed groove in
-                the back of the front plate before attaching the assembled panel
-                to the speaker. A small solid area around the joint may back the
-                uppermost openings when the grille continues across the face.
+                Slide the upper part's tongue down into the groove inside the
+                front plate's top edge before attaching the assembled panel to
+                the speaker. The groove stays within the plate's thickness,
+                keeping the back flush. A small solid area around the joint may
+                back the uppermost openings when the grille continues across the
+                face.
               </p>
             </div>
           </li>

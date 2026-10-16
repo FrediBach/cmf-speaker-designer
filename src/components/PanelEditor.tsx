@@ -163,7 +163,8 @@ export function PanelEditor({
             <strong id={splitLabelId}>Split front and upper panel</strong>
             <small id={splitDescriptionId}>
               Print two parts, joined where the angled section starts. The upper
-              part slides down into a groove in the back of the front plate.
+              part slides down into a groove inside the front plate's top edge,
+              keeping the back flush.
             </small>
           </span>
         </label>

@@ -3,7 +3,7 @@ import initializeManifold, {
   type ManifoldToplevel,
 } from 'manifold-3d'
 import { getFaceFold, MAX_FACE_DEPTH } from './face-depth'
-import { MAX_PANEL_GAP } from './panel-gap'
+import { getPanelGapMetadata, MAX_PANEL_GAP } from './panel-gap'
 import type { SpeakerModel } from './panels'
 
 /** Clearance on each side of the tongue; printer calibration still matters. */
@@ -69,10 +69,10 @@ function positionsOf(solid: Manifold) {
 
 /**
  * Separate the complete angled deck/handle at the start of the front bend.
- * A broad downward tongue engages a blind groove in the front web. The groove
- * stays outside the body contact plane, using 0.4 mm of the existing rear
- * clearance for a backing rib. It also backs any extended grille recesses at
- * the joint, keeping a minimum 0.7 mm front wall under the 0.8 mm race stripes.
+ * A broad downward tongue engages a blind groove within the front web, leaving
+ * its rear face flush. The tongue adapts to the available face depth to retain
+ * 0.8 mm behind the groove and 0.7 mm in front beneath 0.8 mm race stripes.
+ * Internal reinforcement backs extended grille recesses only at the joint.
  * Hooks and control seats remain unmodified. Projecting halo geometry stays
  * with the front, even when its crown extends above the fold in front view.
  */
@@ -147,17 +147,53 @@ export async function createPanelSplitEngine(wasmUrl?: string) {
             -(frontZ + 0.01),
           ),
         )
+        // Recessed control seats can extend below the split on spaced panels.
+        // Keep their original geometry with the upper piece instead of cutting
+        // detached tips from them. Limit ownership to the space behind the
+        // front web so the visible seam and internal joint stay unchanged.
+        for (const well of getPanelGapMetadata(model, panelGap).controlWells) {
+          const cylinder = own(
+            module.Manifold.cylinder(
+              80,
+              well.outerRadius + 0.25,
+              well.outerRadius + 0.25,
+              96,
+            ),
+          )
+          const bounds = own(
+            own(cylinder.rotate([-45, 0, 0])).translate(
+              well.center.map(
+                (coordinate, axis) => coordinate - well.axis[axis] * 40,
+              ) as [number, number, number],
+            ),
+          )
+          const seat = own(
+            own(original.intersect(bounds)).trimByPlane(
+              [0, 0, -1],
+              -(panelGap + 0.5),
+            ),
+          )
+          front = own(front.subtract(seat))
+          upper = own(upper.add(seat))
+        }
         const tongueWidthMm = 26
-        const tongueThicknessMm = 1.2
-        const tongueBack = 1.1 + panelGap
+        // The thinnest striped face has 2.7 mm of material: 0.8 mm rear wall,
+        // 0.7 mm front wall, 0.4 mm clearance, and a 0.8 mm tongue. Added face
+        // depth allows the tongue to grow back to its full 1.2 mm thickness.
+        const tongueThicknessMm = Math.min(1.2, 0.8 + addedFaceDepth)
+        const tongueBack = 1.5 + panelGap
         const tongueFront = tongueBack + tongueThicknessMm
         const bottomY = seamY - PANEL_SPLIT_ENGAGEMENT
-        // The stock inner rear face is Z=0.5 and the body contact plane Z=0.
-        // Stay 0.1 mm outside that plane, retaining 0.8 mm behind the slot.
-        // A solid front skin also protects the slot from extended grille cuts.
+        // The stock inner rear face is Z=0.5. Reinforcement stays entirely
+        // inside the face envelope, without adding a rib behind the panel.
+        // It closes extended grille cuts locally to keep the groove enclosed.
         const receiver = box(
-          [-tongueWidthMm / 2 - 1.2, bottomY - 0.8, panelGap + 0.1],
-          [tongueWidthMm / 2 + 1.2, seamY - halfSeam, panelGap + 3.2],
+          [-tongueWidthMm / 2 - 1.2, bottomY - 0.8, panelGap + 0.5],
+          [
+            tongueWidthMm / 2 + 1.2,
+            seamY - halfSeam,
+            tongueFront + clearanceMm + 0.7,
+          ],
         )
         front = own(front.add(receiver))
         const socket = box(

@@ -82,7 +82,7 @@ Choose **Black** or **Gray** under **Speaker body**, next to the model selection
 - Add up to 2 mm of face depth while retaining the original mounting region and overall face dimensions.
 - Extend the front and angled panel edges by up to 1 cm per side, with an independently sized handle.
 - Add a 0–0.5 cm panel gap with extended attachment necks and cylindrical rear supports on the front and angled section. The knob and button remain at their original height in recessed openings.
-- Optionally split the panel at the start of the angled section and print the front and upper parts separately, with a sliding tongue and rear groove for assembly.
+- Optionally split the panel at the start of the angled section and print the front and upper parts separately, with a sliding tongue and a groove inside the front plate's top edge for assembly.
 - Generate a custom upper handle: adjust its height, width, rounded corners, top angle, and straight or inward/outward rounded top, then choose a solid face, one to three circular or slotted openings, one to seven rounded slits open at the top, or an uploaded SVG cutout.
 - Add LEGO-compatible studs to the custom handle's front face.
 - Recess one to three centered vertical race stripes into the panel, with adjustable stripe width and gap. Studs and decorative face patterns leave the stripes clear.
@@ -115,7 +115,7 @@ The **Grille** tab generates a perforated grille over the original driver openin
 
 In **Front panel → Print assembly**, enable **Split front and upper panel** to print the front plate separately from the angled control deck and everything above it. The option is off by default for existing and new designs. **Speaker** view shows the assembled panel; **Exploded** separates the front, upper section, volume knob, and power button. Color regions move with their physical panel piece. Exports provide the two printable panel parts.
 
-The upper part has a sliding tongue that fits down into a recessed groove in the back of the front plate. The reinforced groove stays within the available clearance behind the panel. A small solid area around the joint may back the uppermost grille openings when **Continue across the face** is enabled. Join the parts before mounting the panel to the speaker. The joint is intended to support alignment alongside the existing mounting hooks, but its printed fit and strength still need testing before carrying a speaker by the handle.
+The upper part has a sliding tongue that fits down into a groove inside the front plate's top edge. The groove sits within the plate's thickness and opens at the split edge, keeping the back flush. Tongue thickness adapts to the added face depth to preserve the walls around the groove. A small solid area around the joint may back the uppermost grille openings when **Continue across the face** is enabled. Join the parts before mounting the panel to the speaker. The joint is intended to support alignment alongside the existing mounting hooks, but its printed fit and strength still need testing before carrying a speaker by the handle.
 
 Split STL/STP exports provide separate front and upper files in a ZIP, including when **Panel only** is selected. Split 3MF contains two panel print objects. In a split **STL parts** export, import all `panel-front-material` files together as one object, and all `panel-upper-material` files together as a second object. Keep each object's color regions aligned; only the two completed panel objects are printed separately.
 
@@ -251,7 +251,7 @@ Multicolor release validation is incomplete. The production build, 390 unit/inte
 - `src/components/MulticolorEditor.tsx` and `MulticolorCanvas.tsx` provide the layer/material inspector and 2D placement editor.
 - `src/lib/multicolor-geometry.ts` partitions the final solid and reports region diagnostics; `multicolor-mesh.ts` prepares printable and smoothed preview meshes in the worker. `multicolor-client.ts`, `multicolor.worker.ts`, and `use-multicolor-geometry.ts` handle worker scheduling, disposal, and current-result gating.
 - `src/lib/panel-engine.ts` combines handle generation, the shared face-depth transformation, grille generation, and halo generation in order inside the worker.
-- `src/lib/panel-split.ts` optionally separates the completed panel into front and upper solids, with a reinforced groove and sliding tongue. Both part buffers travel with the assembled preview for separate exports.
+- `src/lib/panel-split.ts` optionally separates the completed panel into front and upper solids, with an internal groove and sliding tongue. Both part buffers travel with the assembled preview for separate exports.
 - `src/lib/use-panel-geometry.ts` schedules geometry updates, retains the last preview during generation, and enables export when the current design is ready.
 - `src/lib/knob-settings.ts` validates knob styles and dimensions; `knobs.ts` extracts the source parts, preserves the mounting interface, and builds the preview/export geometry.
 - `src/lib/use-knob-geometry.ts`, `knob-client.ts`, and `knobs.worker.ts` load and update knobs in a worker while preventing stale geometry from being exported.

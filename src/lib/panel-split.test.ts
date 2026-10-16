@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs'
-import initializeManifold, { type ManifoldToplevel } from 'manifold-3d'
+import initializeManifold, {
+  type Manifold,
+  type ManifoldToplevel,
+} from 'manifold-3d'
 import {
   BufferGeometry,
   DoubleSide,
@@ -17,7 +20,6 @@ import { getDefaultHandleSettings } from './handle-settings'
 import { buildHandledPanelGeometry } from './handles'
 import { createPanelSplitEngine } from './panel-split'
 import { parsePanelGeometry, type SpeakerModel } from './panels'
-import { createRaceStripeEngine } from './race-stripe-geometry'
 import { normalizeRaceStripeSettings } from './race-stripe-settings'
 
 function readPanel(model: SpeakerModel) {
@@ -98,6 +100,20 @@ function heights(geometry: BufferGeometry, x: number, y: number) {
   ].sort((a, b) => a - b)
 }
 
+function jointRegion(
+  module: ManifoldToplevel,
+  solid: Manifold,
+  seamY: number,
+  gap = 0,
+) {
+  const box = module.Manifold.cube([30, 7, 8])
+  const positioned = box.translate([-15, seamY - 6, gap - 1])
+  const region = solid.intersect(positioned)
+  positioned.delete()
+  box.delete()
+  return region
+}
+
 describe('printable front and angled panel split', () => {
   let engine: Awaited<ReturnType<typeof createPanelSplitEngine>>
   let module: ManifoldToplevel
@@ -122,6 +138,7 @@ describe('printable front and angled panel split', () => {
       const front = solidOf(module, frontPositions)
       const upper = solidOf(module, upperPositions)
       const original = solidOf(module, input)
+      const originalJoint = jointRegion(module, original, seamY)
       const frontGeometry = geometryOf(frontPositions)
       const upperGeometry = geometryOf(upperPositions)
       try {
@@ -130,17 +147,20 @@ describe('printable front and angled panel split', () => {
           const pieces = part.decompose()
           expect(pieces.length).toBe(1)
           pieces.forEach((piece) => piece.delete())
-          // Added receiver backing uses only the existing 0.5 mm rear gap.
-          // It never crosses the body contact plane or enters the controls.
-          const outside = part.subtract(original)
-          const bodyIntrusion = outside.trimByPlane([0, 0, -1], 0)
-          expect(Math.abs(bodyIntrusion.volume())).toBeLessThan(0.01)
-          bodyIntrusion.delete()
+          // The joint adds nothing behind the existing flat rear face.
+          const joint = jointRegion(module, part, seamY)
+          const outside = joint.subtract(originalJoint)
+          const rearAddition = outside.trimByPlane([0, 0, -1], -0.5)
+          expect(Math.abs(rearAddition.volume())).toBeLessThan(0.001)
+          if (part === front)
+            expect(Math.abs(outside.volume())).toBeLessThan(0.001)
+          rearAddition.delete()
           outside.delete()
+          joint.delete()
         }
-        expect(heights(frontGeometry, 0, seamY - 2)).toEqual([0.1, 0.9, 2.5, 4])
-        expect(heights(upperGeometry, 0, seamY - 2)).toEqual([1.1, 2.3])
-        expect(heights(frontGeometry, 0, seamY - 5.5)).toEqual([0.1, 4])
+        expect(heights(frontGeometry, 0, seamY - 2)).toEqual([0.5, 1.3, 2.5, 4])
+        expect(heights(upperGeometry, 0, seamY - 2)).toEqual([1.5, 2.3])
+        expect(heights(frontGeometry, 0, seamY - 5.5)).toEqual([0.5, 4])
         expect(heights(frontGeometry, 15, seamY - 2)).toEqual([0.5, 4])
         // A 0.2 mm gap surrounds the tongue and the seam. The insertion path
         // stays clear from first engagement all the way to the mounted pose.
@@ -185,6 +205,7 @@ describe('printable front and angled panel split', () => {
         front.delete()
         upper.delete()
         original.delete()
+        originalJoint.delete()
         frontGeometry.dispose()
         upperGeometry.dispose()
         source.dispose()
@@ -222,16 +243,33 @@ describe('printable front and angled panel split', () => {
       )
       const front = solidOf(module, result.metadata.frontPositions)
       const upper = solidOf(module, result.metadata.upperPositions)
+      const original = solidOf(
+        module,
+        new Float32Array(customized.getAttribute('position').array),
+      )
+      const originalJoint = jointRegion(
+        module,
+        original,
+        result.metadata.seamY,
+        5,
+      )
       const frontGeometry = geometryOf(result.metadata.frontPositions)
       try {
         for (const part of [front, upper]) {
           const pieces = part.decompose()
           expect(pieces.length).toBe(1)
           pieces.forEach((piece) => piece.delete())
+          const joint = jointRegion(module, part, result.metadata.seamY, 5)
+          const outside = joint.subtract(originalJoint)
+          const rearAddition = outside.trimByPlane([0, 0, -1], -5.5)
+          expect(Math.abs(rearAddition.volume())).toBeLessThan(0.001)
+          rearAddition.delete()
+          outside.delete()
+          joint.delete()
         }
         expect(
           heights(frontGeometry, 0, result.metadata.seamY - 2).slice(0, 3),
-        ).toEqual([5.1, 5.9, 7.5])
+        ).toEqual([5.5, 6.3, 7.9])
         // At maximum relief, the socket overlaps the top of the extended
         // grille. Its reinforcement must close those perforations locally
         // while retaining both skins around the entire insertion channel.
@@ -242,8 +280,8 @@ describe('printable front and angled panel split', () => {
               x,
               result.metadata.seamY - belowSeam,
             )
-            expect(surfaces.slice(0, 3)).toEqual([5.1, 5.9, 7.5])
-            expect(surfaces[3]).toBeGreaterThanOrEqual(8.2)
+            expect(surfaces.slice(0, 3)).toEqual([5.5, 6.3, 7.9])
+            expect(surfaces[3]).toBeGreaterThanOrEqual(8.6)
           }
         for (const distance of [0, 0.1, 0.5, 1, 2, 3, 4, 5, 6]) {
           const moved = upper.translate([0, distance, 0])
@@ -263,6 +301,8 @@ describe('printable front and angled panel split', () => {
       } finally {
         front.delete()
         upper.delete()
+        original.delete()
+        originalJoint.delete()
         frontGeometry.dispose()
         customized.dispose()
         source.dispose()
@@ -271,33 +311,142 @@ describe('printable front and angled panel split', () => {
     60_000,
   )
 
-  it.each(['s', 'm'] as const)(
-    'retains printable %s socket walls beneath a centered race stripe',
-    async (model) => {
+  it.each(
+    (['s', 'm'] as const).flatMap((model) =>
+      [0, 0.2, 0.4, 2].flatMap((depth) =>
+        (model === 's' && depth === 0 ? [0, 3, 5] : [0, 5]).map((gap) => ({
+          model,
+          depth,
+          gap,
+        })),
+      ),
+    ),
+  )(
+    'recesses the $model joint within the striped face at depth $depth and gap $gap',
+    async ({ model, depth, gap }) => {
       const source = readPanel(model)
-      const stripes = await createRaceStripeEngine()
-      const striped = stripes.build(
+      const striped = await buildHandledPanelGeometry(
+        source,
         model,
+        'original',
+        depth,
+        getDefaultHandleSettings(model),
+        undefined,
+        undefined,
+        0,
+        gap,
         normalizeRaceStripeSettings({
           enabled: true,
           count: 1,
           width: 20,
         }),
-        new Float32Array(source.getAttribute('position').array),
       )
-      const result = engine.build(model, striped.positions)
+      const input = new Float32Array(striped.getAttribute('position').array)
+      const result = engine.build(model, input, depth, gap)
       const front = geometryOf(result.metadata.frontPositions)
+      const frontSolid = solidOf(module, result.metadata.frontPositions)
       const upper = solidOf(module, result.metadata.upperPositions)
+      const upperGeometry = geometryOf(result.metadata.upperPositions)
+      const original = solidOf(module, input)
+      const originalJoint = jointRegion(
+        module,
+        original,
+        result.metadata.seamY,
+        gap,
+      )
       try {
-        // Rear wall: 0.8 mm. Recessed front wall: 0.7 mm. Tongue: 1.2 mm.
-        expect(heights(front, 0, result.metadata.seamY - 2)).toEqual([
-          0.1, 0.9, 2.5, 3.2,
-        ])
-        expect(upper.status()).toBe('NoError')
+        const surfaces = heights(front, 0, result.metadata.seamY - 2)
+        expect(surfaces).toHaveLength(4)
+        expect(surfaces[0]).toBeCloseTo(gap + 0.5, 4)
+        expect(surfaces[1] - surfaces[0]).toBeCloseTo(0.8, 4)
+        expect(surfaces[3] - surfaces[2]).toBeGreaterThanOrEqual(0.7 - 0.0001)
+        expect(surfaces[3]).toBeCloseTo(gap + depth + 3.2, 4)
+        expect(result.metadata.tongueThicknessMm).toBeGreaterThanOrEqual(0.8)
+        expect(result.metadata.tongueThicknessMm).toBeLessThanOrEqual(1.2)
+        expect(surfaces[2] - surfaces[1]).toBeCloseTo(
+          result.metadata.tongueThicknessMm + 0.4,
+          4,
+        )
+        for (const part of [frontSolid, upper]) {
+          expect(part.status()).toBe('NoError')
+          const pieces = part.decompose()
+          expect(pieces.length).toBe(1)
+          pieces.forEach((piece) => piece.delete())
+          const joint = jointRegion(module, part, result.metadata.seamY, gap)
+          const outside = joint.subtract(originalJoint)
+          const rearAddition = outside.trimByPlane([0, 0, -1], -(gap + 0.5))
+          expect(Math.abs(rearAddition.volume())).toBeLessThan(0.001)
+          if (part === frontSolid)
+            expect(Math.abs(outside.volume())).toBeLessThan(0.001)
+          else {
+            // The tongue root remains buried in the original upper section,
+            // even beneath the stripe as it follows the curved fold.
+            const exposedRoot = outside.trimByPlane(
+              [0, 1, 0],
+              result.metadata.seamY + 0.1001,
+            )
+            expect(Math.abs(exposedRoot.volume())).toBeLessThan(0.001)
+            exposedRoot.delete()
+          }
+          rearAddition.delete()
+          outside.delete()
+          joint.delete()
+        }
+        for (const distance of [0, 0.1, 1, 3, 6]) {
+          const moved = upper.translate([0, distance, 0])
+          const collision = frontSolid.intersect(moved)
+          expect(Math.abs(collision.volume())).toBeLessThan(0.00001)
+          collision.delete()
+          moved.delete()
+        }
+        if (gap > 0) {
+          const normal = new Vector3(0, Math.SQRT1_2, Math.SQRT1_2)
+          for (const x of [-28.5, 28.5]) {
+            const center = new Vector3(
+              x,
+              model === 's' ? 29.5 : 70,
+              model === 's' ? -6 : -8.5,
+            )
+            expect(
+              hits(
+                upperGeometry,
+                center.clone().addScaledVector(normal, 20),
+                normal.clone().negate(),
+              ),
+            ).toEqual([])
+            // The lower edges of the fixed control wells can cross the split
+            // height at large gaps. Both ends must stay with the upper part.
+            for (const angle of [Math.PI / 2 - 0.1, Math.PI / 2 + 0.1]) {
+              const origin = center
+                .clone()
+                .add(
+                  new Vector3(
+                    12.5 * Math.cos(angle),
+                    -12.5 * Math.sin(angle) * Math.SQRT1_2,
+                    12.5 * Math.sin(angle) * Math.SQRT1_2,
+                  ),
+                )
+                .addScaledVector(normal, 20)
+              const direction = normal.clone().negate()
+              const before = hits(striped, origin, direction)
+              const after = hits(upperGeometry, origin, direction)
+              expect(before.length).toBeGreaterThanOrEqual(2)
+              expect(after.length).toBeGreaterThanOrEqual(2)
+              expect(after[0].distanceTo(before[0])).toBeLessThan(0.0002)
+              expect(after.at(-1)!.distanceTo(before.at(-1)!)).toBeLessThan(
+                0.0002,
+              )
+            }
+          }
+        }
       } finally {
         front.dispose()
+        frontSolid.delete()
         upper.delete()
-        stripes.dispose()
+        upperGeometry.dispose()
+        original.delete()
+        originalJoint.delete()
+        striped.dispose()
         source.dispose()
       }
     },
