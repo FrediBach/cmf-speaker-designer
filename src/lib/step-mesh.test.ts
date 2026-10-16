@@ -8,11 +8,12 @@ import {
 } from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { KNOB_STYLES } from './knob-settings'
+import { KNOB_STYLES, normalizeKnobSettings } from './knob-settings'
 import { customizeKnobGeometry, parseKnobGeometry } from './knobs'
 import { parsePanelGeometry } from './panels'
 import { createStepMeshPreparer } from './step-mesh'
 import { STEP_TOLERANCE_MM } from './step-settings'
+import { prepareTextKnobContours } from './text-knob-contours'
 
 function asset(name: string): ArrayBuffer {
   const bytes = readFileSync(
@@ -184,17 +185,21 @@ describe('STEP mesh preparation', () => {
 
   it.each(KNOB_STYLES)(
     'reduces customized $label knobs while retaining their shaft mounts',
-    ({ id }) => {
+    async ({ id }) => {
       const source = parseKnobGeometry(
         asset('cmf-speaker-sm-3d-printing-knob-original-v1.stl'),
         id,
       )
-      const customized = customizeKnobGeometry(source, {
+      const settings = normalizeKnobSettings({
         style: id,
         height: 20,
         taper: 0.6,
         flutePath: 'spiral',
+        text: 'BO',
       })
+      const text =
+        id === 'text' ? await prepareTextKnobContours(settings) : undefined
+      const customized = customizeKnobGeometry(source, settings, text)
       const result = preparer.prepare(customized)
       const original = measure(customized)
       const simplified = measure(result)

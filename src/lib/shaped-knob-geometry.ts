@@ -5,6 +5,7 @@ import {
   Vector2,
 } from 'three'
 import { KNOB_BASE_HEIGHT, type KnobSettings } from './knob-settings'
+import { TEXT_KNOB_RADIUS, type TextKnobContours } from './text-knob-contours'
 
 type Point = [number, number, number]
 interface GripBase {
@@ -145,9 +146,12 @@ function triangulateCap(contour: Vector2[], hole: Vector2[]) {
 export function shapedKnobGeometry(
   source: BufferGeometry,
   settings: KnobSettings,
+  text?: TextKnobContours,
 ): BufferGeometry {
   const base = gripBase(source)
-  const outline = gripOutline(settings)
+  if (settings.style === 'text' && !text)
+    throw new Error('Text outlines must be prepared before building the knob.')
+  const outlines = text?.contours ?? [gripOutline(settings)]
   const result = [...base.positions]
   const emit = (
     a: Vector2,
@@ -160,8 +164,17 @@ export function shapedKnobGeometry(
 
   // A hole in the base's top face is exactly the grip's lower perimeter.
   // Sharing those vertices avoids overlapping shells and internal faces.
-  const hole = [...outline].reverse()
-  const cap = triangulateCap(base.outline, hole)
+  const holes = outlines.map((outline) => [...outline].reverse())
+  // Reversing every text contour cuts the glyphs out of the collar cap and
+  // restores a floor inside counters such as B/O. Dots and separate letters
+  // all share this cap, leaving a single connected printable solid.
+  const capContours = [base.outline, ...holes]
+  const cap = text
+    ? {
+        points: capContours.flat(),
+        triangles: text.triangulate(capContours),
+      }
+    : triangulateCap(base.outline, holes[0])
   for (const [a, b, c] of cap.triangles)
     emit(
       cap.points[a],
@@ -172,33 +185,46 @@ export function shapedKnobGeometry(
       KNOB_BASE_HEIGHT,
     )
 
-  // A uniform inward taper preserves the concave arrow/V outline and never
-  // closes the notch. Even the smallest stroke retains at least 1.5 mm.
+  // A uniform taper preserves notches and letter counters. Text measures its
+  // taper radially, independently of the other shaped grips' dimensions.
   const scale =
-    1 - (2 * settings.taper) / Math.min(settings.gripWidth, settings.gripDepth)
-  const top = outline.map(
-    ({ x, y }) => new Vector2(Math.fround(x * scale), Math.fround(y * scale)),
+    1 -
+    (text
+      ? settings.taper / TEXT_KNOB_RADIUS
+      : (2 * settings.taper) / Math.min(settings.gripWidth, settings.gripDepth))
+  const tops = outlines.map((outline) =>
+    outline.map(
+      ({ x, y }) => new Vector2(Math.fround(x * scale), Math.fround(y * scale)),
+    ),
   )
-  for (let index = 0; index < outline.length; index += 1) {
-    const next = (index + 1) % outline.length
-    emit(
-      outline[index],
-      KNOB_BASE_HEIGHT,
-      outline[next],
-      KNOB_BASE_HEIGHT,
-      top[next],
-      settings.height,
-    )
-    emit(
-      outline[index],
-      KNOB_BASE_HEIGHT,
-      top[next],
-      settings.height,
-      top[index],
-      settings.height,
-    )
+  for (let contour = 0; contour < outlines.length; contour += 1) {
+    const outline = outlines[contour],
+      top = tops[contour]
+    for (let index = 0; index < outline.length; index += 1) {
+      const next = (index + 1) % outline.length
+      emit(
+        outline[index],
+        KNOB_BASE_HEIGHT,
+        outline[next],
+        KNOB_BASE_HEIGHT,
+        top[next],
+        settings.height,
+      )
+      emit(
+        outline[index],
+        KNOB_BASE_HEIGHT,
+        top[next],
+        settings.height,
+        top[index],
+        settings.height,
+      )
+    }
   }
-  for (const [a, b, c] of ShapeUtils.triangulateShape([...top], []))
+  const top = tops.flat()
+  const topTriangles = text
+    ? text.triangulate(tops)
+    : ShapeUtils.triangulateShape([...top], [])
+  for (const [a, b, c] of topTriangles)
     emit(
       top[a],
       settings.height,

@@ -5,6 +5,10 @@ import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js'
 import originalAsset from '../../resources/stl-files/cmf-speaker-sm-3d-printing-knob-original-v1.stl?url'
 import { shapedKnobGeometry } from './shaped-knob-geometry'
 import {
+  prepareTextKnobContours,
+  type TextKnobContours,
+} from './text-knob-contours'
+import {
   KNOB_MOUNT_HEIGHT,
   KNOB_BASE_HEIGHT,
   normalizeKnobSettings,
@@ -197,6 +201,7 @@ function refinedSource(original: BufferGeometry, detailed: boolean) {
 export function customizeKnobGeometry(
   original: BufferGeometry,
   input: Partial<KnobSettings>,
+  text?: TextKnobContours,
 ): BufferGeometry {
   const settings = normalizeKnobSettings(input)
   original.computeBoundingBox()
@@ -205,12 +210,13 @@ export function customizeKnobGeometry(
   const shaped =
     settings.style === 'triangle' ||
     settings.style === 'arrow' ||
-    settings.style === 'v'
+    settings.style === 'v' ||
+    settings.style === 'text'
   const patterned = settings.style === 'fluted' || settings.style === 'hex'
   const modified =
     patterned || settings.height !== dimensions.z || settings.taper !== 0
   const geometry = shaped
-    ? shapedKnobGeometry(refinedSource(original, false), settings)
+    ? shapedKnobGeometry(refinedSource(original, false), settings, text)
     : (modified
         ? refinedSource(original, patterned || settings.taper !== 0)
         : original
@@ -321,9 +327,12 @@ export async function buildKnobGeometry(
   }
   // Cached loads are shared by both previews. Aborting one caller must not
   // cancel the other or poison the cache; it only discards that caller's work.
-  const original = await source
+  const [original, text] = await Promise.all([
+    source,
+    settings.style === 'text' ? prepareTextKnobContours(settings) : undefined,
+  ])
   signal?.throwIfAborted()
-  return customizeKnobGeometry(original, settings)
+  return customizeKnobGeometry(original, settings, text)
 }
 
 export function prepareKnobExportGeometry(
@@ -350,16 +359,25 @@ export function exportKnobStl(geometry: BufferGeometry): ArrayBuffer {
 
 export function knobFilename(input: KnobSettings): string {
   const settings = normalizeKnobSettings(input)
+  const textLabel = Array.from(settings.text)
+    .map((character) =>
+      /^[a-z0-9]$/i.test(character)
+        ? character
+        : `u${character.codePointAt(0)!.toString(16)}`,
+    )
+    .join('')
   const pattern =
-    settings.style === 'fluted'
-      ? `-${settings.flutePath}-${settings.fluteCount}-flutes-${settings.fluteDepth.toFixed(1)}mm`
-      : settings.style === 'hex'
-        ? `-${settings.facets}-faces`
-        : settings.style === 'triangle' ||
-            settings.style === 'arrow' ||
-            settings.style === 'v'
-          ? `-width-${settings.gripWidth.toFixed(1)}mm-depth-${settings.gripDepth.toFixed(1)}mm${settings.style === 'triangle' ? '' : `-stroke-${settings.gripThickness.toFixed(1)}mm`}`
-          : ''
+    settings.style === 'text'
+      ? `-${textLabel}-${settings.fontId}-${settings.fontWeight}`
+      : settings.style === 'fluted'
+        ? `-${settings.flutePath}-${settings.fluteCount}-flutes-${settings.fluteDepth.toFixed(1)}mm`
+        : settings.style === 'hex'
+          ? `-${settings.facets}-faces`
+          : settings.style === 'triangle' ||
+              settings.style === 'arrow' ||
+              settings.style === 'v'
+            ? `-width-${settings.gripWidth.toFixed(1)}mm-depth-${settings.gripDepth.toFixed(1)}mm${settings.style === 'triangle' ? '' : `-stroke-${settings.gripThickness.toFixed(1)}mm`}`
+            : ''
   const taper =
     settings.taper > 0 ? `-taper-${settings.taper.toFixed(1)}mm` : ''
   const label = settings.style === 'hex' ? 'faceted' : settings.style

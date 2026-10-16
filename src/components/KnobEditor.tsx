@@ -1,3 +1,4 @@
+import { useId, useState } from 'react'
 import { useNumericDraft } from '@/lib/use-numeric-draft'
 import { Check, RotateCcw, SlidersHorizontal } from 'lucide-react'
 import { ColorPicker } from '@/components/ColorPicker'
@@ -11,6 +12,45 @@ import {
   type KnobNumericKey,
   type KnobSettings,
 } from '@/lib/knob-settings'
+import { validateKnobText } from '@/lib/knob-text'
+import {
+  PATTERN_FONTS,
+  PATTERN_FONT_WEIGHT_LABELS,
+  getPatternFont,
+  nearestPatternFontWeight,
+  type PatternFontId,
+  type PatternFontWeight,
+} from '@/lib/multicolor-font-catalog'
+
+const FONT_GROUPS = Array.from(
+  new Set(PATTERN_FONTS.map((font) => font.category)),
+).map((category) => ({
+  category,
+  fonts: PATTERN_FONTS.filter((font) => font.category === category).sort(
+    (left, right) => left.name.localeCompare(right.name),
+  ),
+}))
+
+type KnobTextSettings = Pick<KnobSettings, 'text' | 'fontId' | 'fontWeight'>
+
+function textSettings(value: KnobSettings): KnobTextSettings {
+  return {
+    text: value.text,
+    fontId: value.fontId,
+    fontWeight: value.fontWeight,
+  }
+}
+
+function textError(value: KnobTextSettings) {
+  try {
+    validateKnobText(value.text, value.fontId, value.fontWeight)
+    return null
+  } catch (error) {
+    return error instanceof Error
+      ? error.message
+      : 'Choose one or two visible characters.'
+  }
+}
 
 interface Props {
   value: KnobSettings
@@ -129,24 +169,49 @@ function RibPatternIcon({
 }
 
 export function KnobEditor({ value, onChange, color, onColorChange }: Props) {
+  const textHintId = useId()
+  const textErrorId = useId()
+  const fontWeightHintId = useId()
+  const [previousText, setPreviousText] = useState(() => textSettings(value))
+  const [textDraft, setTextDraft] = useState(() => textSettings(value))
+  if (
+    previousText.text !== value.text ||
+    previousText.fontId !== value.fontId ||
+    previousText.fontWeight !== value.fontWeight
+  ) {
+    setPreviousText(textSettings(value))
+    setTextDraft(textSettings(value))
+  }
   const limits = getKnobLimits(value)
   const defaults = getDefaultKnobSettings(value.style)
   const selected = KNOB_STYLES.find((style) => style.id === value.style)!
   const set = (patch: Partial<KnobSettings>) =>
     onChange(normalizeKnobSettings({ ...value, ...patch }))
-  const hasCustomGrip = (
-    [
-      'height',
-      'taper',
-      'fluteCount',
-      'fluteDepth',
-      'flutePath',
-      'facets',
-      'gripWidth',
-      'gripDepth',
-      'gripThickness',
-    ] as const
-  ).some((key) => value[key] !== defaults[key])
+  const editText = (patch: Partial<KnobTextSettings>) => {
+    const next = { ...textDraft, ...patch }
+    setTextDraft(next)
+    if (!textError(next)) set(next)
+  }
+  const selectedFont = getPatternFont(textDraft.fontId)
+  const invalidText = value.style === 'text' ? textError(textDraft) : null
+  const hasCustomGrip =
+    Boolean(invalidText) ||
+    (
+      [
+        'height',
+        'taper',
+        'fluteCount',
+        'fluteDepth',
+        'flutePath',
+        'facets',
+        'gripWidth',
+        'gripDepth',
+        'gripThickness',
+        'text',
+        'fontId',
+        'fontWeight',
+      ] as const
+    ).some((key) => value[key] !== defaults[key])
   const parameter = (
     key: KnobNumericKey,
     label: string,
@@ -222,7 +287,10 @@ export function KnobEditor({ value, onChange, color, onColorChange }: Props) {
             className="text-button"
             type="button"
             disabled={!hasCustomGrip}
-            onClick={() => onChange(defaults)}
+            onClick={() => {
+              setTextDraft(textSettings(defaults))
+              onChange(defaults)
+            }}
           >
             <RotateCcw size={13} aria-hidden="true" /> Reset grip
           </button>
@@ -233,6 +301,96 @@ export function KnobEditor({ value, onChange, color, onColorChange }: Props) {
           </span>
           <span>Fixed base and socket</span>
         </div>
+        {value.style === 'text' && (
+          <div className="knob-text-controls">
+            <label className="knob-text-field">
+              <span>Knob text</span>
+              <input
+                type="text"
+                value={textDraft.text}
+                aria-invalid={Boolean(invalidText) || undefined}
+                aria-describedby={`${textHintId}${invalidText ? ` ${textErrorId}` : ''}`}
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(event) => editText({ text: event.target.value })}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.stopPropagation()
+                    setTextDraft(textSettings(value))
+                  }
+                  if (event.key === 'Enter') event.currentTarget.blur()
+                }}
+              />
+            </label>
+            <p id={textHintId} className="knob-parameter-note">
+              Enter one or two characters. Text is centered and scaled
+              automatically to fit the knob.
+            </p>
+            <label className="knob-text-field">
+              <span>Text font</span>
+              <select
+                value={textDraft.fontId}
+                onChange={(event) => {
+                  const fontId = event.target.value as PatternFontId
+                  editText({
+                    fontId,
+                    fontWeight: nearestPatternFontWeight(
+                      fontId,
+                      textDraft.fontWeight,
+                    ),
+                  })
+                }}
+              >
+                {FONT_GROUPS.map(({ category, fonts }) => (
+                  <optgroup key={category} label={category}>
+                    {fonts.map((font) => (
+                      <option key={font.id} value={font.id}>
+                        {font.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+            <label className="knob-text-field">
+              <span>Font weight</span>
+              <select
+                value={textDraft.fontWeight}
+                disabled={selectedFont.weights.length === 1}
+                aria-describedby={
+                  selectedFont.weights.length === 1
+                    ? fontWeightHintId
+                    : undefined
+                }
+                onChange={(event) =>
+                  editText({
+                    fontWeight: Number(event.target.value) as PatternFontWeight,
+                  })
+                }
+              >
+                {selectedFont.weights.map((weight) => (
+                  <option key={weight} value={weight}>
+                    {PATTERN_FONT_WEIGHT_LABELS[weight]} ({weight})
+                  </option>
+                ))}
+              </select>
+            </label>
+            {selectedFont.weights.length === 1 && (
+              <p id={fontWeightHintId} className="knob-parameter-note">
+                {selectedFont.name} is available in{' '}
+                {PATTERN_FONT_WEIGHT_LABELS[
+                  selectedFont.weights[0]
+                ].toLowerCase()}{' '}
+                weight only.
+              </p>
+            )}
+            {invalidText && (
+              <p id={textErrorId} className="knob-text-error" role="alert">
+                {invalidText} Preview and export use the last valid text.
+              </p>
+            )}
+          </div>
+        )}
         {parameter('height', 'Knob height')}
         {parameter('taper', 'Grip taper', { step: 0.1 })}
         <p className="knob-parameter-note">

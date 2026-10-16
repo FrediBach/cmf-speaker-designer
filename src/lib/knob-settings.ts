@@ -1,5 +1,21 @@
+import {
+  PATTERN_FONTS,
+  nearestPatternFontWeight,
+  type PatternFontId,
+  type PatternFontWeight,
+} from './multicolor-font-catalog'
+import { validateKnobText } from './knob-text'
+
 export type KnobStyle =
-  'ring' | 'bar' | 'cross' | 'fluted' | 'hex' | 'triangle' | 'arrow' | 'v'
+  | 'ring'
+  | 'bar'
+  | 'cross'
+  | 'fluted'
+  | 'hex'
+  | 'triangle'
+  | 'arrow'
+  | 'v'
+  | 'text'
 export type KnobFlutePath = 'straight' | 'spiral' | 'chevron'
 
 export interface KnobSettings {
@@ -13,9 +29,15 @@ export interface KnobSettings {
   gripWidth: number
   gripDepth: number
   gripThickness: number
+  text: string
+  fontId: PatternFontId
+  fontWeight: PatternFontWeight
 }
 
-export type KnobNumericKey = Exclude<keyof KnobSettings, 'style' | 'flutePath'>
+export type KnobNumericKey = Exclude<
+  keyof KnobSettings,
+  'style' | 'flutePath' | 'text' | 'fontId' | 'fontWeight'
+>
 export type KnobLimits = Record<KnobNumericKey, { min: number; max: number }>
 
 export const KNOB_STYLES: readonly {
@@ -73,6 +95,12 @@ export const KNOB_STYLES: readonly {
       'An open V-shaped grip with adjustable proportions and stroke width.',
     collection: 'studio',
   },
+  {
+    id: 'text',
+    label: 'Text',
+    description: 'One or two characters, automatically fitted to the knob.',
+    collection: 'studio',
+  },
 ]
 
 export const DEFAULT_KNOB_SETTINGS: KnobSettings = {
@@ -86,6 +114,9 @@ export const DEFAULT_KNOB_SETTINGS: KnobSettings = {
   gripWidth: 13,
   gripDepth: 12,
   gripThickness: 3,
+  text: 'A',
+  fontId: 'inter',
+  fontWeight: 700,
 }
 
 /** The source mounting stem, blind socket, and complete base stay unchanged. */
@@ -146,6 +177,21 @@ export function normalizeKnobSettings(
     ? input.style!
     : DEFAULT_KNOB_SETTINGS.style
   const defaults = getDefaultKnobSettings(style)
+  const fontId = PATTERN_FONTS.some(({ id }) => id === input.fontId)
+    ? input.fontId!
+    : defaults.fontId
+  const fontWeight = nearestPatternFontWeight(
+    fontId,
+    typeof input.fontWeight === 'number' && Number.isFinite(input.fontWeight)
+      ? input.fontWeight
+      : defaults.fontWeight,
+  )
+  let text = input.text ?? defaults.text
+  try {
+    validateKnobText(text, fontId, fontWeight)
+  } catch {
+    text = defaults.text
+  }
   const limits = getKnobLimits({ style, gripWidth: 8, gripDepth: 8 })
   const number = (key: KnobNumericKey) => {
     const value = input[key]
@@ -167,6 +213,9 @@ export function normalizeKnobSettings(
   }
   return {
     style,
+    text,
+    fontId,
+    fontWeight,
     height: number('height'),
     taper: number('taper'),
     fluteCount: Math.round(number('fluteCount')),

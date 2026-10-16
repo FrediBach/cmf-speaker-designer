@@ -1,5 +1,6 @@
 import { PALETTE, validateDesign, type Design } from './design'
 import { KNOB_STYLES } from './knob-settings'
+import { PATTERN_FONTS } from './multicolor-font-catalog'
 
 /** Generate a fresh design; only the selected speaker version carries over. */
 export function randomizeDesign(
@@ -92,6 +93,9 @@ export function randomizeDesign(
       gripWidth: range(8, 16, 0.5),
       gripDepth: range(8, 16, 0.5),
       gripThickness: range(2, 5, 0.5),
+      text: pick(['A', 'B', 'S', 'M', 'X', 'GO', 'HI', '01']),
+      fontId: pick(PATTERN_FONTS).id,
+      fontWeight: pick([400, 700, 800] as const),
     },
   })
   // Keep randomized patterns modest; explicit IDs preserve seeded reproducibility.

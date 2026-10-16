@@ -69,6 +69,21 @@ function artworkDesign(): Design {
 }
 
 describe('progressive design variations', () => {
+  it('retains the selected character face in subtle knob variations', () => {
+    const base = validateDesign({
+      ...DEFAULT_DESIGN,
+      knob: { style: 'text', text: 'FB', fontId: 'inter', fontWeight: 300 },
+    })
+    const variations = createDesignVariations(base, seededRandom(4281))
+    for (const variation of variations.filter(({ ring }) => ring === 1))
+      expect(variation.design.knob).toMatchObject({
+        style: 'text',
+        text: 'FB',
+        fontId: 'inter',
+        fontWeight: 300,
+      })
+  })
+
   it('retries a rejected panel with proven source geometry while retaining candidate appearance and knob', () => {
     const base = artworkDesign()
     const candidate = createDesignVariations(base, seededRandom(4281)).at(

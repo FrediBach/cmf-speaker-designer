@@ -88,7 +88,7 @@ Choose **Black** or **Gray** under **Speaker body**, next to the model selection
 - Compose multicolor stripes, crosses, circles/rings, polygons, imported SVGs, and text with arbitrary colors, editable flag presets, a front-view canvas, and numeric controls.
 - Change built-in cutout size, spacing, and position, with dependent dimensions constrained to retain at least 3 mm of material between openings and around their closed edges.
 - Keep your current design locally and copy a link to share a configuration.
-- Select the supplied ring, bar, and cross volume knobs, or generate fluted, faceted, triangle, arrow, and V grips.
+- Select the supplied ring, bar, and cross volume knobs, or generate fluted, faceted, triangle, arrow, V, and automatically sized text grips.
 - Keep the original STL base diameter, collar, and socket fixed; shape the upper grip with height and inward taper.
 - Generate straight, spiral, or chevron flutes with adjustable count and depth, or choose the number of faces on a faceted grip.
 - Inspect the knob at full size in a dedicated preview, or see it mounted on either speaker.
@@ -186,11 +186,13 @@ Choose the **Power button** color in the Front panel tab using palette swatches 
 
 ## Volume knobs
 
-The **Knob** tab selects Ring, Bar, Cross, Fluted, Faceted, Triangle, Arrow, or V. Ring, Bar, and Cross come from the supplied original collection. Fluted and Faceted are additional grip shapes derived from the original ring mesh. Triangle, Arrow, and V add raised grips to the original mounting base. Color presets and a custom picker work independently of the front panel, and the selected shape, dimensions, and color are retained in saved designs and share links. Existing links without knob settings open with the Bar knob.
+The **Knob** tab selects Ring, Bar, Cross, Fluted, Faceted, Triangle, Arrow, V, or Text. Ring, Bar, and Cross come from the supplied original collection. Fluted and Faceted are additional grip shapes derived from the original ring mesh. Triangle, Arrow, V, and Text add raised grips to the original mounting base. Color presets and a custom picker work independently of the front panel, and the selected shape, dimensions, and color are retained in saved designs and share links. Existing links without knob settings open with the Bar knob.
 
 Selecting the Knob tab opens the close-up **Knob only** preview. Use **Speaker** or **Exploded** to inspect it alongside the panel. The base diameter, entire lower collar, mounting stem, and internal socket remain at their original STL dimensions. There is no diameter or rigid rotation control; old saved values for these are discarded when a design opens. Only the grip above the collar changes. Adjust its height and inward taper; Fluted grips offer Straight, Spiral, and Chevron paths with flute count and depth, while Faceted grips offer an adjustable face count. Generative details stay within the original outer diameter. Unmodified supplied styles retain their exact source geometry. The Heart from the larger collection has different mounting dimensions and is no longer offered; saved Heart selections open as Bar. Preview and export use the same mesh, with dimensions measured from it; each knob STL contains one part, with its lowest point at Z=0. Check fit, grip clearance, and printing supports with a test print.
 
 Triangle, Arrow, and V also offer **Grip width** and **Grip depth**, measured across the grip at the collar. Their limits adjust together to keep the entire shape inside the original 18 mm base. Arrow adds **Shaft width**, and V adds **Stroke width** measured across each arm; the V stroke limit keeps its center open. **Reset grip** restores the selected shape's default dimensions. These controls work with saved designs, shared links, random designs, and all knob export formats.
+
+**Text** turns one or two visible characters into a raised grip. Choose from the same bundled fonts and real font weights as multicolor text. The outlines are centered and scaled proportionally to fit inside the circular collar, including wide pairs, narrow letters, holes, and dots. **Knob height** and **Grip taper** control the extrusion; font size is automatic. Unsupported characters and invalid drafts show an inline explanation while preview and export retain the last valid text. Characters and font settings are included in saved designs, share links, undo/redo, and export metadata.
 
 ## Export and design files
 

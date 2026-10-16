@@ -134,7 +134,11 @@ function mixDesign(
     handle: mixSettings(base.handle, target.handle, strength, changes(0)),
     grille: mixSettings(base.grille, target.grille, strength, changes(1)),
     halo: mixSettings(base.halo, target.halo, strength, changes(2)),
-    knob: mixSettings(base.knob, target.knob, strength, changes(3)),
+    knob: {
+      ...mixSettings(base.knob, target.knob, strength, changes(3)),
+      // Font weights select real faces; they are not continuous dimensions.
+      fontWeight: changes(3) ? target.knob.fontWeight : base.knob.fontWeight,
+    },
     raceStripes: mixSettings(
       base.raceStripes,
       target.raceStripes,

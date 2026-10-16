@@ -7,6 +7,8 @@ import {
   normalizeKnobSettings,
   type KnobNumericKey,
 } from './knob-settings'
+import { validateKnobText } from './knob-text'
+import { PATTERN_FONTS } from './multicolor-font-catalog'
 
 const newStyles = ['triangle', 'arrow', 'v'] as const
 
@@ -22,12 +24,74 @@ describe('parametric knob settings', () => {
       facets: 8,
     } as const
     expect(normalizeKnobSettings(legacy)).toEqual({
+      ...DEFAULT_KNOB_SETTINGS,
       ...legacy,
       gripWidth: 13,
       gripDepth: 12,
       gripThickness: 3,
     })
     expect(normalizeKnobSettings()).toEqual(DEFAULT_KNOB_SETTINGS)
+  })
+
+  it('fits text settings into the same height and taper limits as other grips', () => {
+    const settings = normalizeKnobSettings({
+      style: 'text',
+      text: 'AB',
+      fontId: 'inter',
+      fontWeight: 800,
+      height: 100,
+      taper: 2,
+    })
+    expect(settings).toMatchObject({
+      style: 'text',
+      text: 'AB',
+      fontId: 'inter',
+      fontWeight: 800,
+      height: 24,
+      taper: 1,
+    })
+    expect(normalizeKnobSettings(settings)).toEqual(settings)
+  })
+
+  it('accepts one or two supported visible characters without substituting glyphs', () => {
+    for (const text of ['A', 'AB', 'i', '8', '&', 'é'])
+      expect(() => validateKnobText(text, 'inter', 700)).not.toThrow()
+    for (const text of ['', 'ABC', ' ', 'A ', 'A\n', '\u200b', '😀'])
+      expect(() => validateKnobText(text, 'inter', 700)).toThrow()
+    expect(() => validateKnobText('A', 'droid-sans-mono', 700)).toThrow(
+      /weight/,
+    )
+  })
+
+  it('recovers malformed saved text and maps weights to real bundled faces', () => {
+    for (const text of ['', 'ABC', ' ', '😀', 123, {}, null]) {
+      expect(
+        normalizeKnobSettings({ style: 'text', text: text as never }),
+      ).toMatchObject({
+        style: 'text',
+        text: 'A',
+      })
+    }
+    for (const { id, weights } of PATTERN_FONTS) {
+      const settings = normalizeKnobSettings({
+        style: 'text',
+        fontId: id,
+        fontWeight: 900,
+      })
+      expect(weights).toContain(settings.fontWeight)
+      expect(() =>
+        validateKnobText(settings.text, id, settings.fontWeight),
+      ).not.toThrow()
+    }
+    expect(
+      normalizeKnobSettings({
+        fontId: 'missing' as never,
+        fontWeight: NaN as never,
+      }),
+    ).toMatchObject({
+      fontId: 'inter',
+      fontWeight: 700,
+    })
   })
 
   it.each(newStyles)(

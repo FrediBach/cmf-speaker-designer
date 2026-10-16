@@ -2660,6 +2660,46 @@ main {
   font-size: 13px;
   line-height: 1.5;
 }
+.knob-text-controls {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+.knob-text-field {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+  min-width: 0;
+  font-size: 13px;
+}
+.knob-text-field input,
+.knob-text-field select {
+  min-width: 0;
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid var(--control-border);
+  border-radius: 3px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 14px;
+}
+.knob-text-field input {
+  font-size: 20px;
+}
+.knob-text-field input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+.knob-text-field select:disabled {
+  opacity: 0.6;
+}
+.knob-text-error {
+  margin: 4px 0 0;
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
 .knob-pattern-heading {
   margin: 20px 0 10px;
   font-size: 15px;

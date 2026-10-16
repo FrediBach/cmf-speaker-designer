@@ -21,6 +21,9 @@ import {
   knobFilename,
   parseKnobGeometry,
 } from './knobs'
+import { prepareTextKnobContours, TEXT_KNOB_RADIUS } from './text-knob-contours'
+import { getTextContours } from './multicolor-fonts'
+import { PATTERN_FONTS } from './multicolor-font-catalog'
 
 function asset() {
   const data = readFileSync(
@@ -130,7 +133,7 @@ function gripRadius(geometry: BufferGeometry, angle: number, z = 12) {
 describe('volume knobs', () => {
   it.each(KNOB_STYLES.map(({ id }) => id))(
     '%s preview and exported STL remain one closed printable solid',
-    (style) => {
+    async (style) => {
       const original = parseKnobGeometry(originals, style)
       for (const values of [
         { height: 16, taper: 0, fluteCount: 16, fluteDepth: 0.8, facets: 6 },
@@ -151,7 +154,10 @@ describe('volume knobs', () => {
           facets: 12,
         },
       ]) {
-        const geometry = customizeKnobGeometry(original, { style, ...values })
+        const settings = normalizeKnobSettings({ style, ...values })
+        const text =
+          style === 'text' ? await prepareTextKnobContours(settings) : undefined
+        const geometry = customizeKnobGeometry(original, settings, text)
         const inspection = topology(geometry)
         expect(inspection.invalidEdges).toBe(0)
         expect(inspection.components).toBe(1)
@@ -161,7 +167,9 @@ describe('volume knobs', () => {
         // Shaped grips retriangulate the horizontal base-top cap, whose
         // original Float32 vertices sit slightly below nominal 8 mm.
         // All lower collar and mounting vertices remain byte-exact.
-        const ceiling = ['triangle', 'arrow', 'v'].includes(style) ? 7.99999 : 8
+        const ceiling = ['triangle', 'arrow', 'v', 'text'].includes(style)
+          ? 7.99999
+          : 8
         expect(baseVertices(geometry, ceiling)).toEqual(
           baseVertices(original, ceiling),
         )
@@ -307,6 +315,144 @@ describe('volume knobs', () => {
     ).toContain(
       'v-height-16.0mm-width-13.0mm-depth-12.0mm-stroke-3.0mm-taper-1.0mm',
     )
+  })
+
+  it.each(['BO', 'ij', 'WW', 'I', '@', 'é'])(
+    'joins text %s, including counters and detached pieces, into one watertight STL',
+    async (text) => {
+      const original = parseKnobGeometry(originals, 'text')
+      for (const taper of [0, 1]) {
+        const settings = normalizeKnobSettings({
+          style: 'text',
+          text,
+          height: 24,
+          taper,
+        })
+        const contours = await prepareTextKnobContours(settings)
+        const geometry = customizeKnobGeometry(original, settings, contours)
+        const inspection = topology(geometry)
+        expect(inspection.invalidEdges).toBe(0)
+        expect(inspection.components).toBe(1)
+        expect(inspection.volume).toBeGreaterThan(250)
+        expect(baseVertices(geometry, 7.99999)).toEqual(
+          baseVertices(original, 7.99999),
+        )
+        expect(hitsFromBottom(geometry, 0.17, 0.23)[0]).toBe(4.7)
+        expect(geometry.boundingBox!.max.z).toBe(24)
+        const exported = new STLLoader().parse(exportKnobStl(geometry))
+        expect(topology(exported)).toEqual(inspection)
+        geometry.dispose()
+        exported.dispose()
+      }
+      original.dispose()
+    },
+  )
+
+  it('fits narrow and wide character pairs proportionally to the same collar', async () => {
+    for (const text of ['I', 'WW', 'ij', 'BO']) {
+      const settings = normalizeKnobSettings({ style: 'text', text })
+      const original = getTextContours(
+        text,
+        settings.fontId,
+        1,
+        settings.fontWeight,
+      )
+      const prepared = await prepareTextKnobContours(settings)
+      const extents = (points: { x: number; y: number }[]) => ({
+        minX: Math.min(...points.map(({ x }) => x)),
+        maxX: Math.max(...points.map(({ x }) => x)),
+        minY: Math.min(...points.map(({ y }) => y)),
+        maxY: Math.max(...points.map(({ y }) => y)),
+      })
+      const before = extents(original.flat().map(([x, y]) => ({ x, y })))
+      const after = extents(prepared.contours.flat())
+      expect((after.maxX - after.minX) / (after.maxY - after.minY)).toBeCloseTo(
+        (before.maxX - before.minX) / (before.maxY - before.minY),
+        5,
+      )
+      expect(after.minX + after.maxX).toBeCloseTo(0, 6)
+      expect(after.minY + after.maxY).toBeCloseTo(0, 6)
+      expect(
+        Math.max(
+          ...prepared.contours.flat().map(({ x, y }) => Math.hypot(x, y)),
+        ),
+      ).toBeCloseTo(TEXT_KNOB_RADIUS, 5)
+    }
+  })
+
+  it('keeps letter counters open down to the collar and applies text taper independently of shaped-grip dimensions', async () => {
+    const original = parseKnobGeometry(originals, 'text')
+    const settings = normalizeKnobSettings({
+      style: 'text',
+      text: 'O',
+      height: 20,
+    })
+    const contours = await prepareTextKnobContours(settings)
+    const normal = customizeKnobGeometry(original, settings, contours)
+    expect(hitsFromBottom(normal, 0.17, 0.23)).toEqual([4.7, 8])
+    const tapered = customizeKnobGeometry(
+      original,
+      { ...settings, taper: 1 },
+      contours,
+    )
+    const unrelated = customizeKnobGeometry(
+      original,
+      {
+        ...settings,
+        taper: 1,
+        gripWidth: 8,
+        gripDepth: 16,
+      },
+      contours,
+    )
+    expect(unrelated.getAttribute('position').array).toEqual(
+      tapered.getAttribute('position').array,
+    )
+    expect(topology(tapered).volume).toBeLessThan(topology(normal).volume)
+    const radiusAt = (geometry: BufferGeometry, z: number) => {
+      const p = geometry.getAttribute('position')
+      let radius = 0
+      for (let i = 0; i < p.count; i += 1)
+        if (p.getZ(i) === z)
+          radius = Math.max(radius, Math.hypot(p.getX(i), p.getY(i)))
+      return radius
+    }
+    expect(radiusAt(normal, 20)).toBeCloseTo(TEXT_KNOB_RADIUS, 5)
+    expect(radiusAt(tapered, 20)).toBeCloseTo(TEXT_KNOB_RADIUS - 1, 5)
+    for (const geometry of [original, normal, tapered, unrelated])
+      geometry.dispose()
+  })
+
+  it.each(PATTERN_FONTS)(
+    'builds printable contours in $name at every available weight',
+    async ({ id, weights }) => {
+      const original = parseKnobGeometry(originals, 'text')
+      for (const fontWeight of weights) {
+        const settings = normalizeKnobSettings({
+          style: 'text',
+          text: 'B@',
+          fontId: id,
+          fontWeight,
+        })
+        const contours = await prepareTextKnobContours(settings)
+        const geometry = customizeKnobGeometry(original, settings, contours)
+        expect(topology(geometry)).toMatchObject({
+          invalidEdges: 0,
+          components: 1,
+        })
+        geometry.dispose()
+      }
+      original.dispose()
+    },
+  )
+
+  it('includes characters, font and weight in safe text-knob filenames', () => {
+    expect(
+      knobFilename(normalizeKnobSettings({ style: 'text', text: 'AB' })),
+    ).toContain('text-height-16.0mm-AB-inter-700')
+    expect(
+      knobFilename(normalizeKnobSettings({ style: 'text', text: '/?' })),
+    ).toContain('-u2fu3f-')
   })
 
   it('ignores legacy diameter and rigid rotation without changing the original source', () => {

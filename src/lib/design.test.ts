@@ -749,6 +749,36 @@ describe('saved and shared handle designs', () => {
     ).toEqual(DEFAULT_KNOB_SETTINGS)
   })
 
+  it('restores text knob characters, font, weight, and dimensions from JSON, storage, and share links', () => {
+    const design = validateDesign({
+      knob: {
+        style: 'text',
+        text: 'B8',
+        fontId: 'space-mono',
+        fontWeight: 700,
+        height: 20,
+        taper: 0.5,
+      },
+    })
+    expect(design.knob).toMatchObject({
+      style: 'text',
+      text: 'B8',
+      fontId: 'space-mono',
+      fontWeight: 700,
+      height: 20,
+      taper: 0.5,
+    })
+    const serialized = JSON.stringify(design)
+    expect(parseDesignJson(serialized)).toEqual(design)
+    vi.stubGlobal('window', { location: { search: '' } })
+    vi.stubGlobal('localStorage', { getItem: () => serialized })
+    expect(readDesign()).toEqual(design)
+    vi.stubGlobal('window', {
+      location: designShareUrl(design, 'https://example.com/designer/'),
+    })
+    expect(readDesign()).toEqual(design)
+  })
+
   it('restores a shared grille alongside a custom handle in custom panel mode', () => {
     const custom = validateDesign({
       ...DEFAULT_DESIGN,

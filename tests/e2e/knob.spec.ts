@@ -159,7 +159,7 @@ function inspectFacetedStep(binary: Buffer) {
   return { minimum, maximum }
 }
 
-test('selects all eight knobs and renders each in the focused preview', async ({
+test('selects all nine knobs and renders each in the focused preview', async ({
   page,
 }, testInfo) => {
   await page.goto('/')
@@ -182,6 +182,7 @@ test('selects all eight knobs and renders each in the focused preview', async ({
     ['triangle', 'Triangle'],
     ['arrow', 'Arrow'],
     ['v', 'V'],
+    ['text', 'Text'],
   ]) {
     const option = page.getByRole('button', {
       name: `${label} knob`,
@@ -202,7 +203,7 @@ test('selects all eight knobs and renders each in the focused preview', async ({
     frames.add(screenshot.toString('base64'))
   }
   expect(frames.size, 'Each selected grip should render a different mesh').toBe(
-    8,
+    9,
   )
   await page
     .getByRole('group', { name: 'Preview mode' })
@@ -211,6 +212,152 @@ test('selects all eight knobs and renders each in the focused preview', async ({
   await page.screenshot({
     path: testInfo.outputPath('selected-knob-assembled.png'),
   })
+})
+
+test('text knobs validate characters, fit font outlines, and preserve edits in exports and saved links', async ({
+  page,
+  context,
+}, testInfo) => {
+  await page.goto('/')
+  await expectReady(page)
+  await page.getByRole('tab', { name: 'Knob', exact: true }).click()
+  const option = page.getByRole('button', { name: 'Text knob', exact: true })
+  await option.click()
+  const editor = page.getByRole('tabpanel', { name: 'Knob', exact: true })
+  const text = editor.getByRole('textbox', { name: 'Knob text', exact: true })
+  const font = editor.getByRole('combobox', { name: 'Text font', exact: true })
+  const weight = editor.getByRole('combobox', {
+    name: 'Font weight',
+    exact: true,
+  })
+  const reset = editor.getByRole('button', { name: 'Reset grip', exact: true })
+  await expect(text).toHaveValue('A')
+  await expect(font).toHaveValue('inter')
+  await expect(weight).toHaveValue('700')
+  await expect(reset).toBeDisabled()
+  await expectFixedFitControls(page)
+  const original = await downloadKnob(page, testInfo, 'text-default')
+
+  for (const invalid of ['', 'ABC', '猫']) {
+    await text.fill(invalid)
+    await expect(text).toHaveValue(invalid)
+    await expect(text).toHaveAttribute('aria-invalid', 'true')
+    await expect(editor.getByRole('alert')).toContainText(
+      'Preview and export use the last valid text.',
+    )
+  }
+  await expect(editor.getByRole('alert')).toContainText('does not include')
+  const unchanged = await downloadKnob(page, testInfo, 'text-invalid-draft')
+  expect(unchanged.binary).toEqual(original.binary)
+  await text.press('Escape')
+  await expect(text).toHaveValue('A')
+  await expect(editor.getByRole('alert')).toHaveCount(0)
+
+  await font.selectOption('droid-sans-mono')
+  await expect(weight).toHaveValue('400')
+  await expect(weight).toBeDisabled()
+  await expect(
+    editor.getByText('Droid Sans Mono is available in regular weight only.'),
+  ).toBeVisible()
+  await font.selectOption('inter')
+  await weight.selectOption('500')
+  await font.selectOption('helvetiker')
+  await expect(weight).toHaveValue('400')
+  await expect(weight.locator('option')).toHaveCount(2)
+
+  await font.selectOption('space-mono')
+  await weight.selectOption('700')
+  await text.fill('FB')
+  await editor
+    .getByRole('spinbutton', {
+      name: 'Knob height in millimeters',
+      exact: true,
+    })
+    .fill('19')
+  await editor
+    .getByRole('spinbutton', { name: 'Grip taper in millimeters', exact: true })
+    .fill('0.4')
+  await expect(reset).toBeEnabled()
+  const edited = await downloadKnob(page, testInfo, 'text-FB-space-mono')
+  expect(surfaceVertices(edited.binary, 'base', 7.99999)).toEqual(
+    surfaceVertices(original.binary, 'base', 7.99999),
+  )
+  expect(surfaceVertices(edited.binary, 'grip')).not.toEqual(
+    surfaceVertices(original.binary, 'grip'),
+  )
+  const mesh = inspectBinaryStl(edited.binary)
+  expect(mesh.components).toBe(1)
+  expect(mesh.invalidEdges).toBe(0)
+  expect(mesh.degenerateEdges).toBe(0)
+  expect(mesh.signedVolume).toBeGreaterThan(0)
+  expect(mesh.minimum[2]).toBeCloseTo(0, 5)
+  expect(mesh.maximum[2]).toBeCloseTo(19, 3)
+  expect(mesh.maximum[0] - mesh.minimum[0]).toBeCloseTo(18, 3)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await text.scrollIntoViewIfNeeded()
+  await page.screenshot({
+    path: testInfo.outputPath('mobile-text-knob-controls.png'),
+  })
+  const dimensions = await page.evaluate(() => ({
+    width: document.documentElement.clientWidth,
+    contentWidth: document.documentElement.scrollWidth,
+    height: window.innerHeight,
+    contentHeight: document.documentElement.scrollHeight,
+  }))
+  expect(dimensions.contentWidth).toBeLessThanOrEqual(dimensions.width + 1)
+  expect(dimensions.contentHeight).toBeLessThanOrEqual(dimensions.height + 1)
+
+  await page.reload()
+  await expectReady(page)
+  await page.getByRole('tab', { name: 'Knob', exact: true }).click()
+  await expect(option).toHaveAttribute('aria-pressed', 'true')
+  await expect(text).toHaveValue('FB')
+  await expect(font).toHaveValue('space-mono')
+  await expect(weight).toHaveValue('700')
+  await expect(
+    editor.getByRole('spinbutton', {
+      name: 'Knob height in millimeters',
+      exact: true,
+    }),
+  ).toHaveValue('19')
+  await expect(
+    editor.getByRole('spinbutton', {
+      name: 'Grip taper in millimeters',
+      exact: true,
+    }),
+  ).toHaveValue('0.4')
+  const reloaded = await downloadKnob(page, testInfo, 'text-reloaded')
+  expect(reloaded.binary).toEqual(edited.binary)
+
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await page
+    .getByRole('button', { name: 'Copy design link', exact: true })
+    .click()
+  await expect(page.getByRole('status')).toContainText('Design link copied.')
+  const link = await page.evaluate(() => navigator.clipboard.readText())
+  const shared = JSON.parse(new URL(link).searchParams.get('design')!)
+  expect(shared.knob).toMatchObject({
+    style: 'text',
+    text: 'FB',
+    fontId: 'space-mono',
+    fontWeight: 700,
+    height: 19,
+    taper: 0.4,
+  })
+  await page.evaluate(() => localStorage.removeItem('cmf-speaker-design-v1'))
+  await page.goto(link)
+  const restored = await downloadKnob(page, testInfo, 'text-shared')
+  expect(restored.binary).toEqual(edited.binary)
+  await page.getByRole('tab', { name: 'Knob', exact: true }).click()
+  await reset.click()
+  await expect(option).toHaveAttribute('aria-pressed', 'true')
+  await expect(text).toHaveValue('A')
+  await expect(font).toHaveValue('inter')
+  await expect(weight).toHaveValue('700')
+  await expect(reset).toBeDisabled()
+  const resetFile = await downloadKnob(page, testInfo, 'text-reset')
+  expect(resetFile.binary).toEqual(original.binary)
 })
 
 for (const [style, label, thicknessLabel] of [

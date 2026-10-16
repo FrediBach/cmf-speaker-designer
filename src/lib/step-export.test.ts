@@ -21,7 +21,8 @@ import {
   parseKnobGeometry,
   prepareKnobExportGeometry,
 } from './knobs'
-import { KNOB_STYLES } from './knob-settings'
+import { KNOB_STYLES, normalizeKnobSettings } from './knob-settings'
+import { prepareTextKnobContours } from './text-knob-contours'
 
 type Point = [number, number, number]
 const decoder = new TextDecoder()
@@ -313,7 +314,7 @@ describe('STEP solid export', () => {
 
   it.each(KNOB_STYLES)(
     'exports customized $label knobs with their mounting geometry',
-    ({ id }) => {
+    async ({ id }) => {
       const bytes = readFileSync(
         new URL(
           '../../resources/stl-files/cmf-speaker-sm-3d-printing-knob-original-v1.stl',
@@ -325,18 +326,24 @@ describe('STEP solid export', () => {
         bytes.byteOffset + bytes.byteLength,
       ) as ArrayBuffer
       const source = parseKnobGeometry(data, id)
-      const customized = customizeKnobGeometry(source, {
+      const settings = normalizeKnobSettings({
         style: id,
         height: 20,
         taper: 0.6,
         flutePath: 'spiral',
+        text: 'BO',
       })
+      const contours =
+        id === 'text' ? await prepareTextKnobContours(settings) : undefined
+      const customized = customizeKnobGeometry(source, settings, contours)
       const geometry = prepareKnobExportGeometry(customized)
       const text = decoder.decode(exportStep(geometry, `knob-${id}.stp`))
       expect(text.match(/=ADVANCED_FACE\(/g)!.length).toBeGreaterThan(0)
       expect(text.match(/=ADVANCED_FACE\(/g)!.length).toBeLessThanOrEqual(
         geometry.getAttribute('position').count / 3,
       )
+      expect(text.match(/=CLOSED_SHELL\(/g)).toHaveLength(1)
+      expect(text.match(/=MANIFOLD_SOLID_BREP\(/g)).toHaveLength(1)
       source.dispose()
       customized.dispose()
       geometry.dispose()
