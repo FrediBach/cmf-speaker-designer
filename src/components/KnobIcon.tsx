@@ -5,10 +5,55 @@ type Props = {
   className?: string
 }
 
+function RaisedGripIcon({ style }: { style: 'triangle' | 'arrow' | 'v' }) {
+  const outline = {
+    triangle: [
+      [0, 11],
+      [-11, -8],
+      [11, -8],
+    ],
+    arrow: [
+      [0, 12],
+      [-11, 1],
+      [-3.5, 1],
+      [-3.5, -10],
+      [3.5, -10],
+      [3.5, 1],
+      [11, 1],
+    ],
+    v: [
+      [-11, 10],
+      [0, -11],
+      [11, 10],
+      [6, 10],
+      [0, -2],
+      [-6, 10],
+    ],
+  }[style].map(([x, y]) => [36 + x * 1.7, 25 - y])
+  const points = outline.map((point) => point.join(',')).join(' ')
+  return (
+    <>
+      {outline.map(([x, y], index) => {
+        const [nextX, nextY] = outline[(index + 1) % outline.length]
+        return (
+          <polygon
+            key={index}
+            points={`${x},${y} ${nextX},${nextY} ${nextX},${nextY + 11} ${x},${y + 11}`}
+            fill="var(--card)"
+          />
+        )
+      })}
+      <polygon points={points} fill="var(--card)" />
+      <polygon points={points} fill="currentColor" fillOpacity=".12" />
+    </>
+  )
+}
+
 export function KnobIcon({ style, className }: Props) {
   const fluted = style === 'fluted'
   const hex = style === 'hex'
-  const grip = style === 'bar' || style === 'cross'
+  const shaped = style === 'triangle' || style === 'arrow' || style === 'v'
+  const grip = style === 'bar' || style === 'cross' || shaped
 
   return (
     <svg
@@ -65,6 +110,7 @@ export function KnobIcon({ style, className }: Props) {
               )
             })}
           {style === 'ring' && <path d="M27 25v4m18-4v4" opacity=".5" />}
+          {shaped && <RaisedGripIcon style={style} />}
           {style === 'bar' && (
             <>
               <path d="m16 17 8-4 32 17v14l-8 4-32-17Z" fill="var(--card)" />

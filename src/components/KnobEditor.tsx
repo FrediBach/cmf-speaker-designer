@@ -142,6 +142,9 @@ export function KnobEditor({ value, onChange, color, onColorChange }: Props) {
       'fluteDepth',
       'flutePath',
       'facets',
+      'gripWidth',
+      'gripDepth',
+      'gripThickness',
     ] as const
   ).some((key) => value[key] !== defaults[key])
   const parameter = (
@@ -274,6 +277,19 @@ export function KnobEditor({ value, onChange, color, onColorChange }: Props) {
         )}
         {value.style === 'hex' &&
           parameter('facets', 'Facet count', { step: 1, unit: '' })}
+        {(value.style === 'triangle' ||
+          value.style === 'arrow' ||
+          value.style === 'v') && (
+          <>
+            {parameter('gripWidth', 'Grip width')}
+            {parameter('gripDepth', 'Grip depth')}
+            {value.style !== 'triangle' &&
+              parameter(
+                'gripThickness',
+                value.style === 'arrow' ? 'Shaft width' : 'Stroke width',
+              )}
+          </>
+        )}
       </section>
     </div>
   )

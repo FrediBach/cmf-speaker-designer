@@ -3,6 +3,7 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 import { STLExporter } from 'three/addons/exporters/STLExporter.js'
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js'
 import originalAsset from '../../resources/stl-files/cmf-speaker-sm-3d-printing-knob-original-v1.stl?url'
+import { shapedKnobGeometry } from './shaped-knob-geometry'
 import {
   KNOB_MOUNT_HEIGHT,
   KNOB_BASE_HEIGHT,
@@ -22,7 +23,7 @@ export interface KnobMetadata {
 }
 
 const sourceStyle = (style: KnobStyle): SourceStyle =>
-  style === 'fluted' || style === 'hex' ? 'ring' : style
+  style === 'bar' || style === 'cross' ? style : 'ring'
 
 /**
  * Extract one complete, connected part from the supplied multi-part print plate.
@@ -189,9 +190,9 @@ function refinedSource(original: BufferGeometry, detailed: boolean) {
 
 /**
  * The full original collar, shaft, and blind socket at Z<=8 mm stay fixed.
- * Only upper grip material changes. All radial changes subtract inward from
- * the original envelope; the central ring recess remains radially unchanged.
- * No nominal diameter scaling or rigid rotation is applied.
+ * Only upper grip material changes. New shaped grips replace the top cap;
+ * ring-derived grips retain their central recess. Every style stays within
+ * the original envelope, without diameter scaling or rigid rotation.
  */
 export function customizeKnobGeometry(
   original: BufferGeometry,
@@ -201,16 +202,21 @@ export function customizeKnobGeometry(
   original.computeBoundingBox()
   const dimensions = original.boundingBox!.getSize(new Vector3())
   const radius = Math.max(dimensions.x, dimensions.y) / 2
+  const shaped =
+    settings.style === 'triangle' ||
+    settings.style === 'arrow' ||
+    settings.style === 'v'
   const patterned = settings.style === 'fluted' || settings.style === 'hex'
   const modified =
     patterned || settings.height !== dimensions.z || settings.taper !== 0
-  const geometry = (
-    modified
-      ? refinedSource(original, patterned || settings.taper !== 0)
-      : original
-  ).clone()
+  const geometry = shaped
+    ? shapedKnobGeometry(refinedSource(original, false), settings)
+    : (modified
+        ? refinedSource(original, patterned || settings.taper !== 0)
+        : original
+      ).clone()
   const positions = geometry.getAttribute('position')
-  if (modified)
+  if (modified && !shaped)
     for (let index = 0; index < positions.count; index += 1) {
       const x = positions.getX(index),
         y = positions.getY(index),
@@ -349,7 +355,11 @@ export function knobFilename(input: KnobSettings): string {
       ? `-${settings.flutePath}-${settings.fluteCount}-flutes-${settings.fluteDepth.toFixed(1)}mm`
       : settings.style === 'hex'
         ? `-${settings.facets}-faces`
-        : ''
+        : settings.style === 'triangle' ||
+            settings.style === 'arrow' ||
+            settings.style === 'v'
+          ? `-width-${settings.gripWidth.toFixed(1)}mm-depth-${settings.gripDepth.toFixed(1)}mm${settings.style === 'triangle' ? '' : `-stroke-${settings.gripThickness.toFixed(1)}mm`}`
+          : ''
   const taper =
     settings.taper > 0 ? `-taper-${settings.taper.toFixed(1)}mm` : ''
   const label = settings.style === 'hex' ? 'faceted' : settings.style

@@ -67,7 +67,11 @@ async function downloadKnob(page: Page, testInfo: TestInfo, name: string) {
 }
 
 /** Compare positions independently of triangle ordering, normals, and filenames. */
-function surfaceVertices(binary: Buffer, part: 'base' | 'grip') {
+function surfaceVertices(
+  binary: Buffer,
+  part: 'base' | 'grip',
+  baseCeiling = 8,
+) {
   const vertices = new Set<string>()
   for (let triangle = 0; triangle < binary.readUInt32LE(80); triangle += 1) {
     for (let corner = 0; corner < 3; corner += 1) {
@@ -77,7 +81,7 @@ function surfaceVertices(binary: Buffer, part: 'base' | 'grip') {
         binary.readFloatLE(offset + 4),
         binary.readFloatLE(offset + 8),
       ]
-      if (part === 'base' ? point[2] < 8 : point[2] > 8)
+      if (part === 'base' ? point[2] < baseCeiling : point[2] > 8)
         vertices.add(point.join(','))
     }
   }
@@ -155,7 +159,7 @@ function inspectFacetedStep(binary: Buffer) {
   return { minimum, maximum }
 }
 
-test('selects all five knobs and renders each in the focused preview', async ({
+test('selects all eight knobs and renders each in the focused preview', async ({
   page,
 }, testInfo) => {
   await page.goto('/')
@@ -175,6 +179,9 @@ test('selects all five knobs and renders each in the focused preview', async ({
     ['cross', 'Cross'],
     ['fluted', 'Fluted'],
     ['hex', 'Faceted'],
+    ['triangle', 'Triangle'],
+    ['arrow', 'Arrow'],
+    ['v', 'V'],
   ]) {
     const option = page.getByRole('button', {
       name: `${label} knob`,
@@ -195,7 +202,7 @@ test('selects all five knobs and renders each in the focused preview', async ({
     frames.add(screenshot.toString('base64'))
   }
   expect(frames.size, 'Each selected grip should render a different mesh').toBe(
-    5,
+    8,
   )
   await page
     .getByRole('group', { name: 'Preview mode' })
@@ -205,6 +212,129 @@ test('selects all five knobs and renders each in the focused preview', async ({
     path: testInfo.outputPath('selected-knob-assembled.png'),
   })
 })
+
+for (const [style, label, thicknessLabel] of [
+  ['triangle', 'Triangle', null],
+  ['arrow', 'Arrow', 'Shaft width'],
+  ['v', 'V', 'Stroke width'],
+] as const) {
+  test(`${label} grip parameters change the printable mesh and survive saved links and reset`, async ({
+    page,
+    context,
+  }, testInfo) => {
+    if (style === 'v') await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+    await expectReady(page)
+    await page.getByRole('tab', { name: 'Knob', exact: true }).click()
+    const option = page.getByRole('button', {
+      name: `${label} knob`,
+      exact: true,
+    })
+    await option.click()
+    const reset = page.getByRole('button', { name: 'Reset grip', exact: true })
+    await expect(reset).toBeDisabled()
+    const original = await downloadKnob(page, testInfo, `${style}-default`)
+    // Raised grips retriangulate the source cap at nominal 8 mm.
+    const base = surfaceVertices(original.binary, 'base', 7.99999)
+    let previous = original
+    const parameters: [string, string, number, number][] = [
+      ['gripWidth', 'Grip width', 11, 13],
+      ['gripDepth', 'Grip depth', 10, 12],
+    ]
+    if (thicknessLabel)
+      parameters.push([
+        'gripThickness',
+        thicknessLabel,
+        style === 'v' ? 3.5 : 4,
+        3,
+      ])
+    parameters.push(
+      ['height', 'Knob height', 19, 16],
+      ['taper', 'Grip taper', 0.5, 0],
+    )
+    for (const [key, name, value] of parameters) {
+      const control = page.getByRole('spinbutton', {
+        name: `${name} in millimeters`,
+        exact: true,
+      })
+      await control.fill(String(value))
+      await expect(reset).toBeEnabled()
+      const edited = await downloadKnob(page, testInfo, `${style}-${key}`)
+      expect(surfaceVertices(edited.binary, 'base', 7.99999)).toEqual(base)
+      expect(surfaceVertices(edited.binary, 'grip')).not.toEqual(
+        surfaceVertices(previous.binary, 'grip'),
+      )
+      const mesh = inspectBinaryStl(edited.binary)
+      expect(mesh.components).toBe(1)
+      expect(mesh.invalidEdges).toBe(0)
+      expect(mesh.degenerateEdges).toBe(0)
+      expect(mesh.signedVolume).toBeGreaterThan(0)
+      expect(mesh.minimum[2]).toBeCloseTo(0, 5)
+      previous = edited
+    }
+    expect(inspectBinaryStl(previous.binary).maximum[2]).toBeCloseTo(19, 3)
+
+    if (style === 'v') {
+      const dimensions = await page.evaluate(() => ({
+        width: document.documentElement.clientWidth,
+        contentWidth: document.documentElement.scrollWidth,
+        height: window.innerHeight,
+        contentHeight: document.documentElement.scrollHeight,
+      }))
+      expect(dimensions.contentWidth).toBeLessThanOrEqual(dimensions.width + 1)
+      expect(dimensions.contentHeight).toBeLessThanOrEqual(
+        dimensions.height + 1,
+      )
+      await page.screenshot({
+        path: testInfo.outputPath('mobile-v-knob-controls.png'),
+      })
+    }
+
+    await page.reload()
+    await expectReady(page)
+    await page.getByRole('tab', { name: 'Knob', exact: true }).click()
+    await expect(option).toHaveAttribute('aria-pressed', 'true')
+    for (const [, name, value] of parameters)
+      await expect(
+        page.getByRole('spinbutton', {
+          name: `${name} in millimeters`,
+          exact: true,
+        }),
+      ).toHaveValue(String(value))
+    const reloaded = await downloadKnob(page, testInfo, `${style}-reloaded`)
+    expect(reloaded.binary).toEqual(previous.binary)
+
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await page
+      .getByRole('button', { name: 'Copy design link', exact: true })
+      .click()
+    await expect(page.getByRole('status')).toContainText('Design link copied.')
+    const link = await page.evaluate(() => navigator.clipboard.readText())
+    const shared = JSON.parse(new URL(link).searchParams.get('design')!)
+    expect(shared.knob).toMatchObject({
+      style,
+      ...Object.fromEntries(parameters.map(([key, , value]) => [key, value])),
+    })
+    await page.evaluate(() => localStorage.removeItem('cmf-speaker-design-v1'))
+    await page.goto(link)
+    const restored = await downloadKnob(page, testInfo, `${style}-shared`)
+    expect(restored.binary).toEqual(previous.binary)
+
+    await page.getByRole('tab', { name: 'Knob', exact: true }).click()
+    await reset.click()
+    await expect(option).toHaveAttribute('aria-pressed', 'true')
+    await expect(reset).toBeDisabled()
+    for (const [, name, , defaultValue] of parameters)
+      await expect(
+        page.getByRole('spinbutton', {
+          name: `${name} in millimeters`,
+          exact: true,
+        }),
+      ).toHaveValue(String(defaultValue))
+    const resetFile = await downloadKnob(page, testInfo, `${style}-reset`)
+    expect(resetFile.binary).toEqual(original.binary)
+  })
+}
 
 test('preserves upper grip settings and colors in saved links and the printable ZIP', async ({
   page,

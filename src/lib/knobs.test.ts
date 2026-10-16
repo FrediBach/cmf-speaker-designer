@@ -13,10 +13,12 @@ import {
   DEFAULT_KNOB_SETTINGS,
   KNOB_STYLES,
   normalizeKnobSettings,
+  type KnobSettings,
 } from './knob-settings'
 import {
   customizeKnobGeometry,
   exportKnobStl,
+  knobFilename,
   parseKnobGeometry,
 } from './knobs'
 
@@ -88,14 +90,14 @@ function topology(geometry: BufferGeometry) {
   }
 }
 
-function baseVertices(geometry: BufferGeometry) {
+function baseVertices(geometry: BufferGeometry, ceiling = 8) {
   const positions = geometry.getAttribute('position')
   const result = new Set<string>()
   for (let index = 0; index < positions.count; index += 1) {
     const x = positions.getX(index),
       y = positions.getY(index),
       z = positions.getZ(index)
-    if (z < 8) result.add([x, y, z].join(','))
+    if (z < ceiling) result.add([x, y, z].join(','))
   }
   return [...result].sort()
 }
@@ -156,9 +158,13 @@ describe('volume knobs', () => {
         expect(inspection.volume).toBeGreaterThan(250)
         expect(geometry.boundingBox!.min.z).toBe(0)
         expect(geometry.boundingBox!.max.z).toBeCloseTo(values.height, 4)
-        // Freeze the complete original base, including its full outer collar,
-        // not only the central socket. Its XYZ point set stays byte-exact.
-        expect(baseVertices(geometry)).toEqual(baseVertices(original))
+        // Shaped grips retriangulate the horizontal base-top cap, whose
+        // original Float32 vertices sit slightly below nominal 8 mm.
+        // All lower collar and mounting vertices remain byte-exact.
+        const ceiling = ['triangle', 'arrow', 'v'].includes(style) ? 7.99999 : 8
+        expect(baseVertices(geometry, ceiling)).toEqual(
+          baseVertices(original, ceiling),
+        )
         expect(geometry.boundingBox!.min.x).toBe(original.boundingBox!.min.x)
         expect(geometry.boundingBox!.max.x).toBe(original.boundingBox!.max.x)
         expect(geometry.boundingBox!.min.y).toBe(original.boundingBox!.min.y)
@@ -205,6 +211,102 @@ describe('volume knobs', () => {
       geometry.dispose()
       original.dispose()
     }
+  })
+
+  it.each(['triangle', 'arrow', 'v'] as const)(
+    '%s keeps its intended silhouette and parameters in the printable mesh',
+    (style) => {
+      const original = parseKnobGeometry(originals, style)
+      const build = (values: Partial<KnobSettings> = {}) =>
+        customizeKnobGeometry(original, { style, ...values })
+      const normal = build()
+      const highest = (geometry: BufferGeometry, x: number, y: number) =>
+        Math.max(...hitsFromBottom(geometry, x, y))
+      // Probe head, shaft, and notch regions, rather than merely checking
+      // vertex counts: each style must actually produce its named outline.
+      if (style === 'triangle') {
+        expect(highest(normal, 0.1, 4)).toBe(16)
+        expect(highest(normal, 5, 4)).toBe(8)
+        expect(highest(normal, 5, -4)).toBe(16)
+      } else if (style === 'arrow') {
+        expect(highest(normal, 0.1, -4)).toBe(16)
+        expect(highest(normal, 4, -4)).toBe(8)
+        expect(highest(normal, 4, 0.5)).toBe(16)
+      } else {
+        expect(highest(normal, 0.1, 4)).toBe(8)
+        expect(highest(normal, 4, 4)).toBe(16)
+        expect(highest(normal, 0.1, -4)).toBe(16)
+      }
+      const narrower = build({ gripWidth: 8 })
+      const shallower = build({ gripDepth: 8 })
+      const tapered = build({ taper: 1 })
+      for (const smaller of [narrower, shallower, tapered])
+        expect(topology(smaller).volume).toBeLessThan(topology(normal).volume)
+      if (style !== 'triangle') {
+        const thicker = build({ gripThickness: 4 })
+        expect(topology(thicker).volume).toBeGreaterThan(
+          topology(normal).volume,
+        )
+        thicker.dispose()
+      }
+      // The blind socket stays open from the stem bottom, with its original
+      // roof height, whether material is raised above that XY position or not.
+      expect(hitsFromBottom(normal, 0.17, 0.23)[0]).toBe(4.7)
+      for (const geometry of [original, normal, narrower, shallower, tapered])
+        geometry.dispose()
+    },
+  )
+
+  it.each(['triangle', 'arrow', 'v'] as const)(
+    '%s remains watertight at extreme proportions, thicknesses, and tapers',
+    (style) => {
+      const original = parseKnobGeometry(originals, style)
+      for (const [gripWidth, gripDepth] of [
+        [8, 8],
+        [16, 8],
+        [8, 16],
+        [16, 16],
+      ])
+        for (const gripThickness of [2, 5]) {
+          const geometry = customizeKnobGeometry(original, {
+            style,
+            gripWidth,
+            gripDepth,
+            gripThickness,
+            height: 24,
+            taper: 1,
+          })
+          const inspection = topology(geometry)
+          expect(inspection.invalidEdges).toBe(0)
+          expect(inspection.components).toBe(1)
+          expect(inspection.volume).toBeGreaterThan(250)
+          const positions = geometry.getAttribute('position')
+          for (let index = 0; index < positions.count; index += 1)
+            if (positions.getZ(index) > 8)
+              expect(
+                Math.hypot(positions.getX(index), positions.getY(index)),
+              ).toBeLessThan(9)
+          const exported = new STLLoader().parse(exportKnobStl(geometry))
+          expect(topology(exported)).toEqual(inspection)
+          geometry.dispose()
+          exported.dispose()
+        }
+      original.dispose()
+    },
+  )
+
+  it('includes the active shaped-grip dimensions in export filenames', () => {
+    expect(
+      knobFilename(normalizeKnobSettings({ style: 'triangle' })),
+    ).toContain('triangle-height-16.0mm-width-13.0mm-depth-12.0mm')
+    expect(
+      knobFilename(normalizeKnobSettings({ style: 'arrow', gripThickness: 4 })),
+    ).toContain('arrow-height-16.0mm-width-13.0mm-depth-12.0mm-stroke-4.0mm')
+    expect(
+      knobFilename(normalizeKnobSettings({ style: 'v', taper: 1 })),
+    ).toContain(
+      'v-height-16.0mm-width-13.0mm-depth-12.0mm-stroke-3.0mm-taper-1.0mm',
+    )
   })
 
   it('ignores legacy diameter and rigid rotation without changing the original source', () => {

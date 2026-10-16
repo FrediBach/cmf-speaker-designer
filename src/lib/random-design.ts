@@ -89,6 +89,9 @@ export function randomizeDesign(
       fluteDepth: range(0.4, 1.2, 0.2),
       flutePath: pick(['straight', 'spiral', 'chevron'] as const),
       facets: range(5, 12),
+      gripWidth: range(8, 16, 0.5),
+      gripDepth: range(8, 16, 0.5),
+      gripThickness: range(2, 5, 0.5),
     },
   })
   // Keep randomized patterns modest; explicit IDs preserve seeded reproducibility.

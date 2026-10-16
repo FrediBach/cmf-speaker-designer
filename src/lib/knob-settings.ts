@@ -1,4 +1,5 @@
-export type KnobStyle = 'ring' | 'bar' | 'cross' | 'fluted' | 'hex'
+export type KnobStyle =
+  'ring' | 'bar' | 'cross' | 'fluted' | 'hex' | 'triangle' | 'arrow' | 'v'
 export type KnobFlutePath = 'straight' | 'spiral' | 'chevron'
 
 export interface KnobSettings {
@@ -9,6 +10,9 @@ export interface KnobSettings {
   fluteDepth: number
   flutePath: KnobFlutePath
   facets: number
+  gripWidth: number
+  gripDepth: number
+  gripThickness: number
 }
 
 export type KnobNumericKey = Exclude<keyof KnobSettings, 'style' | 'flutePath'>
@@ -50,6 +54,25 @@ export const KNOB_STYLES: readonly {
     description: 'A recessed dial with an adjustable number of grip faces.',
     collection: 'studio',
   },
+  {
+    id: 'triangle',
+    label: 'Triangle',
+    description: 'A raised triangular grip with adjustable width and depth.',
+    collection: 'studio',
+  },
+  {
+    id: 'arrow',
+    label: 'Arrow',
+    description: 'A directional grip with an adjustable head and shaft width.',
+    collection: 'studio',
+  },
+  {
+    id: 'v',
+    label: 'V',
+    description:
+      'An open V-shaped grip with adjustable proportions and stroke width.',
+    collection: 'studio',
+  },
 ]
 
 export const DEFAULT_KNOB_SETTINGS: KnobSettings = {
@@ -60,6 +83,9 @@ export const DEFAULT_KNOB_SETTINGS: KnobSettings = {
   fluteDepth: 0.8,
   flutePath: 'straight',
   facets: 6,
+  gripWidth: 13,
+  gripDepth: 12,
+  gripThickness: 3,
 }
 
 /** The source mounting stem, blind socket, and complete base stay unchanged. */
@@ -75,12 +101,41 @@ export function getDefaultKnobSettings(style: KnobStyle = 'bar'): KnobSettings {
 
 export function getKnobLimits(input: Partial<KnobSettings> = {}): KnobLimits {
   const { height } = getDefaultKnobSettings(input.style)
+  const span = (value: number | undefined, fallback: number) =>
+    typeof value === 'number' && Number.isFinite(value)
+      ? Math.min(16, Math.max(8, value))
+      : fallback
+  // Leave a small margin inside the fixed 18 mm collar, including corners.
+  const maxSpan = (other: number) =>
+    Math.min(16, Math.floor(Math.sqrt(17.9 ** 2 - other ** 2) * 10) / 10)
+  const width = span(input.gripWidth, DEFAULT_KNOB_SETTINGS.gripWidth)
+  const depth = span(input.gripDepth, DEFAULT_KNOB_SETTINGS.gripDepth)
   return {
     height: { min: height - 4, max: height + 8 },
     taper: { min: 0, max: 1 },
     fluteCount: { min: 8, max: 32 },
     fluteDepth: { min: 0.3, max: 1.4 },
     facets: { min: 5, max: 12 },
+    gripWidth: {
+      min: 8,
+      max: maxSpan(depth),
+    },
+    gripDepth: {
+      min: 8,
+      max: maxSpan(width),
+    },
+    gripThickness: {
+      min: 2,
+      max:
+        input.style === 'v'
+          ? Math.min(
+              5,
+              Math.floor(
+                ((0.75 * depth) / Math.hypot(1, (2 * depth) / width)) * 10,
+              ) / 10,
+            )
+          : 5,
+    },
   }
 }
 
@@ -91,7 +146,7 @@ export function normalizeKnobSettings(
     ? input.style!
     : DEFAULT_KNOB_SETTINGS.style
   const defaults = getDefaultKnobSettings(style)
-  const limits = getKnobLimits({ style })
+  const limits = getKnobLimits({ style, gripWidth: 8, gripDepth: 8 })
   const number = (key: KnobNumericKey) => {
     const value = input[key]
     const safe =
@@ -99,6 +154,16 @@ export function normalizeKnobSettings(
         ? value
         : defaults[key]
     return Math.min(limits[key].max, Math.max(limits[key].min, safe))
+  }
+  // Match the precision of the coupled slider limits so a valid saved value
+  // cannot sit above the maximum shown by its control.
+  let gripWidth = Math.round(number('gripWidth') * 10) / 10
+  let gripDepth = Math.round(number('gripDepth') * 10) / 10
+  const diagonal = Math.hypot(gripWidth, gripDepth)
+  if (diagonal > 17.9) {
+    const scale = 17.9 / diagonal
+    gripWidth = Math.floor(gripWidth * scale * 10) / 10
+    gripDepth = Math.floor(gripDepth * scale * 10) / 10
   }
   return {
     style,
@@ -111,5 +176,15 @@ export function normalizeKnobSettings(
         ? input.flutePath
         : 'straight',
     facets: Math.round(number('facets')),
+    gripWidth,
+    gripDepth,
+    gripThickness: Math.min(
+      getKnobLimits({ style, gripWidth, gripDepth }).gripThickness.max,
+      // The V's stroke limit depends on its final normalized proportions.
+      typeof input.gripThickness === 'number' &&
+        Number.isFinite(input.gripThickness)
+        ? Math.max(2, input.gripThickness)
+        : defaults.gripThickness,
+    ),
   }
 }
