@@ -176,6 +176,15 @@ export async function createPanelSplitEngine(wasmUrl?: string) {
           front = own(front.subtract(seat))
           upper = own(upper.add(seat))
         }
+        // The original inner bend starts below the outer fold. A horizontal
+        // split otherwise leaves its curled rear rim sticking out at both
+        // corners. Trim just that bend back to the flat mounting-rim plane.
+        const bounds = original.boundingBox()
+        const rearTrim = box(
+          [bounds.min[0] - 1, seamY - 3, bounds.min[2] - 1],
+          [bounds.max[0] + 1, seamY + 1, panelGap],
+        )
+        front = own(front.subtract(rearTrim))
         const tongueWidthMm = 26
         // The thinnest striped face has 2.7 mm of material: 0.8 mm rear wall,
         // 0.7 mm front wall, 0.4 mm clearance, and a 0.8 mm tongue. Added face

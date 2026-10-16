@@ -114,6 +114,17 @@ function jointRegion(
   return region
 }
 
+function expectCleanRearEdge(positions: Float32Array, seamY: number, gap = 0) {
+  let rearZ = Infinity
+  for (let index = 0; index < positions.length; index += 3) {
+    const y = positions[index + 1]
+    if (y > seamY - 1 && y < seamY)
+      rearZ = Math.min(rearZ, positions[index + 2])
+  }
+  expect(Number.isFinite(rearZ)).toBe(true)
+  expect(rearZ).toBeGreaterThanOrEqual(gap - 0.0001)
+}
+
 describe('printable front and angled panel split', () => {
   let engine: Awaited<ReturnType<typeof createPanelSplitEngine>>
   let module: ManifoldToplevel
@@ -132,6 +143,7 @@ describe('printable front and angled panel split', () => {
       const before = input.slice()
       const result = engine.build(model, input)
       const { frontPositions, upperPositions, seamY } = result.metadata
+      expectCleanRearEdge(frontPositions, seamY)
       expect(input).toEqual(before)
       expect(seamY).toBeCloseTo(getFaceFold(model).frontY, 6)
       expect(result.metadata.insertionAxis).toEqual([0, -1, 0])
@@ -162,6 +174,18 @@ describe('printable front and angled panel split', () => {
         expect(heights(upperGeometry, 0, seamY - 2)).toEqual([1.5, 2.3])
         expect(heights(frontGeometry, 0, seamY - 5.5)).toEqual([0.5, 4])
         expect(heights(frontGeometry, 15, seamY - 2)).toEqual([0.5, 4])
+        // Cutting through the original inner fold used to leave rearward
+        // curls across the join, including sharp tips at both side corners.
+        for (const x of [-41, -40, -20, 20, 40, 41]) {
+          const before = heights(source, x, seamY - 0.25)
+          const after = heights(frontGeometry, x, seamY - 0.25)
+          expect(before[0]).toBeLessThan(0)
+          expect(after[0]).toBe(0)
+          expect(after.at(-1)).toBe(before.at(-1))
+          expect(heights(frontGeometry, x, seamY - 4)).toEqual(
+            heights(source, x, seamY - 4),
+          )
+        }
         // A 0.2 mm gap surrounds the tongue and the seam. The insertion path
         // stays clear from first engagement all the way to the mounted pose.
         for (const distance of [0, 0.1, 0.5, 1, 2, 3, 4, 5, 6]) {
@@ -243,6 +267,11 @@ describe('printable front and angled panel split', () => {
       )
       const front = solidOf(module, result.metadata.frontPositions)
       const upper = solidOf(module, result.metadata.upperPositions)
+      expectCleanRearEdge(
+        result.metadata.frontPositions,
+        result.metadata.seamY,
+        5,
+      )
       const original = solidOf(
         module,
         new Float32Array(customized.getAttribute('position').array),
@@ -343,6 +372,11 @@ describe('printable front and angled panel split', () => {
       )
       const input = new Float32Array(striped.getAttribute('position').array)
       const result = engine.build(model, input, depth, gap)
+      expectCleanRearEdge(
+        result.metadata.frontPositions,
+        result.metadata.seamY,
+        gap,
+      )
       const front = geometryOf(result.metadata.frontPositions)
       const frontSolid = solidOf(module, result.metadata.frontPositions)
       const upper = solidOf(module, result.metadata.upperPositions)
