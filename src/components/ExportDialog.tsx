@@ -5,6 +5,7 @@ import { PanelIcon } from './PanelIcon'
 import { KnobIcon } from './KnobIcon'
 import { colorName, type Design } from '@/lib/design'
 import { getDesignSummary } from '@/lib/design-summary'
+import { getHaloWaveAmplitude, getHaloWaveFrequency } from '@/lib/halo-settings'
 import {
   getHandleHoleCenters,
   getHandleSlits,
@@ -633,6 +634,8 @@ function PanelExportSummary({
             {design.halo.rimHeight === 0
               ? 'Flush rim'
               : `${design.halo.rimHeight} mm rim`}
+            {getHaloWaveAmplitude(design.halo) > 0 &&
+              ` · ${design.halo.waveShape} wave · ${Number(getHaloWaveAmplitude(design.halo).toFixed(2))} mm amplitude · ${getHaloWaveFrequency(design.halo)} cycles · ${design.halo.wavePhase}° phase${design.halo.waveSeamless ? ' · seamless' : ''}`}
           </span>
         )}
         <span>

@@ -1689,6 +1689,92 @@ main {
   stroke: currentColor;
   stroke-width: 1.2;
 }
+.halo-wave-intro {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+.halo-wave-options {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+}
+.halo-wave-options button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-height: 64px;
+  padding: 8px 2px;
+  border: 1px solid var(--control-border);
+  border-radius: 3px;
+  background: transparent;
+  font-size: 11px;
+}
+.halo-wave-options button:hover {
+  background: var(--surface-hover);
+}
+.halo-wave-options button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+  box-shadow: inset 0 -2px var(--accent-ink);
+}
+.halo-wave-options svg {
+  width: 100%;
+  max-width: 48px;
+  height: 26px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.halo-wave-preview {
+  margin-top: 16px;
+  padding: 12px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+.halo-wave-preview > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted-foreground);
+  font: 9px var(--mono);
+}
+.halo-wave-preview strong {
+  color: var(--accent-ink);
+  white-space: nowrap;
+  font-weight: 400;
+}
+.halo-wave-preview > svg {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  overflow: visible;
+}
+.halo-wave-preview polygon {
+  fill: var(--accent-soft);
+}
+.halo-wave-preview polyline {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.halo-wave-baseline,
+.halo-wave-before {
+  stroke: var(--muted-foreground);
+  stroke-opacity: 0.6;
+  stroke-dasharray: 3 3;
+}
+.halo-wave-after {
+  stroke: var(--accent-ink);
+}
+.halo-seamless-toggle {
+  margin-top: 16px;
+}
 .grille-pattern-options {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

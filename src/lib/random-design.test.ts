@@ -122,6 +122,9 @@ describe('random designs', () => {
     expect(new Set(designs.map(({ grille }) => grille.pattern))).toEqual(
       new Set(['round', 'hex', 'slot']),
     )
+    expect(new Set(designs.map(({ halo }) => halo.waveShape))).toEqual(
+      new Set(['none', 'sine', 'triangle', 'square', 'sawtooth']),
+    )
     expect(new Set(designs.map(({ knob }) => knob.flutePath))).toEqual(
       new Set(['straight', 'spiral', 'chevron']),
     )

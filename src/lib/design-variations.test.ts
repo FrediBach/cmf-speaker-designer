@@ -228,6 +228,8 @@ describe('progressive design variations', () => {
       expect(design.grille.mode).toBe(base.grille.mode)
       expect(design.grille.pattern).toBe(base.grille.pattern)
       expect(design.halo.mode).toBe(base.halo.mode)
+      expect(design.halo.waveShape).toBe(base.halo.waveShape)
+      expect(design.halo.waveSeamless).toBe(base.halo.waveSeamless)
       expect(design.knob.style).toBe(base.knob.style)
       expect(design.raceStripes.enabled).toBe(base.raceStripes.enabled)
       expect(

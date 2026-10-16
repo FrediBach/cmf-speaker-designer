@@ -16,6 +16,7 @@ import {
   HALO_INNER_RADIUS,
   getHaloCutPivotRadius,
   normalizeHaloSettings,
+  getHaloModulatedHeight,
 } from './halo-settings'
 import { normalizeGrilleSettings } from './grille-settings'
 import { getDefaultHandleSettings } from './handle-settings'
@@ -619,6 +620,283 @@ describe('generative halo and planar rain hood', () => {
     const result = engine.build('s', DEFAULT_HALO_SETTINGS, positions)
     expect(result.positions).toEqual(positions)
     expect(result.positions).not.toBe(positions)
+    source.dispose()
+  })
+
+  it.each(['s', 'm'] as const)(
+    'oscillates the existing %s wall height with independent amplitude and phase',
+    (model) => {
+      const source = readPanel(model)
+      for (const wavePhase of [0, 90]) {
+        const settings = normalizeHaloSettings({
+          mode: 'custom',
+          outwardAngle: 0,
+          depth: 20,
+          rimHeight: 5,
+          waveShape: 'sine',
+          waveAmplitude: 4,
+          waveFrequency: 1,
+          wavePhase,
+        })
+        const result = engine.build(model, settings, positionsOf(source))
+        const geometry = geometryOf(result.positions)
+        for (const center of result.metadata.centers) {
+          for (const degrees of [0, 90, 180, 270]) {
+            const angle = (degrees * Math.PI) / 180
+            const x = 35 * Math.sin(angle),
+              y = center.y + 35 * Math.cos(angle)
+            expect(heights(geometry, x, y).at(-1)).toBeCloseTo(
+              4 + getHaloModulatedHeight(settings, settings.depth, degrees),
+              3,
+            )
+            expect(heights(geometry, x, y).filter((z) => z < 4)).toEqual(
+              heights(source, x, y).filter((z) => z < 4),
+            )
+          }
+          expect(heights(geometry, center.x, center.y)).toEqual([])
+        }
+        expect(geometry.boundingBox!.max.z).toBeCloseTo(28, 4)
+        expect(result.metadata.frontZ).toBeCloseTo(28, 4)
+        expect(topology(geometry)).toEqual({ invalid: 0, components: 1 })
+        geometry.dispose()
+      }
+      source.dispose()
+    },
+  )
+
+  it('deforms the finished angled cut while preserving its raised rim and buried collar', () => {
+    const source = readPanel('s')
+    const settings = normalizeHaloSettings({
+      mode: 'custom',
+      outwardAngle: 0,
+      depth: 26,
+      thickness: 3,
+      cutAngle: 12,
+      cutRotation: 45,
+      rimHeight: 5,
+      waveShape: 'sine',
+      waveAmplitude: 3,
+      waveFrequency: 3,
+      wavePhase: 90,
+    })
+    const baseline = geometryOf(
+      engine.build('s', { ...settings, waveShape: 'none' }, positionsOf(source))
+        .positions,
+    )
+    const result = engine.build('s', settings, positionsOf(source))
+    const geometry = geometryOf(result.positions)
+    for (const degrees of [0, 45, 90, 135, 180, 225, 270, 315]) {
+      const angle = (degrees * Math.PI) / 180
+      const x = 34 * Math.sin(angle),
+        y = -23 + 34 * Math.cos(angle)
+      const original = heights(baseline, x, y)
+      const actual = heights(geometry, x, y)
+      expect(actual.at(-1)).toBeCloseTo(
+        4 + getHaloModulatedHeight(settings, original.at(-1)! - 4, degrees),
+        2,
+      )
+      expect(actual.filter((z) => z <= 4)).toEqual(
+        original.filter((z) => z <= 4),
+      )
+    }
+    expect(result.metadata.frontZ).toBeCloseTo(geometry.boundingBox!.max.z, 4)
+    expect(topology(geometry)).toEqual({ invalid: 0, components: 1 })
+    baseline.dispose()
+    geometry.dispose()
+    source.dispose()
+  })
+
+  it.each([
+    { waveShape: 'sine' as const, waveFrequency: 3, waveSeamless: true },
+    { waveShape: 'triangle' as const, waveFrequency: 2.6, waveSeamless: true },
+    { waveShape: 'square' as const, waveFrequency: 3, waveSeamless: true },
+    { waveShape: 'sawtooth' as const, waveFrequency: 3, waveSeamless: true },
+    { waveShape: 'sine' as const, waveFrequency: 2.6, waveSeamless: false },
+    { waveShape: 'sawtooth' as const, waveFrequency: 2.6, waveSeamless: false },
+    { waveShape: 'square' as const, waveFrequency: 24, waveSeamless: true },
+  ])(
+    'exports both modulated and cut halo models as one closed solid: %j',
+    (wave) => {
+      for (const model of ['s', 'm'] as const) {
+        const source = readPanel(model)
+        const settings = normalizeHaloSettings({
+          mode: 'custom',
+          outwardAngle: 18,
+          depth: 26,
+          thickness: 3,
+          cutAngle: 35,
+          cutRotation: 137,
+          rimHeight: 2,
+          waveAmplitude: 4,
+          wavePhase: 37,
+          ...wave,
+        })
+        const result = engine.build(model, settings, positionsOf(source))
+        const geometry = geometryOf(result.positions)
+        expect(topology(geometry)).toEqual({ invalid: 0, components: 1 })
+        expect(result.metadata.frontZ).toBeCloseTo(
+          geometry.boundingBox!.max.z,
+          4,
+        )
+        for (const center of result.metadata.centers)
+          expect(heights(geometry, center.x, center.y)).toEqual([])
+        const exported = new STLLoader().parse(exportPanelStl(geometry))
+        expect(topology(exported)).toEqual({ invalid: 0, components: 1 })
+        exported.dispose()
+        geometry.dispose()
+        source.dispose()
+      }
+    },
+    30_000,
+  )
+
+  it.each([
+    { depth: 1, rimHeight: 0, outwardAngle: 45, cutAngle: 44 },
+    { depth: 40, rimHeight: 5, outwardAngle: 45, cutAngle: 0 },
+    { depth: 6, rimHeight: 5, outwardAngle: 0, cutAngle: 75 },
+  ])(
+    'keeps extreme modulations attached without altering the aperture: %j',
+    (dimensions) => {
+      const source = readPanel('m')
+      const result = engine.build(
+        'm',
+        normalizeHaloSettings({
+          mode: 'custom',
+          ...dimensions,
+          thickness: 1,
+          waveShape: 'square',
+          waveAmplitude: 20,
+          waveFrequency: 7.25,
+          waveSeamless: false,
+          wavePhase: 90,
+        }),
+        positionsOf(source),
+      )
+      const geometry = geometryOf(result.positions)
+      expect(topology(geometry)).toEqual({ invalid: 0, components: 1 })
+      for (const center of result.metadata.centers)
+        expect(heights(geometry, center.x, center.y)).toEqual([])
+      const exported = new STLLoader().parse(exportPanelStl(geometry))
+      expect(topology(exported)).toEqual({ invalid: 0, components: 1 })
+      exported.dispose()
+      geometry.dispose()
+      source.dispose()
+    },
+    30_000,
+  )
+
+  it.each([
+    {
+      depth: 1.07,
+      rimHeight: 1.06,
+      cutAngle: 73.7,
+      outwardAngle: 4.1,
+      waveShape: 'square' as const,
+      waveFrequency: 23.65,
+      wavePhase: 179.99,
+    },
+    {
+      depth: 5.17,
+      rimHeight: 4.93,
+      cutAngle: 65.3,
+      outwardAngle: 20.7,
+      waveShape: 'sawtooth' as const,
+      waveFrequency: 0.35,
+      wavePhase: 359.99,
+    },
+    {
+      depth: 16.43,
+      rimHeight: 1.13,
+      cutAngle: 29.9,
+      outwardAngle: 15.2,
+      waveShape: 'triangle' as const,
+      waveFrequency: 7.35,
+      wavePhase: 89.99,
+    },
+    {
+      depth: 36.37,
+      rimHeight: 3.77,
+      cutAngle: 43.7,
+      outwardAngle: 44.9,
+      waveShape: 'sine' as const,
+      waveFrequency: 23.65,
+      wavePhase: 0.01,
+    },
+    {
+      depth: 23.29,
+      rimHeight: 0.0001,
+      cutAngle: 0,
+      outwardAngle: 0.1,
+      waveShape: 'square' as const,
+      waveFrequency: 0.25,
+      wavePhase: 180,
+    },
+    {
+      depth: 12.57,
+      rimHeight: 2.67,
+      cutAngle: 48.3,
+      outwardAngle: 35.2,
+      waveShape: 'sawtooth' as const,
+      waveFrequency: 16.35,
+      wavePhase: 45.01,
+    },
+  ])(
+    'keeps decimal rims and shallow moving walls connected after Float32 export: %j',
+    (input) => {
+      for (const model of ['s', 'm'] as const) {
+        const source = readPanel(model)
+        const result = engine.build(
+          model,
+          normalizeHaloSettings({
+            mode: 'custom',
+            thickness: 1.13,
+            cutRotation: 137.3,
+            waveAmplitude: 20,
+            waveSeamless: false,
+            ...input,
+          }),
+          positionsOf(source),
+        )
+        const geometry = geometryOf(result.positions)
+        expect(topology(geometry)).toEqual({ invalid: 0, components: 1 })
+        const exported = new STLLoader().parse(exportPanelStl(geometry))
+        expect(topology(exported)).toEqual({ invalid: 0, components: 1 })
+        exported.dispose()
+        geometry.dispose()
+        source.dispose()
+      }
+    },
+    30_000,
+  )
+
+  it('preserves exact old geometry for disabled, zero-amplitude and full-rim waves', () => {
+    const source = readPanel('s'),
+      positions = positionsOf(source)
+    for (const dimensions of [
+      { depth: 24, rimHeight: 2 },
+      { depth: 5, rimHeight: 5 },
+    ]) {
+      const settings = normalizeHaloSettings({
+        mode: 'custom',
+        cutAngle: 30,
+        ...dimensions,
+      })
+      const baseline = engine.build('s', settings, positions)
+      const zero = engine.build(
+        's',
+        { ...settings, waveShape: 'square', waveAmplitude: 0 },
+        positions,
+      )
+      expect(zero.positions).toEqual(baseline.positions)
+      if (settings.depth === settings.rimHeight)
+        expect(
+          engine.build(
+            's',
+            { ...settings, waveShape: 'sine', waveAmplitude: 20 },
+            positions,
+          ).positions,
+        ).toEqual(baseline.positions)
+    }
     source.dispose()
   })
 })

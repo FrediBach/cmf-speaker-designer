@@ -587,9 +587,15 @@ describe('design export', async () => {
         cutAngle: 45,
         cutRotation: 180,
         rimHeight: 3,
+        waveShape: 'sine',
+        waveAmplitude: 4,
+        waveFrequency: 3.25,
+        wavePhase: 90,
+        waveSeamless: true,
       },
     })
-    const filename = 'cmf-speaker-s-original-halo-30.0mm-cut-45.0deg.stl'
+    const filename =
+      'cmf-speaker-s-original-halo-30.0mm-cut-45.0deg-wave-sine-4.0mm-3cycles-90.0deg.stl'
     expect(
       (
         await buildDesignExport({

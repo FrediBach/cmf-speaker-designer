@@ -7,6 +7,7 @@ import {
   type DesignHistory,
 } from './design-history'
 import type { SvgCutout } from './svg-cutout'
+import type { HaloSettings } from './halo-settings'
 
 const initial = () => createDesignHistory(DEFAULT_DESIGN)
 const setRelief = (state: DesignHistory, relief: number) =>
@@ -32,6 +33,35 @@ const svgCutout = (): SvgCutout => ({
 })
 
 describe('design history', () => {
+  it.each<Partial<HaloSettings>>([
+    { waveShape: 'triangle' },
+    { waveAmplitude: 7 },
+    { waveFrequency: 3.25 },
+    { wavePhase: 135 },
+    { waveSeamless: false },
+  ])('records isolated halo wave changes: %j', (update) => {
+    const design = validateDesign({
+      ...DEFAULT_DESIGN,
+      halo: { ...DEFAULT_DESIGN.halo, mode: 'custom', waveShape: 'sine' },
+    })
+    const start = createDesignHistory(design)
+    const changed = designHistoryReducer(start, {
+      type: 'set',
+      update: (current) => ({
+        ...current,
+        halo: { ...current.halo, ...update },
+      }),
+    })
+    expect(changed.present.halo).toEqual({ ...design.halo, ...update })
+    expect(changed.past).toHaveLength(1)
+    expect(start.present).toEqual(design)
+    const undone = designHistoryReducer(changed, { type: 'undo' })
+    expect(undone.present).toEqual(design)
+    expect(designHistoryReducer(undone, { type: 'redo' }).present).toEqual(
+      changed.present,
+    )
+  })
+
   it('records independent power button color edits and restores them with undo and redo', () => {
     const start = initial()
     const changed = designHistoryReducer(start, {

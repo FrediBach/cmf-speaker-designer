@@ -81,6 +81,17 @@ export function randomizeDesign(
       rimHeight: range(0, 3, 0.5),
       cutAngle: range(0, 25, 5),
       cutRotation: range(0, 315, 45),
+      waveShape: pick([
+        'none',
+        'sine',
+        'triangle',
+        'square',
+        'sawtooth',
+      ] as const),
+      waveAmplitude: range(1, 5, 0.5),
+      waveFrequency: range(1, 8, 0.25),
+      wavePhase: range(0, 315, 45),
+      waveSeamless: pick([true, true, false]),
     },
     knob: {
       style: pick(KNOB_STYLES).id,

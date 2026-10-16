@@ -153,18 +153,27 @@ LEGO-compatible studs leave clearance around each stripe. Raised and recessed gr
 
 Select **Custom** in the **Halo** tab to generate a ring ready to edit. S receives one halo, and M receives identical halos around both driver openings. All controls apply to both M halos together, including the cutting angle, direction, and rim height. Switching back to S retains the settings and returns to one halo. **Full halo** starts with an uncut ring; **Rain hood** starts with an angled opening and a longer upper edge, like a street-light cover. These are starting shapes, and each dimension remains editable.
 
-| Control        | Range   | Effect                                                                                                          |
-| -------------- | ------- | --------------------------------------------------------------------------------------------------------------- |
-| Outward angle  | 0–45°   | Flares the wall away from the driver as it projects forwards. Zero creates a straight cylindrical wall.         |
-| Halo depth     | 1–40 mm | Sets the maximum forward projection from the panel face.                                                        |
-| Wall thickness | 1–6 mm  | Sets the radial thickness of the halo wall.                                                                     |
-| Cutting angle  | 0–75°*  | Cuts the entire front lip along one straight plane to shorten one side of the ring. Zero leaves the ring uncut. |
-| Cut rotation   | 0–360°  | Rotates the longer side clockwise: 0° points upwards and 90° points right.                                      |
-| Rim height     | 0–5 mm  | Leaves a continuous raised rim along the cut-away side. Zero ends flush with the panel face.                    |
+| Control        | Range                                 | Effect                                                                                                          |
+| -------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Outward angle  | 0–45°                                 | Flares the wall away from the driver as it projects forwards. Zero creates a straight cylindrical wall.         |
+| Halo depth     | 1–40 mm                               | Sets the maximum forward projection before wave modulation.                                                     |
+| Wall thickness | 1–6 mm                                | Sets the radial thickness of the halo wall.                                                                     |
+| Cutting angle  | 0–75°*                                | Cuts the entire front lip along one straight plane to shorten one side of the ring. Zero leaves the ring uncut. |
+| Cut rotation   | 0–360°                                | Rotates the longer side clockwise: 0° points upwards and 90° points right.                                      |
+| Rim height     | 0–5 mm                                | Leaves a continuous raised rim along the cut-away side. Zero ends flush with the panel face.                    |
+| Waveform       | Off, sine, triangle, square, sawtooth | Modulates the height of the existing halo after its front cut.                                                  |
+| Wave amplitude | 0–20 mm*                              | Sets the rise and fall at the original full-height tip; shorter cut sections scale proportionally.              |
+| Wave frequency | 0.25–24 cycles                        | Sets the number of wave cycles around one full turn.                                                            |
+| Wave phase     | 0–360°                                | Shifts the waveform through its cycle, starting at the top and proceeding clockwise around the ring.            |
+| Seamless loop  | On / off                              | Uses the nearest whole frequency (at least one cycle) so the pattern repeats evenly around the ring.            |
 
 \*The maximum cutting angle is the smaller of 75° and 89° minus the outward angle, so the plane can intersect the flared wall cleanly. For example, a 45° outward angle allows cuts up to 44°. Increasing the outward angle reduces an existing cutting angle when needed.
 
 The cut passes through the longest outer tip at the selected halo depth, leaving a single angled lip. **Rim height** defaults to 0 mm for a flush finish where the cut reaches the panel. Increase it to preserve a continuous raised rim up to 5 mm high. The rim cannot exceed the halo depth; reducing the depth also reduces the rim height when needed. The halo stays joined to the panel at every setting.
+
+**Height modulation** deforms the finished ring after the cut, before it joins the panel. The panel, buried attachment collar, and selected base rim stay fixed. Amplitude is limited to 90% of the depth above the base rim (and at most 20 mm), leaving material at wave troughs. A full-height base rim leaves no height to modulate. Waves can extend beyond the original halo depth. Square and sawtooth transitions have steep mesh faces. The diagram shows the original cut profile as a dashed line and the modulated outer lip as a solid line.
+
+**Seamless loop** is enabled by default. The entered frequency is retained while the applied frequency is rounded: 2.6 cycles uses 3 complete cycles. Turn it off to use fractional cycles, with a transition where the ends meet. Phase shifts the wave itself: 360° returns to the same pattern. Select **Off**, or set amplitude to zero, to restore the halo's existing cut shape. Older saved designs open with modulation off.
 
 **Original** removes the generated halos while keeping a custom grille. Selecting **Custom** restores the retained halo dimensions. Halo parameters are saved locally, included in shared design links and the exported `design.json`, and retained when switching speaker models.
 

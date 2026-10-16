@@ -3,11 +3,13 @@ import { BufferGeometry } from 'three'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 import { describe, expect, it } from 'vitest'
 import { getFaceFold } from './face-depth'
+import { normalizeHaloSettings } from './halo-settings'
 import {
   buildPanelGeometry,
   exportPanelStl,
   getPanelDimensions,
   getPanelStyles,
+  haloFilenameSuffix,
   PANEL_ASSETS,
   panelFilename,
   parsePanelGeometry,
@@ -83,6 +85,31 @@ function inspectMesh(geometry: BufferGeometry) {
 }
 
 describe('official panel geometry and millimeter STL export', () => {
+  it('names the applied halo wave while retaining names for unmodulated geometry', () => {
+    const settings = normalizeHaloSettings({
+      mode: 'custom',
+      depth: 24,
+      waveShape: 'triangle',
+      waveAmplitude: 4,
+      waveFrequency: 3.25,
+      wavePhase: 90,
+      waveSeamless: true,
+    })
+    expect(haloFilenameSuffix(settings)).toBe(
+      '-halo-24.0mm-wave-triangle-4.0mm-3cycles-90.0deg',
+    )
+    expect(haloFilenameSuffix({ ...settings, waveSeamless: false })).toBe(
+      '-halo-24.0mm-wave-triangle-4.0mm-3.25cycles-90.0deg',
+    )
+    expect(haloFilenameSuffix({ ...settings, waveShape: 'none' })).toBe(
+      '-halo-24.0mm',
+    )
+    expect(haloFilenameSuffix({ ...settings, waveAmplitude: 0 })).toBe(
+      '-halo-24.0mm',
+    )
+    expect(haloFilenameSuffix({ ...settings, mode: 'original' })).toBe('')
+  })
+
   it.each(fixtures)(
     '%s / %s retains source fit and a closed mesh at maximum face depth',
     (model, style, triangleCount, depth) => {

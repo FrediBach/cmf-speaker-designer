@@ -1,3 +1,12 @@
+export const HALO_WAVE_SHAPES = [
+  'none',
+  'sine',
+  'triangle',
+  'square',
+  'sawtooth',
+] as const
+export type HaloWaveShape = (typeof HALO_WAVE_SHAPES)[number]
+
 export interface HaloSettings {
   mode: 'original' | 'custom'
   outwardAngle: number
@@ -6,6 +15,11 @@ export interface HaloSettings {
   rimHeight: number
   cutAngle: number
   cutRotation: number
+  waveShape: HaloWaveShape
+  waveAmplitude: number
+  waveFrequency: number
+  wavePhase: number
+  waveSeamless: boolean
 }
 
 export const DEFAULT_HALO_SETTINGS: HaloSettings = {
@@ -16,6 +30,11 @@ export const DEFAULT_HALO_SETTINGS: HaloSettings = {
   rimHeight: 0,
   cutAngle: 0,
   cutRotation: 0,
+  waveShape: 'none',
+  waveAmplitude: 4,
+  waveFrequency: 3,
+  wavePhase: 0,
+  waveSeamless: true,
 }
 
 export const HALO_LIMITS = {
@@ -25,6 +44,9 @@ export const HALO_LIMITS = {
   rimHeight: { min: 0, max: 5 },
   cutAngle: { min: 0, max: 75 },
   cutRotation: { min: 0, max: 360 },
+  waveAmplitude: { min: 0, max: 20 },
+  waveFrequency: { min: 0.25, max: 24 },
+  wavePhase: { min: 0, max: 360 },
 } as const
 
 const maximumCutAngle = (outwardAngle: number) =>
@@ -53,8 +75,31 @@ export function normalizeHaloSettings(
     maximumCutAngle(values.outwardAngle),
   )
   values.rimHeight = Math.min(values.rimHeight, values.depth)
-  return { ...values, mode: input.mode === 'custom' ? 'custom' : 'original' }
+  // Leave at least 10% of the wall above the rim at the deepest trough.
+  values.waveAmplitude = Math.min(
+    values.waveAmplitude,
+    maximumWaveAmplitude(values),
+  )
+  return {
+    ...values,
+    mode: input.mode === 'custom' ? 'custom' : 'original',
+    waveShape: HALO_WAVE_SHAPES.includes(input.waveShape as HaloWaveShape)
+      ? input.waveShape!
+      : DEFAULT_HALO_SETTINGS.waveShape,
+    waveSeamless:
+      typeof input.waveSeamless === 'boolean'
+        ? input.waveSeamless
+        : DEFAULT_HALO_SETTINGS.waveSeamless,
+  }
 }
+
+const maximumWaveAmplitude = (
+  settings: Pick<HaloSettings, 'depth' | 'rimHeight'>,
+) =>
+  Math.min(
+    HALO_LIMITS.waveAmplitude.max,
+    0.9 * (settings.depth - settings.rimHeight),
+  )
 
 export function getHaloLimits(input: Partial<HaloSettings> = {}) {
   const settings = normalizeHaloSettings(input)
@@ -68,6 +113,82 @@ export function getHaloLimits(input: Partial<HaloSettings> = {}) {
       min: HALO_LIMITS.rimHeight.min,
       max: Math.min(HALO_LIMITS.rimHeight.max, settings.depth),
     },
+    waveAmplitude: {
+      min: HALO_LIMITS.waveAmplitude.min,
+      max: maximumWaveAmplitude(settings),
+    },
+  }
+}
+
+/** Number of cycles around the ring, optionally snapped to a full-cycle join. */
+export function getHaloWaveFrequency(input: Partial<HaloSettings> = {}) {
+  return waveFrequency(normalizeHaloSettings(input))
+}
+
+function waveFrequency(settings: HaloSettings) {
+  return settings.waveSeamless
+    ? Math.max(1, Math.round(settings.waveFrequency))
+    : settings.waveFrequency
+}
+
+/** Peak displacement at the original full-height tip, in millimeters. */
+export function getHaloWaveAmplitude(input: Partial<HaloSettings> = {}) {
+  const settings = normalizeHaloSettings(input)
+  return settings.waveShape === 'none' ? 0 : settings.waveAmplitude
+}
+
+/** A unit waveform; angle zero is +Y and positive angles turn toward +X. */
+export function getHaloWaveValue(
+  input: Partial<HaloSettings>,
+  angleDegrees: number,
+) {
+  return waveValue(normalizeHaloSettings(input), angleDegrees)
+}
+
+function waveValue(settings: HaloSettings, angleDegrees: number) {
+  const cycles =
+    (angleDegrees * waveFrequency(settings) + (settings.wavePhase % 360)) / 360
+  const fraction = ((cycles % 1) + 1) % 1
+  switch (settings.waveShape) {
+    case 'sine':
+      return Math.sin(2 * Math.PI * fraction)
+    case 'triangle':
+      return 1 - 4 * Math.abs(((fraction + 0.25) % 1) - 0.5)
+    case 'square':
+      return fraction < 0.5 ? 1 : -1
+    case 'sawtooth':
+      return 2 * fraction - 1
+    default:
+      return 0
+  }
+}
+
+/** Warp an existing height above the panel face, preserving the raised rim. */
+export function getHaloModulatedHeight(
+  input: Partial<HaloSettings>,
+  heightAboveFace: number,
+  angleDegrees: number,
+) {
+  return createHaloHeightModulator(input)(heightAboveFace, angleDegrees)
+}
+
+/** Prepare a reusable sampler for dense mesh deformation without renormalizing vertices. */
+export function createHaloHeightModulator(input: Partial<HaloSettings>) {
+  const settings = normalizeHaloSettings(input)
+  const remaining = settings.depth - settings.rimHeight
+  return (heightAboveFace: number, angleDegrees: number) => {
+    if (
+      heightAboveFace <= settings.rimHeight ||
+      remaining <= 0 ||
+      settings.waveShape === 'none'
+    )
+      return heightAboveFace
+    return (
+      heightAboveFace +
+      ((heightAboveFace - settings.rimHeight) / remaining) *
+        settings.waveAmplitude *
+        waveValue(settings, angleDegrees)
+    )
   }
 }
 

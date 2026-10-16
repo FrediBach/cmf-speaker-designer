@@ -210,6 +210,11 @@ test('generates a cut halo, retains shared settings, and exports it with a grill
     cutAngle: 35,
     cutRotation: 45,
     rimHeight: 2,
+    waveShape: 'none',
+    waveAmplitude: 4,
+    waveFrequency: 3,
+    wavePhase: 0,
+    waveSeamless: true,
   })
   await page.evaluate(() => localStorage.removeItem('cmf-speaker-design-v1'))
   await page.goto(link)
@@ -383,6 +388,181 @@ test('generates a cut halo, retains shared settings, and exports it with a grill
   expect(restoredSmall.mesh.rayZ(0, -23)).toEqual([])
 })
 
+test('modulates existing halos, snaps seamless cycles, and retains shareable wave controls', async ({
+  page,
+  context,
+}, testInfo) => {
+  test.setTimeout(240_000)
+  await page.goto('/')
+  await expectReady(page)
+  await page.getByRole('tab', { name: 'Halo', exact: true }).click()
+  await page.getByRole('button', { name: 'Custom halo', exact: true }).click()
+  const waveform = page.getByRole('group', { name: 'Halo waveform' })
+  await expect(waveform.getByRole('button')).toHaveText([
+    'Off',
+    'Sine',
+    'Triangle',
+    'Square',
+    'Sawtooth',
+  ])
+  await expect(
+    waveform.getByRole('button', { name: 'Off', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  const profile = [
+    ['Outward angle in degrees', '0'],
+    ['Halo depth in millimeters', '26'],
+    ['Wall thickness in millimeters', '3'],
+    ['Cutting angle in degrees', '12'],
+    ['Cut rotation in degrees', '45'],
+    ['Rim height in millimeters', '5'],
+  ] as const
+  for (const [name, value] of profile) {
+    await page.getByRole('spinbutton', { name, exact: true }).fill(value)
+  }
+  const baseline = await downloadPanel(page, testInfo, 'halo-wave-off')
+  await waveform.getByRole('button', { name: 'Sine', exact: true }).click()
+  const amplitude = page.getByRole('spinbutton', {
+    name: 'Wave amplitude in millimeters',
+    exact: true,
+  })
+  const frequency = page.getByRole('spinbutton', {
+    name: 'Wave frequency in cycles',
+    exact: true,
+  })
+  const phase = page.getByRole('spinbutton', {
+    name: 'Wave phase in degrees',
+    exact: true,
+  })
+  const seamless = page.getByRole('checkbox', {
+    name: 'Seamless loop',
+    exact: true,
+  })
+  await expect(amplitude).toHaveValue('4')
+  await expect(frequency).toHaveValue('3')
+  await expect(phase).toHaveValue('0')
+  await expect(seamless).toBeChecked()
+  await amplitude.fill('3')
+  await frequency.fill('2.6')
+  await phase.fill('37')
+  await expectReady(page)
+  const viewport = page.viewportSize()!
+  await page.setViewportSize({ width: viewport.width, height: 1600 })
+  await page.locator('.halo-wave-section').screenshot({
+    path: testInfo.outputPath('halo-wave-desktop-controls.png'),
+  })
+  await page.setViewportSize(viewport)
+
+  const snapped = await downloadPanel(page, testInfo, 'halo-wave-snapped')
+  expect(
+    Math.abs(snapped.mesh.rayZ(34, -23)[0] - baseline.mesh.rayZ(34, -23)[0]),
+    'Enabling a wave must change the already cut halo geometry',
+  ).toBeGreaterThan(0.1)
+  await expect(frequency).toHaveValue('2.6')
+  await frequency.fill('3')
+  const integer = await downloadPanel(page, testInfo, 'halo-wave-integer')
+  expect(
+    snapped.mesh.signedVolume,
+    'Seamless 2.6 cycles must generate the same geometry as exactly 3 cycles',
+  ).toBeCloseTo(integer.mesh.signedVolume, 3)
+  snapped.mesh.maximum.forEach((value, axis) =>
+    expect(value).toBeCloseTo(integer.mesh.maximum[axis], 4),
+  )
+  for (const [x, y] of [
+    [34, -23],
+    [0, 11],
+    [-34, -23],
+    [0, -57],
+  ]) {
+    expect(snapped.mesh.rayZ(x, y)).toEqual(integer.mesh.rayZ(x, y))
+  }
+
+  await frequency.fill('2.6')
+  await seamless.uncheck()
+  const free = await downloadPanel(page, testInfo, 'halo-wave-free-frequency')
+  expect(
+    Math.abs(free.mesh.signedVolume - snapped.mesh.signedVolume),
+    'Disabling seamless mode must use the entered fractional frequency',
+  ).toBeGreaterThan(1)
+  await page.reload()
+  await expectReady(page)
+  await expect(frequency).toHaveValue('2.6')
+  await expect(amplitude).toHaveValue('3')
+  await expect(phase).toHaveValue('37')
+  await expect(seamless).not.toBeChecked()
+  await expect(
+    waveform.getByRole('button', { name: 'Sine', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await page
+    .getByRole('button', { name: 'Copy design link', exact: true })
+    .click()
+  await expect(page.getByRole('status')).toContainText('Design link copied.')
+  const link = await page.evaluate(() => navigator.clipboard.readText())
+  expect(JSON.parse(new URL(link).searchParams.get('design')!).halo).toEqual({
+    mode: 'custom',
+    outwardAngle: 0,
+    depth: 26,
+    thickness: 3,
+    cutAngle: 12,
+    cutRotation: 45,
+    rimHeight: 5,
+    waveShape: 'sine',
+    waveAmplitude: 3,
+    waveFrequency: 2.6,
+    wavePhase: 37,
+    waveSeamless: false,
+  })
+  await page.evaluate(() => localStorage.removeItem('cmf-speaker-design-v1'))
+  await page.goto(link)
+  await expectReady(page)
+  await page.getByRole('tab', { name: 'Halo', exact: true }).click()
+  await expect(frequency).toHaveValue('2.6')
+  await expect(amplitude).toHaveValue('3')
+  await expect(phase).toHaveValue('37')
+  await expect(seamless).not.toBeChecked()
+  await expect(
+    waveform.getByRole('button', { name: 'Sine', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  for (const [name, value] of profile) {
+    await expect(
+      page.getByRole('spinbutton', { name, exact: true }),
+    ).toHaveValue(value)
+  }
+
+  await amplitude.fill('0')
+  const zero = await downloadPanel(page, testInfo, 'halo-wave-zero-amplitude')
+  expect(
+    zero.mesh.signedVolume,
+    'Zero amplitude must restore the existing halo without changing its cut',
+  ).toBeCloseTo(baseline.mesh.signedVolume, 3)
+  baseline.mesh.maximum.forEach((value, axis) =>
+    expect(value).toBeCloseTo(zero.mesh.maximum[axis], 4),
+  )
+  await amplitude.fill('3')
+  await seamless.check()
+  for (const shape of ['Triangle', 'Square', 'Sawtooth']) {
+    if (shape === 'Square') {
+      await revealSpeakerControls(page)
+      await page.getByRole('button', { name: /^Speaker M/ }).click()
+    }
+    await waveform.getByRole('button', { name: shape, exact: true }).click()
+    const generated = await downloadPanel(
+      page,
+      testInfo,
+      `halo-wave-${shape.toLowerCase()}`,
+    )
+    const centers = shape === 'Triangle' ? [-23] : [15, -70]
+    for (const center of centers) {
+      expect(
+        generated.mesh.rayZ(0, center),
+        `${shape} modulation must keep every driver opening clear`,
+      ).toEqual([])
+    }
+  }
+  await screenshotHaloCloseup(page, testInfo, 'speaker-m-wave-halos.png')
+})
+
 test.describe('mobile halo controls', () => {
   test.use({
     viewport: { width: 390, height: 844 },
@@ -493,6 +673,41 @@ test.describe('mobile halo controls', () => {
       exact: true,
     })
     await depth.fill('18')
+    const waveform = page.getByRole('group', { name: 'Halo waveform' })
+    await waveform
+      .getByRole('button', { name: 'Triangle', exact: true })
+      .click()
+    const waveControls = [
+      ['Wave amplitude in millimeters', '2'],
+      ['Wave frequency in cycles', '4.4'],
+      ['Wave phase in degrees', '90'],
+    ] as const
+    for (const [name, value] of waveControls) {
+      const control = page.getByRole('spinbutton', { name, exact: true })
+      await control.scrollIntoViewIfNeeded()
+      await expect(control).toBeInViewport({ ratio: 1 })
+      await control.fill(value)
+    }
+    const seamless = page.getByRole('checkbox', {
+      name: 'Seamless loop',
+      exact: true,
+    })
+    await seamless.uncheck()
+    await seamless.scrollIntoViewIfNeeded()
+    await expect(seamless).toBeInViewport({ ratio: 1 })
+    await expectReady(page)
+    await expect(page.locator('.preview-card')).toBeInViewport({ ratio: 1 })
+    await page.screenshot({
+      path: testInfo.outputPath('mobile-halo-wave-controls.png'),
+      fullPage: true,
+    })
+    await waveform.evaluate((element) =>
+      element.scrollIntoView({ block: 'start' }),
+    )
+    await page.screenshot({
+      path: testInfo.outputPath('mobile-halo-wave-selector.png'),
+      fullPage: true,
+    })
     await page
       .getByRole('button', { name: 'Original halo', exact: true })
       .click()
@@ -503,6 +718,15 @@ test.describe('mobile halo controls', () => {
     await expect(page.getByRole('spinbutton')).toHaveCount(0)
     await page.getByRole('button', { name: 'Custom halo', exact: true }).click()
     await expect(depth).toHaveValue('18')
+    for (const [name, value] of waveControls) {
+      await expect(
+        page.getByRole('spinbutton', { name, exact: true }),
+      ).toHaveValue(value)
+    }
+    await expect(seamless).not.toBeChecked()
+    await expect(
+      waveform.getByRole('button', { name: 'Triangle', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true')
 
     await page.getByRole('tab', { name: 'Front panel', exact: true }).click()
     await expect(

@@ -832,6 +832,11 @@ describe('saved and shared handle designs', () => {
         cutAngle: 40,
         cutRotation: 90,
         rimHeight: 2.4,
+        waveShape: 'triangle',
+        waveAmplitude: 5.5,
+        waveFrequency: 4.25,
+        wavePhase: 135,
+        waveSeamless: false,
       },
       grille: { ...DEFAULT_DESIGN.grille, mode: 'custom' },
       handle: { ...DEFAULT_DESIGN.handle, mode: 'custom' },
@@ -844,6 +849,11 @@ describe('saved and shared handle designs', () => {
       cutAngle: 40,
       cutRotation: 90,
       rimHeight: 2.4,
+      waveShape: 'triangle',
+      waveAmplitude: 5.5,
+      waveFrequency: 4.25,
+      wavePhase: 135,
+      waveSeamless: false,
     })
     expect(custom.style).toBe('custom')
     vi.stubGlobal('window', { location: { search: '' } })
@@ -862,5 +872,33 @@ describe('saved and shared handle designs', () => {
     expect(
       validateDesign({ halo: { mode: 'custom', cutAngle: 35 } }).halo.rimHeight,
     ).toBe(0)
+  })
+
+  it('restores legacy halo designs with wave modulation disabled', () => {
+    const legacyHalo = {
+      mode: 'custom',
+      outwardAngle: 15,
+      depth: 20,
+      thickness: 3,
+      cutAngle: 25,
+      cutRotation: 180,
+      rimHeight: 1,
+    }
+    const legacy = { ...DEFAULT_DESIGN, halo: legacyHalo }
+    vi.stubGlobal('window', { location: { search: '' } })
+    vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(legacy) })
+    expect(readDesign().halo).toEqual({
+      ...DEFAULT_HALO_SETTINGS,
+      ...legacyHalo,
+    })
+    vi.stubGlobal('window', {
+      location: {
+        search: `?design=${encodeURIComponent(JSON.stringify(legacy))}`,
+      },
+    })
+    expect(readDesign().halo).toEqual({
+      ...DEFAULT_HALO_SETTINGS,
+      ...legacyHalo,
+    })
   })
 })

@@ -1,6 +1,6 @@
 import { useNumericDraft } from '@/lib/use-numeric-draft'
 import { useId } from 'react'
-import { ArrowRight, Circle } from 'lucide-react'
+import { ArrowRight, Check, Circle } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import {
   DEFAULT_HALO_SETTINGS,
@@ -8,6 +8,10 @@ import {
   HALO_LIMITS,
   getHaloLimits,
   getHaloCutPivotRadius,
+  createHaloHeightModulator,
+  getHaloWaveAmplitude,
+  getHaloWaveFrequency,
+  getHaloWaveValue,
   normalizeHaloSettings,
   type HaloSettings,
 } from '@/lib/halo-settings'
@@ -33,20 +37,21 @@ function HaloParameter({
   min: number
   max: number
   step: number
-  unit: 'mm' | '°'
+  unit: 'mm' | '°' | 'cycles'
   description: string
   onChange: (value: number) => void
 }) {
   const descriptionId = useId()
-  const [draft, setDraft] = useNumericDraft(value)
-  const unitName = unit === 'mm' ? 'millimeters' : 'degrees'
+  const [draft, setDraft] = useNumericDraft(value, 3)
+  const unitName =
+    unit === 'mm' ? 'millimeters' : unit === '°' ? 'degrees' : 'cycles'
   const commit = () => {
     const numeric = Number(draft)
     const next =
       draft.trim() && Number.isFinite(numeric)
         ? Math.min(max, Math.max(min, numeric))
         : value
-    setDraft(String(Number(next.toFixed(2))))
+    setDraft(String(Number(next.toFixed(3))))
     if (next !== value) onChange(next)
   }
 
@@ -63,6 +68,7 @@ function HaloParameter({
             min={min}
             max={max}
             step={step}
+            disabled={max <= min}
             value={draft}
             onChange={(event) => {
               setDraft(event.target.value)
@@ -86,11 +92,12 @@ function HaloParameter({
       <Slider
         aria-label={label}
         aria-describedby={descriptionId}
-        aria-valuetext={`${Number(value.toFixed(2))} ${unitName}`}
+        aria-valuetext={`${Number(value.toFixed(3))} ${unitName}`}
         value={[value]}
         min={min}
-        max={max}
+        max={Math.max(min + step, max)}
         step={step}
+        disabled={max <= min}
         onValueChange={([next]) => onChange(next)}
       />
       <p id={descriptionId}>{description}</p>
@@ -99,6 +106,7 @@ function HaloParameter({
 }
 
 function HaloDiagram({ value }: { value: HaloSettings }) {
+  const modulateHeight = createHaloHeightModulator(value)
   const flare = Math.tan((value.outwardAngle * Math.PI) / 180)
   const slope = Math.tan((value.cutAngle * Math.PI) / 180)
   const radius = HALO_INNER_RADIUS
@@ -140,13 +148,19 @@ function HaloDiagram({ value }: { value: HaloSettings }) {
           return end <= 0 ? [...intersection, point] : intersection
         })
     if (clipped.length < 3) return null
-    return clipped.map(([z, radial]) => `${z + 15},${-radial}`).join(' ')
+    const angle = value.cutRotation + (direction === 1 ? 0 : 180)
+    return clipped
+      .map(([z, radial]) => `${modulateHeight(z, angle) + 15},${-radial}`)
+      .join(' ')
   }
   const extent = Math.max(45, tipRadius + 8)
   const hasCut = value.cutAngle > 0 && value.rimHeight < value.depth
+  const hasWave = value.waveShape !== 'none' && getHaloWaveAmplitude(value) > 0
   return (
     <div className="halo-diagram" aria-hidden="true">
-      <svg viewBox={`0 ${-extent} 70 ${extent * 2}`}>
+      <svg
+        viewBox={`0 ${-extent} ${Math.max(70, value.depth + getHaloWaveAmplitude(value) + 23)} ${extent * 2}`}
+      >
         <path
           d={`M11 ${-outerRadius - 5}v${(outerRadius + 5) * 2}`}
           stroke="var(--control-border)"
@@ -180,9 +194,11 @@ function HaloDiagram({ value }: { value: HaloSettings }) {
       </svg>
       <div className="halo-diagram-notes">
         <span>CUT PROFILE</span>
-        <strong>{hasCut ? 'Angled hood' : 'Full halo'}</strong>
+        <strong>
+          {hasWave ? 'Modulated halo' : hasCut ? 'Angled hood' : 'Full halo'}
+        </strong>
         <p>
-          {value.depth} mm projection
+          {value.depth} mm {hasWave ? 'base depth' : 'projection'}
           <br />
           {value.outwardAngle}° outward flare
         </p>
@@ -194,14 +210,107 @@ function HaloDiagram({ value }: { value: HaloSettings }) {
               transform={`rotate(${value.cutRotation} 12 12)`}
             />
           </svg>
-          {hasCut ? `${value.cutRotation}° cut direction` : 'Even rim'}
+          {hasCut
+            ? `${value.cutRotation}° cut direction`
+            : hasWave
+              ? 'Waved rim'
+              : 'Even rim'}
         </span>
       </div>
     </div>
   )
 }
 
+const WAVEFORMS = [
+  ['none', 'Off'],
+  ['sine', 'Sine'],
+  ['triangle', 'Triangle'],
+  ['square', 'Square'],
+  ['sawtooth', 'Sawtooth'],
+] as const
+
+function WaveformMark({ shape }: { shape: HaloSettings['waveShape'] }) {
+  const settings = {
+    ...DEFAULT_HALO_SETTINGS,
+    waveShape: shape,
+    waveFrequency: 1,
+  }
+  return (
+    <svg viewBox="0 0 48 26" fill="none" aria-hidden="true">
+      <polyline
+        points={Array.from(
+          { length: 65 },
+          (_, index) =>
+            `${3 + (index / 64) * 42},${13 - getHaloWaveValue(settings, (index / 64) * 360) * 9}`,
+        ).join(' ')}
+      />
+    </svg>
+  )
+}
+
+function HaloWaveDiagram({ value }: { value: HaloSettings }) {
+  const modulateHeight = createHaloHeightModulator(value)
+  const slope = Math.tan((value.cutAngle * Math.PI) / 180)
+  const flare = Math.tan((value.outwardAngle * Math.PI) / 180)
+  const pivot = getHaloCutPivotRadius(value)
+  const outerRadius = HALO_INNER_RADIUS + value.thickness
+  const maxHeight = value.depth + getHaloWaveAmplitude(value)
+  const points = Array.from({ length: 513 }, (_, index) => {
+    const angle = (index / 512) * 360
+    const direction = Math.cos(((angle - value.cutRotation) * Math.PI) / 180)
+    const height = Math.max(
+      value.rimHeight,
+      Math.min(
+        value.depth,
+        (value.depth - slope * pivot + slope * outerRadius * direction) /
+          (1 - slope * flare * direction),
+      ),
+    )
+    const x = 6 + (index / 512) * 268
+    return {
+      base: `${x},${66 - (height / maxHeight) * 58}`,
+      wave: `${x},${66 - (modulateHeight(height, angle) / maxHeight) * 58}`,
+    }
+  })
+  const frequency = getHaloWaveFrequency(value)
+  return (
+    <div className="halo-wave-preview">
+      <div>
+        <span>HEIGHT AROUND THE HALO</span>
+        <strong>
+          {Number(frequency.toFixed(2))} {frequency === 1 ? 'cycle' : 'cycles'}
+        </strong>
+      </div>
+      <svg
+        viewBox="0 0 280 76"
+        role="img"
+        aria-label="Halo rim height around one full turn, with the original cut profile shown as a dashed line"
+      >
+        <path d="M6 66H274" className="halo-wave-baseline" />
+        <polygon
+          points={`6,66 ${points.map((point) => point.wave).join(' ')} 274,66`}
+        />
+        <polyline
+          points={points.map((point) => point.base).join(' ')}
+          className="halo-wave-before"
+        />
+        <polyline
+          points={points.map((point) => point.wave).join(' ')}
+          className="halo-wave-after"
+        />
+      </svg>
+      <div>
+        <span>0° · TOP</span>
+        <span>180° · BOTTOM</span>
+        <span>360°</span>
+      </div>
+    </div>
+  )
+}
+
 export function HaloEditor({ model, value: input, onChange }: Props) {
+  const seamlessLabelId = useId()
+  const seamlessDescriptionId = useId()
   const value = normalizeHaloSettings(input)
   const limits = getHaloLimits(value)
   const set = (patch: Partial<HaloSettings>) =>
@@ -209,7 +318,7 @@ export function HaloEditor({ model, value: input, onChange }: Props) {
   const parameter = (
     key: keyof typeof HALO_LIMITS,
     label: string,
-    unit: 'mm' | '°',
+    unit: 'mm' | '°' | 'cycles',
     description: string,
     step = 0.5,
   ) => (
@@ -235,8 +344,8 @@ export function HaloEditor({ model, value: input, onChange }: Props) {
         </div>
         <p>
           {model === 'm'
-            ? 'Shape both driver rings, or cut them back into matching rain hoods.'
-            : 'Shape the driver ring, or cut it back into a rain hood.'}
+            ? 'Shape both driver rings with an angled cut and waves around the rim.'
+            : 'Shape the driver ring with an angled cut and waves around the rim.'}
         </p>
         <div
           className="halo-mode"
@@ -273,7 +382,8 @@ export function HaloEditor({ model, value: input, onChange }: Props) {
           <h4>No custom halo selected</h4>
           <p>
             Adjust the outward angle, depth, and wall thickness. Tilt the front
-            cut to create a streetlight-style cover.
+            cut to create a streetlight-style cover, then modulate its height
+            with a wave.
           </p>
           <button type="button" onClick={() => set({ mode: 'custom' })}>
             Design your halo <ArrowRight size={16} aria-hidden="true" />
@@ -322,7 +432,7 @@ export function HaloEditor({ model, value: input, onChange }: Props) {
               'depth',
               'Halo depth',
               'mm',
-              'The furthest projection from the front face.',
+              'The furthest projection before wave modulation.',
             )}
             {parameter(
               'thickness',
@@ -355,6 +465,85 @@ export function HaloEditor({ model, value: input, onChange }: Props) {
               'mm',
               '0 mm lets the cut meet the panel flush. Raise it to keep a continuous base rim.',
               0.1,
+            )}
+          </section>
+          <section className="control-section halo-wave-section">
+            <h3>
+              <span aria-hidden="true">03</span> Height modulation
+            </h3>
+            <p className="halo-wave-intro">
+              Add a wave to the current halo and its cut. The base rim stays
+              fixed.
+            </p>
+            <div
+              className="halo-wave-options"
+              role="group"
+              aria-label="Halo waveform"
+            >
+              {WAVEFORMS.map(([shape, label]) => (
+                <button
+                  key={shape}
+                  type="button"
+                  aria-pressed={value.waveShape === shape}
+                  onClick={() => set({ waveShape: shape })}
+                >
+                  <WaveformMark shape={shape} />
+                  {label}
+                </button>
+              ))}
+            </div>
+            {value.waveShape !== 'none' && (
+              <>
+                <HaloWaveDiagram value={value} />
+                {parameter(
+                  'waveAmplitude',
+                  'Wave amplitude',
+                  'mm',
+                  value.rimHeight >= value.depth
+                    ? 'Lower the rim height below the halo depth to make room for a wave.'
+                    : 'Rise and fall at the full-height tip. Shorter cut sections scale proportionally; the base rim stays fixed.',
+                  0.1,
+                )}
+                {parameter(
+                  'waveFrequency',
+                  'Wave frequency',
+                  'cycles',
+                  value.waveSeamless
+                    ? `Snaps to ${getHaloWaveFrequency(value)} whole ${getHaloWaveFrequency(value) === 1 ? 'cycle' : 'cycles'} around the ring.`
+                    : 'Cycles around one full turn. Fractional cycles create a transition where the ends meet.',
+                  0.05,
+                )}
+                <label className="grille-extension-toggle halo-seamless-toggle">
+                  <input
+                    type="checkbox"
+                    aria-labelledby={seamlessLabelId}
+                    aria-describedby={seamlessDescriptionId}
+                    checked={value.waveSeamless}
+                    onChange={(event) =>
+                      set({ waveSeamless: event.target.checked })
+                    }
+                  />
+                  <span className="grille-checkbox" aria-hidden="true">
+                    {value.waveSeamless && (
+                      <Check size={11} strokeWidth={2.5} />
+                    )}
+                  </span>
+                  <span>
+                    <strong id={seamlessLabelId}>Seamless loop</strong>
+                    <small id={seamlessDescriptionId}>
+                      Use the nearest whole frequency so the wave repeats evenly
+                      around the halo.
+                    </small>
+                  </span>
+                </label>
+                {parameter(
+                  'wavePhase',
+                  'Wave phase',
+                  '°',
+                  'Shift the wave through its cycle. One full cycle is 360°; the ring starts at the top and runs clockwise.',
+                  1,
+                )}
+              </>
             )}
           </section>
           <p className="halo-footnote">

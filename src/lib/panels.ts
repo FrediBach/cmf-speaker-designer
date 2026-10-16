@@ -4,7 +4,11 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 import { applyFaceDepth, MAX_FACE_DEPTH } from './face-depth'
 import { applyPanelExtension } from './panel-extension'
 import { computePanelNormals } from './panel-normals'
-import type { HaloSettings } from './halo-settings'
+import {
+  getHaloWaveAmplitude,
+  getHaloWaveFrequency,
+  type HaloSettings,
+} from './halo-settings'
 import type { HandleSettings } from './handle-settings'
 export { MAX_FACE_DEPTH } from './face-depth'
 
@@ -195,7 +199,12 @@ export function panelFilename(
 
 export function haloFilenameSuffix(settings?: HaloSettings): string {
   if (settings?.mode !== 'custom') return ''
-  return `-halo-${settings.depth.toFixed(1)}mm${settings.cutAngle > 0 ? `-cut-${settings.cutAngle.toFixed(1)}deg` : ''}`
+  const amplitude = getHaloWaveAmplitude(settings)
+  const waveSuffix =
+    amplitude > 0
+      ? `-wave-${settings.waveShape}-${amplitude.toFixed(1)}mm-${getHaloWaveFrequency(settings)}cycles-${settings.wavePhase.toFixed(1)}deg`
+      : ''
+  return `-halo-${settings.depth.toFixed(1)}mm${settings.cutAngle > 0 ? `-cut-${settings.cutAngle.toFixed(1)}deg` : ''}${waveSuffix}`
 }
 
 export function handleFilenameSuffix(settings?: HandleSettings): string {
