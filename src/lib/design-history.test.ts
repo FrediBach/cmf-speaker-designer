@@ -165,6 +165,31 @@ describe('design history', () => {
     )
   })
 
+  it('records split panel opt-in and restores it with undo, redo, and reset', () => {
+    const start = initial()
+    const changed = designHistoryReducer(start, {
+      type: 'set',
+      update: (design) => ({ ...design, panelSplit: true }),
+    })
+    expect(changed.present.panelSplit).toBe(true)
+    expect(changed.past).toHaveLength(1)
+    const undone = designHistoryReducer(changed, { type: 'undo' })
+    expect(undone.present).toEqual(DEFAULT_DESIGN)
+    const redone = designHistoryReducer(undone, { type: 'redo' })
+    expect(redone.present).toEqual(changed.present)
+    expect(
+      designHistoryReducer(redone, { type: 'set', update: redone.present }),
+    ).toBe(redone)
+    const reset = designHistoryReducer(redone, {
+      type: 'set',
+      update: DEFAULT_DESIGN,
+    })
+    expect(reset.present.panelSplit).toBe(false)
+    expect(designHistoryReducer(reset, { type: 'undo' }).present).toEqual(
+      changed.present,
+    )
+  })
+
   it('records panel extension changes and restores them with undo and redo', () => {
     const start = initial()
     const changed = designHistoryReducer(start, {

@@ -34,6 +34,7 @@ import { normalizeHaloSettings } from './halo-settings'
 import { normalizeRaceStripeSettings } from './race-stripe-settings'
 import { applyMulticolorPreset, MULTICOLOR_PRESETS } from './multicolor-presets'
 import { validateDesign } from './design'
+import { randomizeDesign } from './random-design'
 
 function readPanel(model: SpeakerModel) {
   const bytes = readFileSync(
@@ -107,6 +108,13 @@ function inspect(part: MaterialMesh) {
     const cx = p[c * 3],
       cy = p[c * 3 + 1],
       cz = p[c * 3 + 2]
+    const area = Math.hypot(
+      (by - ay) * (cz - az) - (bz - az) * (cy - ay),
+      (bz - az) * (cx - ax) - (bx - ax) * (cz - az),
+      (bx - ax) * (cy - ay) - (by - ay) * (cx - ax),
+    )
+    if (area === 0)
+      throw new Error('An exported region has a collapsed triangle.')
     volume +=
       (ax * (by * cz - bz * cy) +
         ay * (bz * cx - bx * cz) +
@@ -175,7 +183,11 @@ describe('multicolor material partitioning', () => {
   })
   afterAll(() => engine.dispose())
 
-  function assertPartition(input: MulticolorMesh, parts: MaterialMesh[]) {
+  function assertPartition(
+    input: MulticolorMesh,
+    parts: MaterialMesh[],
+    componentCount = 1,
+  ) {
     const owned: Manifold[] = []
     const own = (solid: Manifold) => {
       owned.push(solid)
@@ -209,11 +221,118 @@ describe('multicolor material partitioning', () => {
       const components = united.decompose().map(own)
       expect(
         components.filter((part) => part.volume() > tolerance),
-      ).toHaveLength(1)
+      ).toHaveLength(componentCount)
     } finally {
       owned.reverse().forEach((solid) => solid.delete())
     }
   }
+
+  it('partitions the shared split M design with large angled text and small deck lettering', async () => {
+    const design = validateDesign(
+      JSON.parse(
+        readFileSync(
+          new URL('./__fixtures__/split-text-design.json', import.meta.url),
+          'utf8',
+        ),
+      ),
+    )
+    const source = readPanel(design.model)
+    const panel = await buildHandledPanelGeometry(
+      source,
+      design.model,
+      'original',
+      design.relief,
+      design.handle,
+      design.grille,
+      design.halo,
+      design.panelExtension,
+      design.panelGap,
+      design.raceStripes,
+      undefined,
+      true,
+    )
+    try {
+      const split = panel.userData.split
+      const cases = [
+        { input: inputOf(panel), components: 2 },
+        { input: { positions: split.frontPositions }, components: 1 },
+        { input: { positions: split.upperPositions }, components: 1 },
+      ]
+      for (const { input, components } of cases) {
+        const result = engine.build(input, design.multicolor)
+        expect(result.parts.map((part) => part.materialId)).toEqual([
+          'base',
+          design.multicolor.materials[0].id,
+        ])
+        expect(result.parts.flatMap((part) => part.elementIds)).toContain(
+          design.multicolor.elements[0].id,
+        )
+        if (components === 2)
+          expect(
+            result.parts.flatMap((part) => part.elementIds).sort(),
+          ).toEqual(
+            design.multicolor.elements.map((element) => element.id).sort(),
+          )
+        assertPartition(input, result.parts, components)
+      }
+    } finally {
+      source.dispose()
+      panel.dispose()
+    }
+  }, 60_000)
+
+  it.each(['seed', 'browser'] as const)(
+    'partitions the Speaker S random design from the %s regression',
+    async (kind) => {
+      let seed = 4281
+      const design =
+        kind === 'seed'
+          ? randomizeDesign('s', () => {
+              seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+              return seed / 4294967296
+            })
+          : validateDesign(
+              JSON.parse(
+                readFileSync(
+                  new URL(
+                    './__fixtures__/history-random-design.json',
+                    import.meta.url,
+                  ),
+                  'utf8',
+                ),
+              ),
+            )
+      const source = readPanel(design.model)
+      const panel = await buildHandledPanelGeometry(
+        source,
+        design.model,
+        'original',
+        design.relief,
+        design.handle,
+        design.grille,
+        design.halo,
+        design.panelExtension,
+        design.panelGap,
+        design.raceStripes,
+      )
+      try {
+        const input = inputOf(panel)
+        const result = engine.build(input, design.multicolor)
+        expect(result.parts.map((part) => part.materialId)).toEqual(
+          expect.arrayContaining(
+            design.multicolor.enabled
+              ? design.multicolor.materials.map((material) => material.id)
+              : ['base'],
+          ),
+        )
+        assertPartition(input, result.parts)
+      } finally {
+        source.dispose()
+        panel.dispose()
+      }
+    },
+    60_000,
+  )
 
   it('partitions the reported overlapping stripes on a slotted handle and round grille', async () => {
     const design = validateDesign(

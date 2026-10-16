@@ -344,7 +344,7 @@ function PreviewSummary({
           : `${panelWidth} × ${panelHeight} MM`}{' '}
         <span>·</span>{' '}
         {design.multicolor.enabled && assembly !== 'knob'
-          ? `${meshes.materialParts?.length ?? '…'} MATERIALS`
+          ? `${meshes.materialParts ? new Set(meshes.materialParts.map((part) => part.materialId)).size : '…'} MATERIALS`
           : colorName(
               assembly === 'knob' ? design.knobColor : design.panelColor,
             ).toUpperCase()}

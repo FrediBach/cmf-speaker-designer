@@ -69,6 +69,17 @@ function artworkDesign(): Design {
 }
 
 describe('progressive design variations', () => {
+  it.each([false, true])(
+    'retains the explicitly chosen split assembly setting (%s) in every variation',
+    (panelSplit) => {
+      const base = validateDesign({ ...DEFAULT_DESIGN, panelSplit })
+      for (const { design } of createDesignVariations(base, seededRandom(17)))
+        expect(design.panelSplit).toBe(panelSplit)
+      const candidate = validateDesign({ ...base, panelSplit: !panelSplit })
+      expect(panelSafeVariation(base, candidate).panelSplit).toBe(panelSplit)
+    },
+  )
+
   it('retains the selected character face in subtle knob variations', () => {
     const base = validateDesign({
       ...DEFAULT_DESIGN,
@@ -98,6 +109,7 @@ describe('progressive design variations', () => {
       'relief',
       'panelExtension',
       'panelGap',
+      'panelSplit',
       'handle',
       'grille',
       'halo',

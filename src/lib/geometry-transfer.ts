@@ -55,7 +55,13 @@ export function deserializeGeometry(data: SerializedGeometry): BufferGeometry {
 export function geometryTransferList(data: SerializedGeometry): ArrayBuffer[] {
   return [
     ...new Set(
-      [data.positions, data.normals, data.indices]
+      [
+        data.positions,
+        data.normals,
+        data.indices,
+        data.userData.split?.frontPositions as Float32Array | undefined,
+        data.userData.split?.upperPositions as Float32Array | undefined,
+      ]
         .filter((array) => array !== undefined)
         .map((array) => array.buffer as ArrayBuffer),
     ),

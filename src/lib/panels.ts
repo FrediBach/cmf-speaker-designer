@@ -127,6 +127,7 @@ export function buildPanelGeometry(
     addedFaceDepth: relief,
     panelExtension,
     panelGap: 0,
+    panelSplit: false,
     units: 'mm',
   }
   if (relief > 0 || panelExtension !== 0) {

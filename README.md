@@ -82,6 +82,7 @@ Choose **Black** or **Gray** under **Speaker body**, next to the model selection
 - Add up to 2 mm of face depth while retaining the original mounting region and overall face dimensions.
 - Extend the front and angled panel edges by up to 1 cm per side, with an independently sized handle.
 - Add a 0–0.5 cm panel gap with extended attachment necks and cylindrical rear supports on the front and angled section. The knob and button remain at their original height in recessed openings.
+- Optionally split the panel at the start of the angled section and print the front and upper parts separately, with a sliding tongue and rear groove for assembly.
 - Generate a custom upper handle: adjust its height, width, rounded corners, top angle, and straight or inward/outward rounded top, then choose a solid face, one to three circular or slotted openings, one to seven rounded slits open at the top, or an uploaded SVG cutout.
 - Add LEGO-compatible studs to the custom handle's front face.
 - Recess one to three centered vertical race stripes into the panel, with adjustable stripe width and gap. Studs and decorative face patterns leave the stripes clear.
@@ -110,6 +111,16 @@ The **Grille** tab generates a perforated grille over the original driver openin
 
 **Recess depth** ranges from −3 to 6 mm, independently of grille thickness. Positive values recess the pattern and can cut completely through the panel where there is no case attachment; attachment regions retain at least 0.5 mm of backing. Zero leaves the surrounding face flat. Negative values raise the shapes above the face, like studs, by the absolute depth. Driver openings remain through-holes at every depth.
 
+## Split panel assembly
+
+In **Front panel → Print assembly**, enable **Split front and upper panel** to print the front plate separately from the angled control deck and everything above it. The option is off by default for existing and new designs. **Speaker** view shows the assembled panel; **Exploded** separates the front, upper section, volume knob, and power button. Color regions move with their physical panel piece. Exports provide the two printable panel parts.
+
+The upper part has a sliding tongue that fits down into a recessed groove in the back of the front plate. The reinforced groove stays within the available clearance behind the panel. A small solid area around the joint may back the uppermost grille openings when **Continue across the face** is enabled. Join the parts before mounting the panel to the speaker. The joint is intended to support alignment alongside the existing mounting hooks, but its printed fit and strength still need testing before carrying a speaker by the handle.
+
+Split STL/STP exports provide separate front and upper files in a ZIP, including when **Panel only** is selected. Split 3MF contains two panel print objects. In a split **STL parts** export, import all `panel-front-material` files together as one object, and all `panel-upper-material` files together as a second object. Keep each object's color regions aligned; only the two completed panel objects are printed separately.
+
+The assembly choice is saved locally, included in shared links and design JSON, and supports undo/redo. Design variations preserve it; generating an entirely new random design returns to the default one-piece assembly.
+
 ## Multicolor patterns
 
 In **Front panel → Colors**, choose **Multicolor** to reveal the configurator. The existing panel color becomes **Background**; knob and power button colors remain independent. Color mode works with both Original and Custom panel geometry. Switching to Single color hides the pattern without deleting it, and selecting Original panel shape retains the multicolor composition.
@@ -137,7 +148,7 @@ The stripe generator supports equal or weighted widths, direction, count, gaps, 
 
 Authored artwork keeps its physical dimensions when the speaker model or panel geometry changes. **Fit artwork to current panel** applies a uniform scale, preserving circles; **Reapply chosen preset to panel** regenerates the recipe against the current panel. The artwork frame clips the pattern, with background material outside it. Existing holes remain open: a disc entirely inside a driver opening contributes no printable material.
 
-Color regions extend through the finished panel's full depth, including intersected handles, halos, grille bars, and mounting features. They divide the existing solid without changing its shape. This is intended as one assembled multicolor print, not separate inlays or a shallow decorative skin. Front projection does not unwrap the angled control deck. Use compatible filaments and inspect bonding, sliced boundaries, supports, and tool changes; simple layer-height filament swaps cannot reproduce every pattern.
+Color regions extend through the finished panel's full depth, including intersected handles, halos, grille bars, and mounting features. They divide the existing solid without changing its shape. Each physical panel part prints with its material regions assembled, rather than as separate inlays or a shallow decorative skin. Split assembly creates two physical panel parts, each with its own aligned color regions. Front projection does not unwrap the angled control deck. Use compatible filaments and inspect bonding, sliced boundaries, supports, and tool changes; simple layer-height filament swaps cannot reproduce every pattern.
 
 The provisional limits are **128 elements**, **128 vertices per polygon**, and **128 explicit palette materials** plus Background. Excess documents are rejected rather than trimmed. Geometry runs in a separate worker; palette RGB/name edits do not repartition the panel. Empty and occluded regions are omitted from exports. Small-region diagnostics use a provisional 0.8 mm reference, not a guaranteed printable minimum. Dense jobs can time out after 45 seconds; reduce complexity or retry. Browser profiling, complete slicer workflows, and physical print validation remain release checks.
 
@@ -205,7 +216,7 @@ Triangle, Arrow, and V also offer **Grip width** and **Grip depth**, measured ac
 
 ## Export and design files
 
-Choose **Export design**, then a format and **All parts**, **Panel only**, **Knob only**, or **Power button only**. Single-color designs default to STL; Multicolor defaults to 3MF. Material exports containing the panel wait for regions matching the current design. Combined geometry exports remain available without material separation.
+Choose **Export design**, then a format and **All parts**, **Panel only**, **Knob only**, or **Power button only**. Single-color designs default to STL; Multicolor defaults to 3MF. Material exports containing the panel wait for regions matching the current design. Combined geometry exports remain available without material separation. The table describes one-piece panels; with **Split front and upper panel**, each panel becomes two print objects, and panel STL/STP exports always include both files in a ZIP.
 
 | Format        | Output and use                                                                                                                                                                                                                                                                                                            |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -240,6 +251,7 @@ Multicolor release validation is incomplete. The production build, 390 unit/inte
 - `src/components/MulticolorEditor.tsx` and `MulticolorCanvas.tsx` provide the layer/material inspector and 2D placement editor.
 - `src/lib/multicolor-geometry.ts` partitions the final solid and reports region diagnostics; `multicolor-mesh.ts` prepares printable and smoothed preview meshes in the worker. `multicolor-client.ts`, `multicolor.worker.ts`, and `use-multicolor-geometry.ts` handle worker scheduling, disposal, and current-result gating.
 - `src/lib/panel-engine.ts` combines handle generation, the shared face-depth transformation, grille generation, and halo generation in order inside the worker.
+- `src/lib/panel-split.ts` optionally separates the completed panel into front and upper solids, with a reinforced groove and sliding tongue. Both part buffers travel with the assembled preview for separate exports.
 - `src/lib/use-panel-geometry.ts` schedules geometry updates, retains the last preview during generation, and enables export when the current design is ready.
 - `src/lib/knob-settings.ts` validates knob styles and dimensions; `knobs.ts` extracts the source parts, preserves the mounting interface, and builds the preview/export geometry.
 - `src/lib/use-knob-geometry.ts`, `knob-client.ts`, and `knobs.worker.ts` load and update knobs in a worker while preventing stale geometry from being exported.

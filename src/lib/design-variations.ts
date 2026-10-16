@@ -54,6 +54,7 @@ export function panelSafeVariation(base: Design, candidate: Design): Design {
     relief: original.relief,
     panelExtension: original.panelExtension,
     panelGap: original.panelGap,
+    panelSplit: original.panelSplit,
     handle: original.handle,
     grille: original.grille,
     halo: original.halo,

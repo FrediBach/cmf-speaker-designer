@@ -1,6 +1,8 @@
 import { buildArchive } from './archive'
-import type { BufferGeometry } from 'three'
+import { BufferAttribute, BufferGeometry } from 'three'
 import type { Design } from './design'
+import type { PanelSplitMetadata } from './panel-split'
+import { buildMulticolorGeometry } from './multicolor-client'
 import { exportKnobStl, knobFilename, prepareKnobExportGeometry } from './knobs'
 import {
   exportPowerButtonStl,
@@ -70,6 +72,106 @@ function selectedPanelFilename(design: Design): string {
   )
 }
 
+/** Read typed split buffers before cloning: Three serializes cloned userData. */
+function splitPanelGeometries(panel: BufferGeometry) {
+  const split = panel.userData.split as PanelSplitMetadata | undefined
+  if (!split?.frontPositions?.length || !split?.upperPositions?.length)
+    throw new Error('Wait for the split panel to finish before exporting.')
+  return (['front', 'upper'] as const).map((id) => {
+    const geometry = new BufferGeometry()
+    geometry.setAttribute(
+      'position',
+      new BufferAttribute(new Float32Array(split[`${id}Positions`]), 3),
+    )
+    return { id, geometry }
+  })
+}
+
+function splitPanelExportMetadata(panel: BufferGeometry) {
+  const split = panel.userData.split as PanelSplitMetadata
+  return {
+    seamY: split.seamY,
+    seamGapMm: split.seamGapMm,
+    clearanceMm: split.clearanceMm,
+    engagementMm: split.engagementMm,
+    tongueWidthMm: split.tongueWidthMm,
+    tongueThicknessMm: split.tongueThicknessMm,
+    insertionAxis: split.insertionAxis,
+    assemblyNote:
+      'Print the front and upper panel separately. Slide the upper tongue down into the groove in the front panel before mounting the panel on the speaker.',
+  }
+}
+
+async function buildSplitPanelExport(
+  input: DesignExportInput & { format: 'stl' | 'stp' },
+): Promise<DesignExportFile> {
+  const { panel, design, target, format } = input
+  const parts = splitPanelGeometries(panel)
+  const filenames = {
+    front: selectedPanelFilename(design).replace(
+      '.stl',
+      `-split-front.${format}`,
+    ),
+    upper: selectedPanelFilename(design).replace(
+      '.stl',
+      `-split-upper.${format}`,
+    ),
+  }
+  const entries: { name: string; data: Uint8Array }[] = []
+  try {
+    for (const { id, geometry } of parts) {
+      geometry.applyMatrix4(panelAssemblyTransform(geometry, id))
+      entries.push({
+        name: filenames[id],
+        data: new Uint8Array(
+          format === 'stp'
+            ? await exportStepFile(geometry, filenames[id])
+            : serializePlacedStl(geometry),
+        ),
+      })
+    }
+    const files: Record<string, string | typeof filenames> = {
+      panel: filenames,
+    }
+    if (target === 'all') {
+      for (const part of ['knob', 'power-button'] as const) {
+        const file = await buildDesignExport({ ...input, target: part })
+        entries.push({ name: file.filename, data: new Uint8Array(file.data) })
+        files[part === 'knob' ? 'knob' : 'powerButton'] = file.filename
+      }
+    }
+    entries.push({
+      name: 'design.json',
+      data: encoder.encode(
+        `${JSON.stringify(
+          {
+            ...design,
+            export: {
+              version: 2,
+              units: 'mm',
+              format,
+              geometryType: format === 'stp' ? 'advanced-brep' : 'mesh',
+              ...(format === 'stp' ? { toleranceMm: STEP_TOLERANCE_MM } : {}),
+              files,
+              panelSplit: splitPanelExportMetadata(panel),
+              colorNote: `${format.toUpperCase()} files contain geometry only. Match the saved colors to filament or material colors in your slicer or CAD application.`,
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      ),
+    })
+    return {
+      filename: `cmf-speaker-${design.model}-${target === 'all' ? 'design' : 'panel'}-split${format === 'stp' ? '-stp' : ''}.zip`,
+      data: buildArchive(entries),
+      mimeType: 'application/zip',
+    }
+  } finally {
+    parts.forEach(({ geometry }) => geometry.dispose())
+  }
+}
+
 /** Exports separate printable parts, preparing CAD geometry only for STEP. */
 export async function buildDesignExport({
   panel,
@@ -82,6 +184,16 @@ export async function buildDesignExport({
 }: DesignExportInput): Promise<DesignExportFile> {
   if (format === '3mf' || format === 'stl-parts')
     return buildMaterialExport({
+      panel,
+      knob,
+      powerButton,
+      design,
+      target,
+      format,
+      materialParts,
+    })
+  if (design.panelSplit && (target === 'all' || target === 'panel'))
+    return buildSplitPanelExport({
       panel,
       knob,
       powerButton,
@@ -180,7 +292,7 @@ export async function buildDesignExport({
   }
 }
 
-function buildMaterialExport({
+async function buildMaterialExport({
   panel,
   knob,
   powerButton,
@@ -188,7 +300,7 @@ function buildMaterialExport({
   target,
   format,
   materialParts,
-}: DesignExportInput): DesignExportFile {
+}: DesignExportInput): Promise<DesignExportFile> {
   const owned: BufferGeometry[] = []
   const own = (geometry: BufferGeometry) => {
     owned.push(geometry)
@@ -196,12 +308,22 @@ function buildMaterialExport({
   }
   try {
     const assemblies: ThreeMfAssembly[] = []
-    let printablePanel: BufferGeometry | undefined
+    const splitPanel =
+      design.panelSplit && (target === 'all' || target === 'panel')
+    let precedingPart: BufferGeometry | undefined
+    const placeNextPart = (geometry: BufferGeometry) => {
+      geometry.computeBoundingBox()
+      const offset = precedingPart
+        ? [
+            precedingPart.boundingBox!.max.x + 10 - geometry.boundingBox!.min.x,
+            precedingPart.boundingBox!.min.y - geometry.boundingBox!.min.y,
+          ]
+        : [0, 0]
+      geometry.translate(offset[0], offset[1], 0)
+      precedingPart = geometry
+      return offset
+    }
     if (target === 'all' || target === 'panel') {
-      const transform = panelAssemblyTransform(panel)
-      printablePanel = own(panel.clone().applyMatrix4(transform))
-      printablePanel.computeBoundingBox()
-      let parts: ThreeMfPart[]
       if (design.multicolor.enabled) {
         if (!materialParts?.length)
           throw new Error(
@@ -218,54 +340,99 @@ function buildMaterialExport({
           throw new Error(
             'The multicolor regions are out of date. Wait for the current design to finish.',
           )
-        parts = materialParts.map((part) => {
-          const material =
-            part.materialId === 'base'
-              ? { name: 'Background', color: design.panelColor }
-              : design.multicolor.materials.find(
-                  (item) => item.id === part.materialId,
-                )
-          if (!material)
-            throw new Error(
-              'The material regions no longer match the current palette. Please regenerate.',
-            )
-          return {
-            id: part.materialId,
-            name: material.name,
-            color: material.color,
-            geometry: own(part.geometry.clone().applyMatrix4(transform)),
-          }
-        })
-      } else {
-        parts = [
-          {
-            id: 'base',
-            name: 'Front panel',
-            color: design.panelColor,
-            geometry: printablePanel,
-          },
-        ]
       }
-      assemblies.push({
-        name: `Speaker ${design.model.toUpperCase()} panel`,
-        parts,
-      })
-    }
-    let precedingPart = printablePanel
-    const placeNextPart = (geometry: BufferGeometry) => {
-      geometry.computeBoundingBox()
-      if (precedingPart) {
-        geometry.translate(
-          precedingPart.boundingBox!.max.x + 10 - geometry.boundingBox!.min.x,
-          precedingPart.boundingBox!.min.y - geometry.boundingBox!.min.y,
-          0,
+      const panelPieces = design.panelSplit
+        ? splitPanelGeometries(panel).map((piece) => ({
+            ...piece,
+            geometry: own(piece.geometry),
+          }))
+        : [{ id: 'front' as const, geometry: panel }]
+      const taggedRegions =
+        design.multicolor.enabled &&
+        design.panelSplit &&
+        materialParts!.some(({ panelPart }) => panelPart !== undefined)
+      if (
+        taggedRegions &&
+        (materialParts!.some(
+          ({ panelPart }) => panelPart !== 'front' && panelPart !== 'upper',
+        ) ||
+          panelPieces.some(
+            ({ id }) =>
+              !materialParts!.some(({ panelPart }) => panelPart === id),
+          ))
+      )
+        throw new Error(
+          'The split material regions are incomplete. Wait for the current design to finish.',
         )
+      for (const piece of panelPieces) {
+        const transform = panelAssemblyTransform(piece.geometry, piece.id)
+        const printablePanel = own(
+          piece.geometry.clone().applyMatrix4(transform),
+        )
+        const [offsetX, offsetY] = placeNextPart(printablePanel)
+        let regions = materialParts
+        if (taggedRegions) {
+          regions = materialParts!.filter(
+            ({ panelPart }) => panelPart === piece.id,
+          )
+        } else if (design.multicolor.enabled && design.panelSplit) {
+          // Partition the exact physical solid, including the tongue/groove.
+          // A plane cut of the combined color mesh would put the tongue into
+          // the front object and could leave either physical part open.
+          const generated = await buildMulticolorGeometry(
+            piece.geometry,
+            design.multicolor,
+          )
+          regions = generated.parts
+          for (const region of regions) {
+            own(region.geometry)
+            if (region.previewGeometry) own(region.previewGeometry)
+          }
+        }
+        const name = design.panelSplit
+          ? `${piece.id === 'front' ? 'Front' : 'Upper'} panel`
+          : 'Front panel'
+        const parts: ThreeMfPart[] = design.multicolor.enabled
+          ? regions!.map((part) => {
+              const material =
+                part.materialId === 'base'
+                  ? { name: 'Background', color: design.panelColor }
+                  : design.multicolor.materials.find(
+                      (item) => item.id === part.materialId,
+                    )
+              if (!material)
+                throw new Error(
+                  'The material regions no longer match the current palette. Please regenerate.',
+                )
+              return {
+                id: part.materialId,
+                name: material.name,
+                color: material.color,
+                geometry: own(
+                  part.geometry
+                    .clone()
+                    .applyMatrix4(transform)
+                    .translate(offsetX, offsetY, 0),
+                ),
+              }
+            })
+          : [
+              {
+                id: 'base',
+                name,
+                color: design.panelColor,
+                geometry: printablePanel,
+              },
+            ]
+        assemblies.push({
+          name: `Speaker ${design.model.toUpperCase()} ${design.panelSplit ? `${piece.id} panel` : 'panel'}`,
+          parts,
+        })
       }
-      precedingPart = geometry
-      return geometry
     }
     if (target === 'all' || target === 'knob') {
-      const printableKnob = placeNextPart(own(prepareKnobExportGeometry(knob)))
+      const printableKnob = own(prepareKnobExportGeometry(knob))
+      placeNextPart(printableKnob)
       assemblies.push({
         name: 'Volume knob',
         parts: [
@@ -279,9 +446,10 @@ function buildMaterialExport({
       })
     }
     if (target === 'all' || target === 'power-button') {
-      const printablePowerButton = placeNextPart(
-        own(preparePowerButtonExportGeometry(powerButton)),
+      const printablePowerButton = own(
+        preparePowerButtonExportGeometry(powerButton),
       )
+      placeNextPart(printablePowerButton)
       assemblies.push({
         name: 'Power button',
         parts: [
@@ -303,8 +471,10 @@ function buildMaterialExport({
         geometryType: 'material-volumes',
         mapping: 'front-projection',
         depthMode: 'full-depth',
-        colorNote:
-          'Assign and confirm filament for each named material part in your slicer. Keep panel parts assembled; do not center or ground them separately.',
+        ...(splitPanel ? { panelSplit: splitPanelExportMetadata(panel) } : {}),
+        colorNote: splitPanel
+          ? 'Print the front and upper panel as separate objects. Keep the color regions within each object assembled; do not center or ground individual color regions. Slide the upper tongue down into the groove in the front panel before mounting.'
+          : 'Assign and confirm filament for each named material part in your slicer. Keep panel parts assembled; do not center or ground them separately.',
       },
     }
     if (format === '3mf')
@@ -334,7 +504,7 @@ function buildMaterialExport({
             ? 'volume-knob.stl'
             : assembly.name === 'Power button'
               ? 'power-button.stl'
-              : `panel-material-${String(index + 1).padStart(2, '0')}-${slug}.stl`
+              : `${design.panelSplit ? (assembly.name.endsWith('front panel') ? 'panel-front' : 'panel-upper') : 'panel'}-material-${String(index + 1).padStart(2, '0')}-${slug}.stl`
         entries.push({
           name,
           data: new Uint8Array(serializePlacedStl(part.geometry)),
@@ -362,7 +532,9 @@ function buildMaterialExport({
     entries.push({
       name: 'README.txt',
       data: encoder.encode(
-        'CMF Speaker Designer — multicolor parts\n\nImport all panel-material STLs together as PARTS OF ONE OBJECT at 100% scale in millimeters. Preserve their common positions; do not auto-arrange, center, or drop each part independently. Assign a filament to each named material, using materials.json as your color guide. The volume knob and power button are separate objects.\n\nThese are full-depth material regions of one assembled print, not separately printable inlays. Review sliced layers, supports, interfaces, and filament compatibility. Reopen the authored composition using Load design JSON in the designer.\n',
+        splitPanel
+          ? 'CMF Speaker Designer — split panel multicolor parts\n\nImport all panel-front-material STLs together as PARTS OF ONE OBJECT, then import all panel-upper-material STLs as PARTS OF A SECOND OBJECT, at 100% scale in millimeters. Each group is one physical print. Preserve the common positions within each group; do not center or ground individual color regions. The volume knob and power button are separate objects.\n\nAssign a filament to each named material using materials.json. Slide the upper tongue down into the groove in the printed front panel before mounting. Review supports and test-fit your first print. Reopen the authored composition using Load design JSON in the designer.\n'
+          : 'CMF Speaker Designer — multicolor parts\n\nImport all panel-material STLs together as PARTS OF ONE OBJECT at 100% scale in millimeters. Preserve their common positions; do not auto-arrange, center, or drop each part independently. Assign a filament to each named material, using materials.json as your color guide. The volume knob and power button are separate objects.\n\nThese are full-depth material regions of one assembled print, not separately printable inlays. Review sliced layers, supports, interfaces, and filament compatibility. Reopen the authored composition using Load design JSON in the designer.\n',
       ),
     })
     return {

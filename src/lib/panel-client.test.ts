@@ -50,6 +50,7 @@ function serializedPanel(): SerializedGeometry {
       addedFaceDepth: 0,
       panelExtension: 0,
       panelGap: 0,
+      panelSplit: false,
       units: 'mm',
     },
   }
@@ -75,6 +76,7 @@ function panelRequest(): Omit<HandleWorkerRequest, 'id'> {
     relief: DEFAULT_DESIGN.relief,
     panelExtension: DEFAULT_DESIGN.panelExtension,
     panelGap: DEFAULT_DESIGN.panelGap,
+    panelSplit: DEFAULT_DESIGN.panelSplit,
     raceStripes: DEFAULT_DESIGN.raceStripes,
   }
 }
@@ -156,6 +158,34 @@ describe('panel worker client', () => {
     const geometry = await pending
     geometry.dispose()
     source.dispose()
+  })
+
+  it('passes the split opt-in to the worker and transfers both printable pieces', async () => {
+    const { buildDesignPanelGeometry } = await import('./handles')
+    const { geometryTransferList } = await import('./geometry-transfer')
+    const pending = buildDesignPanelGeometry({
+      ...DEFAULT_DESIGN,
+      panelSplit: true,
+    })
+    const worker = PanelWorker.instances[0]
+    expect(worker.requests[0].payload.panelSplit).toBe(true)
+    const result = serializedPanel()
+    const frontPositions = result.positions.slice()
+    const upperPositions = result.positions.slice()
+    result.userData.panelSplit = true
+    result.userData.split = { frontPositions, upperPositions }
+    const transferred = structuredClone(result, {
+      transfer: geometryTransferList(result),
+    })
+    expect(frontPositions.byteLength).toBe(0)
+    expect(upperPositions.byteLength).toBe(0)
+    worker.respond(worker.requests[0], transferred)
+    const geometry = await pending
+    expect(geometry.userData.split.frontPositions).toBeInstanceOf(Float32Array)
+    expect(geometry.userData.split.upperPositions).toBeInstanceOf(Float32Array)
+    expect(geometry.userData.split.frontPositions.length).toBe(9)
+    expect(geometry.userData.split.upperPositions.length).toBe(9)
+    geometry.dispose()
   })
 
   it.each(['before response', 'after response'] as const)(

@@ -5,6 +5,7 @@ import { applyFaceDepth } from './face-depth'
 import { applyPanelExtension } from './panel-extension'
 import { createPanelGapEngine, type PanelGapMetadata } from './panel-gap'
 import type { HandleWorkerRequest } from './handles'
+import { createPanelSplitEngine, type PanelSplitMetadata } from './panel-split'
 import {
   createRaceStripeEngine,
   type RaceStripeMetadata,
@@ -17,9 +18,10 @@ export interface GeneratedPanel {
   halo?: HaloMetadata
   gap?: PanelGapMetadata
   raceStripes?: RaceStripeMetadata
+  split?: PanelSplitMetadata
 }
 
-/** One worker pipeline keeps all panel customizations in the same solid. */
+/** Build the complete panel in one worker, then optionally separate its jointed parts. */
 export function createPanelEngine(wasmUrl?: string) {
   const sources = new Map<string, Float32Array>()
   let handleEngine: ReturnType<typeof createHandleEngine> | undefined
@@ -27,6 +29,7 @@ export function createPanelEngine(wasmUrl?: string) {
   let haloEngine: ReturnType<typeof createHaloEngine> | undefined
   let gapEngine: ReturnType<typeof createPanelGapEngine> | undefined
   let stripeEngine: ReturnType<typeof createRaceStripeEngine> | undefined
+  let splitEngine: ReturnType<typeof createPanelSplitEngine> | undefined
 
   return {
     async build(
@@ -41,6 +44,7 @@ export function createPanelEngine(wasmUrl?: string) {
         relief,
         panelExtension,
         panelGap = 0,
+        panelSplit = false,
         raceStripes,
         source,
       } = request
@@ -55,6 +59,7 @@ export function createPanelEngine(wasmUrl?: string) {
       let haloMetadata: HaloMetadata | undefined
       let gapMetadata: PanelGapMetadata | undefined
       let stripeMetadata: RaceStripeMetadata | undefined
+      let splitMetadata: PanelSplitMetadata | undefined
       if (settings.mode === 'custom') {
         handleEngine ??= createHandleEngine(wasmUrl).catch((error) => {
           handleEngine = undefined
@@ -154,6 +159,20 @@ export function createPanelEngine(wasmUrl?: string) {
         positions = result.positions
         haloMetadata = result.metadata
       }
+      if (panelSplit) {
+        splitEngine ??= createPanelSplitEngine(wasmUrl).catch((error) => {
+          splitEngine = undefined
+          throw error
+        })
+        const result = (await splitEngine).build(
+          model,
+          positions,
+          relief,
+          panelGap,
+        )
+        positions = result.positions
+        splitMetadata = result.metadata
+      }
       return {
         positions,
         handle,
@@ -161,6 +180,7 @@ export function createPanelEngine(wasmUrl?: string) {
         halo: haloMetadata,
         gap: gapMetadata,
         raceStripes: stripeMetadata,
+        split: splitMetadata,
       }
     },
     async dispose() {
@@ -169,11 +189,13 @@ export function createPanelEngine(wasmUrl?: string) {
       const halos = await haloEngine
       const gaps = await gapEngine
       const stripes = await stripeEngine
+      const split = await splitEngine
       handles?.dispose()
       grilles?.dispose()
       halos?.dispose()
       gaps?.dispose()
       stripes?.dispose()
+      split?.dispose()
       sources.clear()
     },
   }

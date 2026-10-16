@@ -49,6 +49,14 @@ export function PrintGuide({ open, onOpenChange, triggerRef }: Props) {
                 openings. In the Knob tab, shape the upper grip while retaining
                 the original base and socket dimensions.
               </p>
+              <p>
+                Enable Split front and upper panel in Front panel → Print
+                assembly to separate the panel where its angled section starts.
+                Slide the upper part's tongue down into the recessed groove in
+                the back of the front plate before attaching the assembled panel
+                to the speaker. A small solid area around the joint may back the
+                uppermost openings when the grille continues across the face.
+              </p>
             </div>
           </li>
           <li>
@@ -89,14 +97,15 @@ export function PrintGuide({ open, onOpenChange, triggerRef }: Props) {
                 the printable button.
               </p>
               <p>
-                Multicolor designs default to 3MF, with one assembled panel and
-                separate material regions. The STL parts ZIP is an alternative:
-                import every panel-material file together as parts of one
-                object. Keep their common positions; do not center or drop parts
-                onto the plate individually. Assign filaments and inspect the
-                sliced layers. Combined STL/STP exports contain geometry only.
-                Small regions may disappear in slicing; adjust the pattern for
-                your nozzle and line width.
+                Multicolor designs default to 3MF, with separate material
+                regions within each printable object. With split assembly, print
+                the front and upper panel as two objects. The STL parts ZIP is
+                an alternative: import each panel's material files together as
+                parts of one object. Keep their common positions; do not center
+                or drop color regions onto the plate individually. Assign
+                filaments and inspect the sliced layers. Combined STL/STP
+                exports contain geometry only. Small regions may disappear in
+                slicing; adjust the pattern for your nozzle and line width.
               </p>
             </div>
           </li>
@@ -106,10 +115,11 @@ export function PrintGuide({ open, onOpenChange, triggerRef }: Props) {
               <h4>Test the first print</h4>
               <p>
                 Printer tolerances vary. Test the fit before making a full set.
-                Generated handles, panel gaps, and custom face depth have not
-                been physically tested. Check that the attachments lock and the
-                controls move freely. Test strength before using a printed
-                handle to carry a speaker.
+                Generated handles, split panel joints, panel gaps, and custom
+                face depth have not been physically tested. Check that the
+                attachments lock, the sliding joint fits, and the controls move
+                freely. Test strength before using a printed handle to carry a
+                speaker.
               </p>
               <p>
                 Multicolor material interfaces also need physical bonding and

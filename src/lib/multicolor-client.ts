@@ -4,6 +4,7 @@ import type { MulticolorRequest, MulticolorResponse } from './multicolor.worker'
 import type { MulticolorSettings } from './multicolor-settings'
 import { deserializeGeometry } from './geometry-transfer'
 import type { PreparedMulticolorResult } from './multicolor-mesh'
+import type { PanelSplitMetadata } from './panel-split'
 
 interface Job {
   request: MulticolorRequest
@@ -85,6 +86,11 @@ function pump() {
     ]
     if (request.mesh.indices)
       transfer.push(request.mesh.indices.buffer as ArrayBuffer)
+    if (request.upperMesh) {
+      transfer.push(request.upperMesh.positions.buffer as ArrayBuffer)
+      if (request.upperMesh.indices)
+        transfer.push(request.upperMesh.indices.buffer as ArrayBuffer)
+    }
     running.timeout = setTimeout(
       () =>
         resetWorker(
@@ -106,11 +112,17 @@ function requestPartition(
   mesh: MulticolorMesh,
   settings: MulticolorSettings,
   signal?: AbortSignal,
+  upperMesh?: MulticolorMesh,
 ) {
   if (signal?.aborted) return Promise.reject(cancelled())
   return new Promise<PreparedMulticolorResult>((resolve, reject) => {
     const job: Job = {
-      request: { id: ++nextId, mesh, settings },
+      request: {
+        id: ++nextId,
+        mesh,
+        settings,
+        ...(upperMesh ? { upperMesh } : {}),
+      },
       resolve,
       reject,
       signal,
@@ -141,7 +153,10 @@ export async function buildMulticolorGeometry(
   signal?: AbortSignal,
 ): Promise<{ parts: MaterialGeometry[]; diagnostics: string[] }> {
   if (signal?.aborted) throw cancelled()
-  const attribute = panel.getAttribute('position')
+  const split = panel.userData.split as PanelSplitMetadata | undefined
+  const attribute = split
+    ? new BufferAttribute(split.frontPositions, 3)
+    : panel.getAttribute('position')
   const contiguous =
     attribute instanceof BufferAttribute &&
     attribute.itemSize === 3 &&
@@ -156,11 +171,14 @@ export async function buildMulticolorGeometry(
       positions[i * 3 + 2] = attribute.getZ(i)
     }
   }
-  const index = panel.getIndex()
+  const index = split ? null : panel.getIndex()
   const mesh: MulticolorMesh = {
     positions,
     ...(index ? { indices: Uint32Array.from(index.array) } : {}),
   }
+  const upperMesh = split
+    ? { positions: new Float32Array(split.upperPositions) }
+    : undefined
   let result: PreparedMulticolorResult
   if (typeof Worker === 'undefined') {
     testEngine ??= import('./multicolor-geometry')
@@ -169,18 +187,21 @@ export async function buildMulticolorGeometry(
         testEngine = undefined
         throw error
       })
-    const { prepareMulticolorResult } = await import('./multicolor-mesh')
-    result = prepareMulticolorResult(
-      (await testEngine).build(mesh, settings),
+    const { prepareMulticolorPanelResult } = await import('./multicolor-mesh')
+    result = prepareMulticolorPanelResult(
+      (await testEngine).build,
+      mesh,
       settings,
+      upperMesh,
     )
   } else {
-    result = await requestPartition(mesh, settings, signal)
+    result = await requestPartition(mesh, settings, signal, upperMesh)
   }
   if (signal?.aborted) throw cancelled()
   const parts: MaterialGeometry[] = result.parts.map(
     ({
       materialId,
+      panelPart,
       geometry: printable,
       previewGeometry: preview,
       volume,
@@ -190,7 +211,14 @@ export async function buildMulticolorGeometry(
       const previewGeometry = deserializeGeometry(preview)
       geometry.userData.multicolorSourceUuid = panel.uuid
       previewGeometry.userData.multicolorSourceUuid = panel.uuid
-      return { materialId, geometry, previewGeometry, volume, elementIds }
+      return {
+        materialId,
+        ...(panelPart ? { panelPart } : {}),
+        geometry,
+        previewGeometry,
+        volume,
+        elementIds,
+      }
     },
   )
   return { parts, diagnostics: result.diagnostics }

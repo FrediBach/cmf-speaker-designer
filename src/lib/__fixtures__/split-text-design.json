@@ -1,0 +1,118 @@
+{
+  "model": "m",
+  "bodyColor": "black",
+  "bodyGrilleColor": "black",
+  "knob": {
+    "style": "text",
+    "text": "A",
+    "fontId": "inter",
+    "fontWeight": 700,
+    "height": 12,
+    "taper": 0,
+    "fluteCount": 9,
+    "fluteDepth": 0.951,
+    "flutePath": "spiral",
+    "facets": 9,
+    "gripWidth": 13,
+    "gripDepth": 12,
+    "gripThickness": 4
+  },
+  "grille": {
+    "size": 5.319,
+    "spacing": 4.84,
+    "slotLength": 21.965,
+    "rotation": 16.896,
+    "thickness": 3.08,
+    "recessDepth": 2.8,
+    "mode": "original",
+    "pattern": "slot",
+    "layout": "grid",
+    "extendPattern": true
+  },
+  "halo": {
+    "outwardAngle": 22.5,
+    "depth": 20,
+    "thickness": 3.718,
+    "rimHeight": 0,
+    "cutAngle": 7,
+    "cutRotation": 0,
+    "waveAmplitude": 3.7,
+    "waveFrequency": 10,
+    "wavePhase": 0,
+    "mode": "custom",
+    "waveShape": "sine",
+    "waveSeamless": true
+  },
+  "raceStripes": { "enabled": false, "count": 3, "width": 4.5, "gap": 8.7 },
+  "multicolor": {
+    "version": 1,
+    "enabled": true,
+    "mapping": "front-projection",
+    "depthMode": "full-depth",
+    "frame": { "centerX": 0, "centerY": 0, "width": 85, "height": 225 },
+    "materials": [
+      {
+        "id": "material-cb37e15c-b52d-4353-818e-ee98c8aa9e71",
+        "name": "Color 1",
+        "color": "#ffffff"
+      }
+    ],
+    "elements": [
+      {
+        "id": "shape-d7afc3e2-addb-4d46-aa19-cd1cb3bdcb82",
+        "name": "Text",
+        "visible": true,
+        "materialId": "material-cb37e15c-b52d-4353-818e-ee98c8aa9e71",
+        "x": 21.5,
+        "y": -45.5,
+        "rotation": 300,
+        "kind": "text",
+        "text": "NOTHING",
+        "fontId": "roboto",
+        "fontWeight": 800,
+        "fontSize": 66.23758881295447
+      },
+      {
+        "id": "shape-0816f900-4ce8-4d72-a9f4-485de46d7792",
+        "name": "Text",
+        "visible": true,
+        "materialId": "material-cb37e15c-b52d-4353-818e-ee98c8aa9e71",
+        "x": -12,
+        "y": 69.5,
+        "rotation": 300,
+        "kind": "text",
+        "text": "ABSOLUTELY",
+        "fontId": "helvetiker",
+        "fontWeight": 700,
+        "fontSize": 4
+      }
+    ],
+    "groups": []
+  },
+  "handle": {
+    "mode": "custom",
+    "legoStuds": false,
+    "height": 36.85,
+    "width": 101,
+    "cornerRadius": 2.675,
+    "topAngle": -0.416,
+    "topShape": "straight",
+    "topCurve": 8.771,
+    "cutout": "slits",
+    "svgCutout": null,
+    "holeCount": 5,
+    "holeWidth": 8.266799999999998,
+    "holeHeight": 21,
+    "holeGap": 4.101,
+    "offsetX": -3.552713678800501e-15,
+    "offsetY": 0
+  },
+  "style": "custom",
+  "panelColor": "#ff3d8b",
+  "powerButtonColor": "#4e5253",
+  "knobColor": "#4d4a4c",
+  "relief": 1.3,
+  "panelExtension": 0,
+  "panelGap": 0,
+  "panelSplit": true
+}

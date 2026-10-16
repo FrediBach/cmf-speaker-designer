@@ -186,7 +186,12 @@ export function DesignControls({
             update={update}
             onOpenGuide={onOpenGuide}
             geometry={meshes.previewGeometry}
-            materialCount={meshes.materialParts?.length ?? null}
+            materialCount={
+              meshes.materialParts
+                ? new Set(meshes.materialParts.map((part) => part.materialId))
+                    .size
+                : null
+            }
             patternNotes={meshes.multicolorDiagnostics}
             patternError={meshes.multicolorError}
             onBeginTransaction={onBeginTransaction}

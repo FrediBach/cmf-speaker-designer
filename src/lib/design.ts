@@ -74,6 +74,7 @@ export type Design = {
   relief: number
   panelExtension: number
   panelGap: number
+  panelSplit: boolean
   handle: HandleSettings
   grille: GrilleSettings
   halo: HaloSettings
@@ -92,6 +93,7 @@ export const DEFAULT_DESIGN: Design = {
   relief: 0,
   panelExtension: 0,
   panelGap: 0,
+  panelSplit: false,
   handle: getDefaultHandleSettings('s'),
   grille: { ...DEFAULT_GRILLE_SETTINGS },
   halo: { ...DEFAULT_HALO_SETTINGS },
@@ -156,6 +158,7 @@ export function validateDesign(value: unknown): Design {
       typeof data.panelGap === 'number' && Number.isFinite(data.panelGap)
         ? Math.round(Math.min(5, Math.max(0, data.panelGap)) * 10) / 10
         : 0,
+    panelSplit: data.panelSplit === true,
   }
 }
 
@@ -205,6 +208,7 @@ export function parseDesignJson(text: string): Design {
       'model',
       'panelColor',
       'powerButtonColor',
+      'panelSplit',
       'knobColor',
       'handle',
       'grille',

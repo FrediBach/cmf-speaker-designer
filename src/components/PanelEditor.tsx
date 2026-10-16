@@ -1,4 +1,4 @@
-import type { MouseEventHandler } from 'react'
+import { useId, type MouseEventHandler } from 'react'
 import { ArrowUpRight, Check, CircleHelp } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import { PanelIcon } from './PanelIcon'
@@ -42,6 +42,8 @@ export function PanelEditor({
 }: Props) {
   const panelExtensionCm = design.panelExtension / 10
   const panelGapCm = design.panelGap / 10
+  const splitLabelId = useId()
+  const splitDescriptionId = useId()
   return (
     <>
       <PanelShapeControls design={design} update={update} />
@@ -142,13 +144,43 @@ export function PanelEditor({
           posts. The knob and button stay in recessed openings.
         </p>
       </section>
+      <section className="control-section">
+        <h3>
+          <span>06</span> Print assembly
+        </h3>
+        <label className="grille-extension-toggle">
+          <input
+            type="checkbox"
+            aria-labelledby={splitLabelId}
+            aria-describedby={splitDescriptionId}
+            checked={design.panelSplit}
+            onChange={(event) => update({ panelSplit: event.target.checked })}
+          />
+          <span className="grille-checkbox" aria-hidden="true">
+            {design.panelSplit && <Check size={11} strokeWidth={2.5} />}
+          </span>
+          <span>
+            <strong id={splitLabelId}>Split front and upper panel</strong>
+            <small id={splitDescriptionId}>
+              Print two parts, joined where the angled section starts. The upper
+              part slides down into a groove in the back of the front plate.
+            </small>
+          </span>
+        </label>
+        {design.panelSplit && (
+          <p className="subtle-note">
+            Fit the parts together before mounting the panel. Check the first
+            print's sliding fit and strength before using the handle.
+          </p>
+        )}
+      </section>
       <RaceStripeEditor
         value={design.raceStripes}
         onChange={(raceStripes) => update({ raceStripes })}
       />
       <div className="looks-bar">
         <div className="looks-title">
-          <span className="section-index">07</span>
+          <span className="section-index">08</span>
           <span>Color presets</span>
         </div>
         <div className="looks">

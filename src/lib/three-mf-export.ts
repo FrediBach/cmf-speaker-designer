@@ -38,8 +38,15 @@ const xml = (value: string) => {
 }
 
 /** Derive this once from the complete panel; never ground individual regions. */
-export function panelAssemblyTransform(geometry: BufferGeometry) {
+export function panelAssemblyTransform(
+  geometry: BufferGeometry,
+  part: 'front' | 'upper' = 'front',
+) {
   const rotation = new Matrix4().makeRotationY(Math.PI)
+  // The upper control deck faces along [0, √½, √½]. Lay that face down
+  // before grounding the complete part, including its handle and sliding joint.
+  if (part === 'upper')
+    rotation.multiply(new Matrix4().makeRotationX(Math.PI / 4))
   const position = geometry.getAttribute('position')
   const point = new Vector3()
   const bounds = new Box3()

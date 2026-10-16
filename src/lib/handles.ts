@@ -25,6 +25,7 @@ export interface HandleWorkerRequest {
   relief: number
   panelExtension: number
   panelGap: number
+  panelSplit?: boolean
   raceStripes?: RaceStripeSettings
   source?: Float32Array
 }
@@ -44,7 +45,7 @@ let testEngine:
   | undefined
 
 /**
- * Generate the handle, side extension, gap, face depth, grille, halo, and stripes in one worker.
+ * Generate the handle, extensions, gap, face, grille, halo, stripes, and optional split in one worker.
  * Callers own the returned geometry; preview and STL export use this same mesh.
  * Original panels also use the worker for deformation, normals, and bounds.
  */
@@ -60,6 +61,7 @@ export async function buildHandledPanelGeometry(
   panelGap = 0,
   raceStripesInput?: RaceStripeSettings,
   signal?: AbortSignal,
+  panelSplit = false,
 ): Promise<BufferGeometry> {
   const settings = normalizeHandleSettings(model, input)
   const grille = normalizeGrilleSettings(grilleInput)
@@ -75,6 +77,7 @@ export async function buildHandledPanelGeometry(
     relief,
     panelExtension,
     panelGap,
+    panelSplit,
     raceStripes,
     source: source
       ? new Float32Array(source.getAttribute('position').array)
@@ -117,5 +120,6 @@ export function buildDesignPanelGeometry(design: Design, signal?: AbortSignal) {
     design.panelGap,
     design.raceStripes,
     signal,
+    design.panelSplit,
   )
 }

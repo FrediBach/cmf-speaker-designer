@@ -12,6 +12,11 @@ import {
 import type { MaterialGeometry } from '@/lib/multicolor-geometry'
 import type { PatternMaterial } from '@/lib/multicolor-settings'
 import {
+  speakerPreviewLayout,
+  splitPanelPreviewGeometries,
+  type PreviewPosition,
+} from '@/lib/preview-layout'
+import {
   CAMERA_MAX_POLAR,
   CAMERA_MIN_POLAR,
   presentationAngles,
@@ -31,7 +36,6 @@ import {
   DataTexture,
   ExtrudeGeometry,
   LinearFilter,
-  Matrix4,
   LinearMipmapLinearFilter,
   PerspectiveCamera,
   RepeatWrapping,
@@ -305,26 +309,20 @@ function SpeakerControls({
   knobGeometry,
   powerButtonColor,
   powerButtonGeometry,
-  model,
+  knobPosition,
+  powerButtonPosition,
 }: {
   knobColor: string
   knobGeometry: BufferGeometry | null
   powerButtonColor: string
   powerButtonGeometry: BufferGeometry | null
-  model: 's' | 'm'
+  knobPosition: PreviewPosition
+  powerButtonPosition: PreviewPosition
 }) {
-  const top = model === 's' ? 29.5 : 70
-  const depth = model === 's' ? -6 : -8.5
-  // All source panels place the control openings 28.5 mm from the centerline.
-  const controlOffset = 28.5
-
   return (
     <>
       {powerButtonGeometry && (
-        <group
-          position={[-controlOffset, top, depth]}
-          rotation={[-Math.PI / 4, 0, 0]}
-        >
+        <group position={powerButtonPosition} rotation={[-Math.PI / 4, 0, 0]}>
           <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
             <cylinderGeometry args={[9.4, 9.4, 1.1, 48]} />
             <meshStandardMaterial color="#1f2224" roughness={0.45} />
@@ -356,10 +354,7 @@ function SpeakerControls({
         </group>
       )}
       {knobGeometry && (
-        <group
-          position={[controlOffset, top, depth]}
-          rotation={[-Math.PI / 4, 0, 0]}
-        >
+        <group position={knobPosition} rotation={[-Math.PI / 4, 0, 0]}>
           <mesh
             position={[0, 0, -(knobGeometry.userData.knob?.mountHeight ?? 5)]}
             castShadow
@@ -707,7 +702,26 @@ export function SpeakerModel({
 > & { geometry: BufferGeometry }) {
   const height = model === 's' ? 130.97 : 224.97
   const width = 84.97
-  const offset = assembly === 'exploded' ? 32 : 0
+  const layout = useMemo(
+    () =>
+      speakerPreviewLayout(
+        geometry,
+        model,
+        assembly,
+        knobGeometry,
+        powerButtonGeometry,
+      ),
+    [geometry, model, assembly, knobGeometry, powerButtonGeometry],
+  )
+  const splitSingleColor = assembly === 'exploded' && !materialParts
+  const splitMeshes = useMemo(
+    () => (splitSingleColor ? splitPanelPreviewGeometries(geometry) : null),
+    [geometry, splitSingleColor],
+  )
+  useEffect(
+    () => () => splitMeshes?.forEach(({ geometry: piece }) => piece.dispose()),
+    [splitMeshes],
+  )
   return (
     <>
       {assembly !== 'panel' && assembly !== 'knob' && (
@@ -720,10 +734,17 @@ export function SpeakerModel({
         />
       )}
       {assembly !== 'knob' && (
-        <group position={[0, 0, offset]}>
+        <>
           {materialParts ? (
             materialParts.map((part) => (
-              <mesh key={part.materialId} castShadow receiveShadow>
+              <mesh
+                key={`${part.panelPart ?? 'panel'}:${part.materialId}`}
+                position={
+                  part.panelPart === 'upper' ? layout.upper : layout.front
+                }
+                castShadow
+                receiveShadow
+              >
                 <primitive
                   object={part.previewGeometry ?? part.geometry}
                   attach="geometry"
@@ -743,8 +764,20 @@ export function SpeakerModel({
                 />
               </mesh>
             ))
+          ) : splitMeshes ? (
+            splitMeshes.map(({ part, geometry: piece }) => (
+              <mesh key={part} position={layout[part]} castShadow receiveShadow>
+                <primitive object={piece} attach="geometry" dispose={null} />
+                <meshStandardMaterial
+                  color={panelColor}
+                  roughness={0.43}
+                  metalness={0.025}
+                  envMapIntensity={0.5}
+                />
+              </mesh>
+            ))
           ) : (
-            <mesh castShadow receiveShadow>
+            <mesh position={layout.front} castShadow receiveShadow>
               <primitive object={geometry} attach="geometry" dispose={null} />
               <meshStandardMaterial
                 color={panelColor}
@@ -760,10 +793,11 @@ export function SpeakerModel({
               knobGeometry={knobGeometry}
               powerButtonColor={powerButtonColor}
               powerButtonGeometry={powerButtonGeometry}
-              model={model}
+              knobPosition={layout.knob}
+              powerButtonPosition={layout.powerButton}
             />
           )}
-        </group>
+        </>
       )}
       {assembly === 'knob' && knobGeometry && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
@@ -816,36 +850,17 @@ function SpeakerScene({
   onStopPresentation?: () => void
 }) {
   const height = model === 's' ? 130.97 : 224.97
-  const width = 84.97
-  const offset = assembly === 'exploded' ? 32 : 0
-  const bounds = useMemo(() => {
-    if (assembly === 'knob' && knobGeometry) {
-      if (!knobGeometry.boundingBox) knobGeometry.computeBoundingBox()
-      return knobGeometry
-        .boundingBox!.clone()
-        .applyMatrix4(new Matrix4().makeRotationX(-Math.PI / 2))
-    }
-    const result = geometry.boundingBox?.clone() ?? new Box3()
-    if (result.isEmpty()) {
-      const positions = geometry.getAttribute('position')
-      const point = new Vector3()
-      for (let index = 0; index < positions.count; index++) {
-        result.expandByPoint(point.fromBufferAttribute(positions, index))
-      }
-    }
-    result.translate(new Vector3(0, 0, offset))
-    if (assembly !== 'panel') {
-      const bodyDepth = model === 's' ? 55 : 64
-      const controlsTop = model === 's' ? 45.5 : 86
-      result.union(
-        new Box3(
-          new Vector3(-width / 2, -height / 2 - 1.65, -bodyDepth - 2),
-          new Vector3(width / 2, controlsTop, 10 + offset),
-        ),
-      )
-    }
-    return result
-  }, [geometry, knobGeometry, model, assembly, offset, height])
+  const { bounds } = useMemo(
+    () =>
+      speakerPreviewLayout(
+        geometry,
+        model,
+        assembly,
+        knobGeometry,
+        powerButtonGeometry,
+      ),
+    [geometry, model, assembly, knobGeometry, powerButtonGeometry],
+  )
 
   return (
     <>
@@ -977,7 +992,9 @@ export function SpeakerPreview({
       data-power-button-ready={!!powerButtonGeometry}
       data-power-button-color={powerButtonColor}
       data-presentation={presentation}
-      data-material-count={materialParts?.length ?? 0}
+      data-material-count={
+        new Set(materialParts?.map((part) => part.materialId)).size
+      }
       role="img"
       data-preview-controls
       tabIndex={0}

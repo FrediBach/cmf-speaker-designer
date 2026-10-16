@@ -1,0 +1,129 @@
+{
+  "model": "s",
+  "bodyColor": "black",
+  "bodyGrilleColor": "orange",
+  "knob": {
+    "style": "arrow",
+    "text": "S",
+    "fontId": "playfair-display",
+    "fontWeight": 700,
+    "height": 18,
+    "taper": 0.4,
+    "fluteCount": 16,
+    "fluteDepth": 0.4,
+    "flutePath": "chevron",
+    "facets": 10,
+    "gripWidth": 12.8,
+    "gripDepth": 12.4,
+    "gripThickness": 3
+  },
+  "grille": {
+    "size": 8,
+    "spacing": 5,
+    "slotLength": 8,
+    "rotation": 30,
+    "thickness": 3,
+    "recessDepth": 1.6,
+    "mode": "custom",
+    "pattern": "hex",
+    "layout": "grid",
+    "extendPattern": false
+  },
+  "halo": {
+    "outwardAngle": 15,
+    "depth": 10,
+    "thickness": 2.5,
+    "rimHeight": 2.5,
+    "cutAngle": 0,
+    "cutRotation": 180,
+    "waveAmplitude": 3,
+    "waveFrequency": 4.5,
+    "wavePhase": 90,
+    "mode": "original",
+    "waveShape": "none",
+    "waveSeamless": true
+  },
+  "raceStripes": {
+    "enabled": true,
+    "count": 1,
+    "width": 7,
+    "gap": 7
+  },
+  "multicolor": {
+    "version": 1,
+    "enabled": true,
+    "mapping": "front-projection",
+    "depthMode": "full-depth",
+    "frame": {
+      "centerX": 0,
+      "centerY": 0,
+      "width": 85,
+      "height": 131
+    },
+    "materials": [
+      {
+        "id": "random-color-0",
+        "name": "Color 1",
+        "color": "#13b7b1"
+      },
+      {
+        "id": "random-color-1",
+        "name": "Color 2",
+        "color": "#eeeae1"
+      }
+    ],
+    "elements": [
+      {
+        "id": "random-stripe-0",
+        "name": "Stripe 1",
+        "visible": true,
+        "materialId": "random-color-0",
+        "x": -21.25,
+        "y": 0,
+        "rotation": 0,
+        "kind": "stripe",
+        "width": 42.5,
+        "height": 131
+      },
+      {
+        "id": "random-stripe-1",
+        "name": "Stripe 2",
+        "visible": true,
+        "materialId": "random-color-1",
+        "x": 21.25,
+        "y": 0,
+        "rotation": 0,
+        "kind": "stripe",
+        "width": 42.5,
+        "height": 131
+      }
+    ],
+    "groups": []
+  },
+  "handle": {
+    "mode": "custom",
+    "legoStuds": true,
+    "height": 44,
+    "width": 90,
+    "cornerRadius": 12,
+    "topAngle": -5,
+    "topShape": "outward",
+    "topCurve": 10,
+    "cutout": "slot",
+    "svgCutout": null,
+    "holeCount": 1,
+    "holeWidth": 8,
+    "holeHeight": 8,
+    "holeGap": 6,
+    "offsetX": 2,
+    "offsetY": 2
+  },
+  "style": "custom",
+  "panelColor": "#13b7b1",
+  "powerButtonColor": "#13b7b1",
+  "knobColor": "#e4b8b4",
+  "relief": 0.6,
+  "panelExtension": 0,
+  "panelGap": 0,
+  "panelSplit": false
+}

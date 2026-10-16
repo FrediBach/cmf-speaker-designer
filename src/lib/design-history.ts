@@ -93,6 +93,7 @@ function designsEqual(left: Design, right: Design) {
     left.relief === right.relief &&
     left.panelExtension === right.panelExtension &&
     left.panelGap === right.panelGap &&
+    left.panelSplit === right.panelSplit &&
     settingsEqual(leftHandle, rightHandle) &&
     svgCutoutsEqual(leftSvg, rightSvg) &&
     settingsEqual(left.grille, right.grille) &&

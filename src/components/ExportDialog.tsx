@@ -126,6 +126,7 @@ export function ExportDialog({
     !!geometry &&
     !!knobGeometry &&
     !!powerButtonGeometry &&
+    (!design.panelSplit || !includesPanel || !!geometry.userData.split) &&
     regionsReady &&
     !busy
   async function exportDesign() {
@@ -183,7 +184,11 @@ export function ExportDialog({
         </div>
         <span className="eyebrow">EXPORT / {formatLabel}</span>
         <DialogTitle>Export design</DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
+        <DialogDescription>
+          {design.panelSplit && includesPanel && isMaterialExport
+            ? 'Front and angled upper panel as separate print objects. Keep each object’s color regions together and assign a filament to each named material.'
+            : description}
+        </DialogDescription>
         <ExportChoices
           multicolor={design.multicolor.enabled}
           target={exportTarget}
@@ -207,6 +212,7 @@ export function ExportDialog({
           />
         )}
         <ExportNotes
+          panelSplit={design.panelSplit && includesPanel}
           extendedAttachments={includesPanel && design.panelGap > 0}
           includesPanel={includesPanel}
           isMaterialExport={isMaterialExport}
@@ -215,6 +221,7 @@ export function ExportDialog({
           formatLabel={formatLabel}
         />
         <ExportDownloadButton
+          panelSplit={design.panelSplit && includesPanel}
           busy={busy}
           disabled={
             !ready || (isMaterialExport && includesPanel && !!multicolorError)
@@ -231,6 +238,7 @@ export function ExportDialog({
 }
 
 function ExportDownloadButton({
+  panelSplit,
   busy,
   disabled,
   onClick,
@@ -239,6 +247,7 @@ function ExportDownloadButton({
   formatLabel,
   model,
 }: {
+  panelSplit: boolean
   busy: boolean
   disabled: boolean
   onClick: () => void
@@ -263,7 +272,9 @@ function ExportDownloadButton({
           ? 'Preparing files…'
           : exportFormat === '3mf'
             ? 'Download 3MF'
-            : exportFormat === 'stl-parts' || exportTarget === 'all'
+            : exportFormat === 'stl-parts' ||
+                exportTarget === 'all' ||
+                panelSplit
               ? 'Download ZIP'
               : `Download ${formatLabel}`}
         <span>Speaker {model.toUpperCase()}</span>
@@ -350,6 +361,7 @@ function ExportChoices({
 }
 
 function ExportNotes({
+  panelSplit,
   extendedAttachments,
   includesPanel,
   isMaterialExport,
@@ -357,6 +369,7 @@ function ExportNotes({
   exportFormat,
   formatLabel,
 }: {
+  panelSplit: boolean
   extendedAttachments: boolean
   includesPanel: boolean
   isMaterialExport: boolean
@@ -375,14 +388,23 @@ function ExportNotes({
         </p>
         <p>
           <Check size={15} />{' '}
-          {isMaterialExport && includesPanel
-            ? 'Panel regions share one assembly position'
-            : 'Separate parts, positioned on the build plate'}
+          {panelSplit
+            ? 'Front and upper panel positioned as separate print objects'
+            : isMaterialExport && includesPanel
+              ? 'Panel regions share one assembly position'
+              : 'Separate parts, positioned on the build plate'}
         </p>
-        {exportTarget === 'all' && !isMaterialExport && (
+        {panelSplit && (
           <p>
-            <Check size={15} /> ZIP includes all three {formatLabel} files and
-            design.json with your colors and settings
+            <Check size={15} /> Slide the upper tongue into the front panel’s
+            groove before mounting
+          </p>
+        )}
+        {(exportTarget === 'all' || panelSplit) && !isMaterialExport && (
+          <p>
+            <Check size={15} /> ZIP includes{' '}
+            {exportTarget === 'all' ? (panelSplit ? 'four' : 'three') : 'two'}{' '}
+            {formatLabel} files and design.json with your colors and settings
           </p>
         )}
       </div>
@@ -390,7 +412,7 @@ function ExportNotes({
         {isMaterialExport
           ? 'Confirm filament assignments in your slicer. Use compatible materials, inspect sliced boundaries and supports, and test fit and bonding before using the panel. 3MF display colors do not select printer filament slots.'
           : exportFormat === 'stp'
-            ? `Faceted STEP with ${STEP_TOLERANCE_MM} mm surface tolerance, without smooth CAD surfaces or parametric feature history. ${exportTarget === 'all' ? 'Colors are saved in the ZIP’s design.json.' : 'Choose All parts to include colors and settings in a ZIP.'}`
+            ? `Faceted STEP with ${STEP_TOLERANCE_MM} mm surface tolerance, without smooth CAD surfaces or parametric feature history. ${exportTarget === 'all' || panelSplit ? 'Colors are saved in the ZIP’s design.json.' : 'Choose All parts to include colors and settings in a ZIP.'}`
             : 'STL files don’t store colors. Match your selected colors with filament. Review supports in your slicer and test-fit your first print.'}
       </p>
     </>
@@ -477,15 +499,22 @@ function MaterialExportSummary({
   formatLabel: string
 }) {
   const { materialParts, multicolorDiagnostics } = meshes
+  const usedMaterials = materialParts
+    ? [
+        ...new Map(
+          materialParts.map((part) => [part.materialId, part]),
+        ).values(),
+      ]
+    : null
   return (
     <div className="multicolor-export-summary">
       {isMaterialExport ? (
         <>
           <strong>
-            {materialParts?.length ?? '…'} used materials · Full-depth regions
+            {usedMaterials?.length ?? '…'} used materials · Full-depth regions
           </strong>
           <div className="multicolor-export-materials">
-            {materialParts?.map((part) => {
+            {usedMaterials?.map((part) => {
               const material =
                 part.materialId === 'base'
                   ? { name: 'Background', color: design.panelColor }
@@ -513,9 +542,9 @@ function MaterialExportSummary({
         </>
       ) : (
         <p>
-          <strong>Combined geometry only.</strong> This {formatLabel} joins the
-          panel into one solid and discards material separation. Choose 3MF or
-          STL parts for multicolor printing.
+          <strong>Geometry only.</strong> This {formatLabel} discards material
+          separation{design.panelSplit ? ' within each panel piece' : ''}.
+          Choose 3MF or STL parts for multicolor printing.
         </p>
       )}
     </div>
@@ -578,6 +607,9 @@ function PanelExportSummary({
             : 'Standard face depth'}{' '}
           · {geometryLabel}
         </span>
+        {design.panelSplit && (
+          <span>Two-piece panel · Front + angled upper section</span>
+        )}
         {design.panelExtension > 0 && (
           <span>
             Side extension · {(design.panelExtension / 10).toFixed(2)} cm per

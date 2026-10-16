@@ -16,9 +16,17 @@ export function preparePanelGeometry(
     addedFaceDepth: request.relief,
     panelExtension: request.panelExtension,
     panelGap: request.panelGap,
+    panelSplit: request.panelSplit ?? false,
     units: 'mm',
   }
-  for (const key of ['handle', 'grille', 'halo', 'gap', 'raceStripes'] as const)
+  for (const key of [
+    'handle',
+    'grille',
+    'halo',
+    'gap',
+    'raceStripes',
+    'split',
+  ] as const)
     if (result[key]) geometry.userData[key] = result[key]
   computePanelNormals(geometry)
   geometry.computeBoundingBox()

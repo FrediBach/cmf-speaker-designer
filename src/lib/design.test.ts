@@ -229,6 +229,39 @@ describe('panel extension', () => {
   })
 })
 
+describe('split panel assembly', () => {
+  it('requires an explicit opt-in and preserves legacy one-piece designs', () => {
+    expect(DEFAULT_DESIGN.panelSplit).toBe(false)
+    for (const panelSplit of [undefined, null, false, 'true', 1, {}, []])
+      expect(validateDesign({ panelSplit }).panelSplit).toBe(false)
+    expect(parseDesignJson('{"model":"m"}').panelSplit).toBe(false)
+    expect(parseDesignJson('{"panelSplit":true}').panelSplit).toBe(true)
+  })
+
+  it.each(['s', 'm'] as const)(
+    'preserves the %s panel assembly choice through storage, sharing, and JSON import',
+    (model) => {
+      const design = validateDesign({
+        ...DEFAULT_DESIGN,
+        model,
+        panelSplit: true,
+        panelGap: 3.5,
+        panelExtension: 7.5,
+      })
+      expect(design.panelSplit).toBe(true)
+      const serialized = JSON.stringify(design)
+      expect(parseDesignJson(serialized)).toEqual(design)
+      vi.stubGlobal('window', { location: { search: '' } })
+      vi.stubGlobal('localStorage', { getItem: () => serialized })
+      expect(readDesign()).toEqual(design)
+      vi.stubGlobal('window', {
+        location: designShareUrl(design, 'https://example.com/designer/'),
+      })
+      expect(readDesign()).toEqual(design)
+    },
+  )
+})
+
 describe('panel gap', () => {
   it('keeps legacy panels flush and rejects malformed gaps', () => {
     expect(DEFAULT_DESIGN.panelGap).toBe(0)

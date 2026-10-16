@@ -17,7 +17,7 @@ export function usePanelGeometry(design: Design, retryKey: number) {
     key: string
     message: string
   } | null>(null)
-  const key = `${design.model}:${design.style}:${design.relief}:${design.panelExtension}:${design.panelGap}:${JSON.stringify(design.handle)}:${JSON.stringify(design.grille)}:${JSON.stringify(design.halo)}:${JSON.stringify(design.raceStripes)}:${retryKey}`
+  const key = `${design.model}:${design.style}:${design.relief}:${design.panelExtension}:${design.panelGap}:${design.panelSplit}:${JSON.stringify(design.handle)}:${JSON.stringify(design.grille)}:${JSON.stringify(design.halo)}:${JSON.stringify(design.raceStripes)}:${retryKey}`
 
   useEffect(() => {
     const controller = new AbortController()
@@ -51,6 +51,7 @@ export function usePanelGeometry(design: Design, retryKey: number) {
         design.grille.mode === 'custom' ||
         design.halo.mode === 'custom' ||
         design.panelGap > 0 ||
+        design.panelSplit ||
         design.raceStripes.enabled
         ? 180
         : 0,

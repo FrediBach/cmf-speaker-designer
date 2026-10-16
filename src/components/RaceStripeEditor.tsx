@@ -109,7 +109,7 @@ export function RaceStripeEditor({
   return (
     <section className="control-section">
       <h3>
-        <span>06</span> Race stripes
+        <span>07</span> Race stripes
       </h3>
       <label className="grille-extension-toggle">
         <input

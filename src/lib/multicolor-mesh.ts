@@ -6,6 +6,7 @@ import {
 } from './geometry-transfer'
 import {
   patternGeometryKey,
+  type MulticolorMesh,
   type MulticolorResult,
 } from './multicolor-geometry'
 import type { MulticolorSettings } from './multicolor-settings'
@@ -14,12 +15,35 @@ import { computePanelNormals } from './panel-normals'
 export interface PreparedMulticolorResult {
   parts: {
     materialId: string
+    panelPart?: 'front' | 'upper'
     geometry: SerializedGeometry
     previewGeometry: SerializedGeometry
     volume: number
     elementIds: string[]
   }[]
   diagnostics: string[]
+}
+
+/** Keep physical part identity through color partitioning, in assembly coordinates. */
+export function prepareMulticolorPanelResult(
+  build: (
+    mesh: MulticolorMesh,
+    settings: MulticolorSettings,
+  ) => MulticolorResult,
+  mesh: MulticolorMesh,
+  settings: MulticolorSettings,
+  upperMesh?: MulticolorMesh,
+): PreparedMulticolorResult {
+  const front = prepareMulticolorResult(build(mesh, settings), settings)
+  if (!upperMesh) return front
+  const upper = prepareMulticolorResult(build(upperMesh, settings), settings)
+  return {
+    parts: [
+      ...front.parts.map((part) => ({ ...part, panelPart: 'front' as const })),
+      ...upper.parts.map((part) => ({ ...part, panelPart: 'upper' as const })),
+    ],
+    diagnostics: [...new Set([...front.diagnostics, ...upper.diagnostics])],
+  }
 }
 
 /** Finish both printable topology and display normals before leaving the worker. */

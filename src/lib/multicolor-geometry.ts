@@ -12,6 +12,7 @@ import {
 /** Indexed topology is authoritative for both preview and multipart exports. */
 export interface MaterialGeometry {
   materialId: string
+  panelPart?: 'front' | 'upper'
   geometry: BufferGeometry
   previewGeometry?: BufferGeometry
   volume: number
@@ -168,6 +169,49 @@ function validateMesh(mesh: Required<MulticolorMesh>) {
     )
 }
 
+/** Resolve only sub-tolerance edges on faces already collapsed by Float32. */
+function snapDegenerateEdges(
+  mesh: Required<MulticolorMesh>,
+  tolerance: number,
+) {
+  const positions = mesh.positions.slice()
+  const distance = (a: number, b: number, original = false) => {
+    const first = original ? mesh.positions : positions
+    return Math.hypot(
+      first[a * 3] - positions[b * 3],
+      first[a * 3 + 1] - positions[b * 3 + 1],
+      first[a * 3 + 2] - positions[b * 3 + 2],
+    )
+  }
+  for (let triangle = 0; triangle < mesh.indices.length; triangle += 3) {
+    const [a, b, c] = mesh.indices.subarray(triangle, triangle + 3)
+    const ux = positions[b * 3] - positions[a * 3]
+    const uy = positions[b * 3 + 1] - positions[a * 3 + 1]
+    const uz = positions[b * 3 + 2] - positions[a * 3 + 2]
+    const vx = positions[c * 3] - positions[a * 3]
+    const vy = positions[c * 3 + 1] - positions[a * 3 + 1]
+    const vz = positions[c * 3 + 2] - positions[a * 3 + 2]
+    if (uy * vz !== uz * vy || uz * vx !== ux * vz || ux * vy !== uy * vx)
+      continue
+    const edges = [
+      [a, b],
+      [b, c],
+      [c, a],
+    ].sort(
+      (first, second) =>
+        distance(first[0], first[1]) - distance(second[0], second[1]),
+    )
+    let [from, to] = edges[0]
+    if (distance(from, to) > tolerance) continue
+    if (distance(from, to, true) > tolerance) [from, to] = [to, from]
+    // Bound total displacement even when adjacent degenerate faces share a
+    // vertex; repeated local edits must not accumulate beyond the tolerance.
+    if (distance(from, to, true) > tolerance) continue
+    positions.set(positions.subarray(to * 3, to * 3 + 3), from * 3)
+  }
+  return { positions, indices: mesh.indices }
+}
+
 /** Full-depth material assignment never changes the final panel's exterior. */
 export async function createMulticolorEngine(wasmUrl?: string) {
   const module = await initializeManifold(
@@ -287,7 +331,7 @@ export async function createMulticolorEngine(wasmUrl?: string) {
         for (const materialId of allowed) {
           const group = groups.get(materialId)
           if (!group) continue
-          const solid =
+          let solid =
             group.solids.length === 1
               ? group.solids[0]
               : own(module.Manifold.union(group.solids))
@@ -299,8 +343,30 @@ export async function createMulticolorEngine(wasmUrl?: string) {
             throw new Error(
               'A material could not be joined into a printable part.',
             )
-          const mesh = indexedMesh(solid)
-          validateMesh(mesh)
+          let mesh = indexedMesh(solid)
+          try {
+            validateMesh(mesh)
+          } catch (error) {
+            // Boolean intersections can produce distinct double-precision
+            // vertices which round to identical or collinear Float32 points.
+            // Snap only sub-0.00005 mm edges on those collapsed faces, then
+            // round-trip the indexed topology so the kernel can rebuild them.
+            // Never drop triangles: that would leave an open printable part.
+            const repaired = own(
+              sourceSolid(module, snapDegenerateEdges(mesh, 0.00005)),
+            )
+            if (
+              repaired.status() !== 'NoError' ||
+              repaired.isEmpty() ||
+              repaired.volume() <= 0 ||
+              Math.abs(repaired.volume() - solid.volume()) >
+                Math.max(0.001, solid.volume() * 0.00001)
+            )
+              throw error
+            mesh = indexedMesh(repaired)
+            validateMesh(mesh)
+            solid = repaired
+          }
           // A conservative footprint heuristic, not a promise about any printer.
           // Check the resolved material, including clipping and layer overlaps.
           const footprint = own(solid.project())

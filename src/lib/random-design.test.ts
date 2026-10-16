@@ -28,6 +28,7 @@ describe('random designs', () => {
       ]
       for (const design of designs) {
         expect(design.model).toBe(model)
+        expect(design.panelSplit).toBe(false)
         expect(design.handle.svgCutout).toBeNull()
         expect(['black', 'gray']).toContain(design.bodyColor)
         expect(

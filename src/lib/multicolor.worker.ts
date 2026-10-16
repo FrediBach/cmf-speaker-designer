@@ -5,7 +5,7 @@ import {
 } from './multicolor-geometry'
 import {
   multicolorTransferList,
-  prepareMulticolorResult,
+  prepareMulticolorPanelResult,
   type PreparedMulticolorResult,
 } from './multicolor-mesh'
 import type { MulticolorSettings } from './multicolor-settings'
@@ -13,6 +13,8 @@ import type { MulticolorSettings } from './multicolor-settings'
 export interface MulticolorRequest {
   id: number
   mesh: MulticolorMesh
+  /** When present, mesh is the front solid and this is its separate upper solid. */
+  upperMesh?: MulticolorMesh
   settings: MulticolorSettings
 }
 
@@ -24,15 +26,17 @@ export interface MulticolorResponse {
 
 let engine: ReturnType<typeof createMulticolorEngine> | undefined
 self.onmessage = async (event: MessageEvent<MulticolorRequest>) => {
-  const { id, mesh, settings } = event.data
+  const { id, mesh, settings, upperMesh } = event.data
   try {
     engine ??= createMulticolorEngine(wasmUrl).catch((error) => {
       engine = undefined
       throw error
     })
-    const result = prepareMulticolorResult(
-      (await engine).build(mesh, settings),
+    const result = prepareMulticolorPanelResult(
+      (await engine).build,
+      mesh,
       settings,
+      upperMesh,
     )
     self.postMessage({ id, result } satisfies MulticolorResponse, {
       transfer: multicolorTransferList(result),
