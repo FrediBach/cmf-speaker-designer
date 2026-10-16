@@ -118,11 +118,14 @@ function elementBounds(element: PatternElement): Bounds {
 function resized(element: PatternElement, scale: number): PatternElement {
   switch (element.kind) {
     case 'stripe':
+    case 'svg':
       return {
         ...element,
         width: element.width * scale,
         height: element.height * scale,
       }
+    case 'text':
+      return { ...element, fontSize: element.fontSize * scale }
     case 'circle':
       return {
         ...element,
@@ -558,7 +561,7 @@ export function MulticolorCanvas({
                   key={element.id}
                   d={paths.get(element.id)}
                   fill={materialColor(element.materialId)}
-                  fillRule="evenodd"
+                  fillRule="nonzero"
                   className="multicolor-shape"
                   onPointerDown={(event) => start(event, 'move', element)}
                 >

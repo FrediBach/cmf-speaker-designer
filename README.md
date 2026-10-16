@@ -85,7 +85,7 @@ Choose **Black** or **Gray** under **Speaker body**, next to the model selection
 - Generate a custom upper handle: adjust its height, width, rounded corners, top angle, and straight or inward/outward rounded top, then choose a solid face, one to three circular or slotted openings, one to seven rounded slits open at the top, or an uploaded SVG cutout.
 - Add LEGO-compatible studs to the custom handle's front face.
 - Recess one to three centered vertical race stripes into the panel, with adjustable stripe width and gap. Studs and decorative face recesses leave the stripes clear.
-- Compose multicolor stripes, crosses, circles/rings, and polygons with arbitrary colors, editable flag presets, a front-view canvas, and numeric controls.
+- Compose multicolor stripes, crosses, circles/rings, polygons, imported SVGs, and text with arbitrary colors, editable flag presets, a front-view canvas, and numeric controls.
 - Change built-in cutout size, spacing, and position, with dependent dimensions constrained to retain at least 3 mm of material between openings and around their closed edges.
 - Keep your current design locally and copy a link to share a configuration.
 - Select the supplied ring, bar, and cross volume knobs, or generate fluted, faceted, triangle, arrow, and V grips.
@@ -114,7 +114,11 @@ Recess depth ranges from 0.2 to 3 mm and is limited to the grille thickness minu
 
 In **Front panel → Colors**, choose **Multicolor** to reveal the configurator. The existing panel color becomes **Background**; knob and power button colors remain independent. Color mode works with both Original and Custom panel geometry. Switching to Single color hides the pattern without deleting it, and selecting Original panel shape retains the multicolor composition.
 
-Add and independently position stripes/rectangles, crosses with unequal arms, circles/rings, and polygons. Use the front-view canvas to move, rotate, resize, or edit polygon vertices, or use numeric coordinates in millimeters. Layer order determines which material wins at overlaps. Shapes can share named materials; **Make unique** separates an assignment, and explicit material merging combines it. Matching hex colors alone do not merge existing materials.
+Add and independently position stripes/rectangles, crosses with unequal arms, circles/rings, polygons, imported SVGs, and text. Use the front-view canvas to move, rotate, resize, or edit polygon vertices, or use numeric coordinates in millimeters. Layer order determines which material wins at overlaps. Shapes can share named materials; **Make unique** separates an assignment, and explicit material merging combines it. Matching hex colors alone do not merge existing materials.
+
+Choose **SVG** to import filled vector artwork as one material layer. Compound paths retain their holes, overlapping paths combine into one silhouette, and width/height edits preserve proportions. **Replace SVG** updates the artwork within its existing layer. Imports accept SVGs up to 256 KB and 4,096 sampled points; convert strokes and embedded text to filled paths and expand clips, masks, and other effects before importing. Original SVG colors are replaced by the layer’s material.
+
+Choose **Text** to add editable lettering with **Helvetiker**, **Optimer**, or **Droid Sans Mono** and a font size in millimeters. Fonts are bundled locally, and unsupported characters report an error. Text supports up to 120 characters within the outline complexity limit. Both new shapes support layer ordering, duplication, undo, saved design JSON, and the same full-depth material geometry in the 2D canvas, 3D preview, and multicolor exports.
 
 The stripe generator supports equal or weighted widths, direction, count, gaps, and a repeating color sequence. Generated stripes remain individually editable; redistribution changes their layout as an explicit operation. Presets include **France, Italy, Germany, Switzerland, Norway, United Kingdom, Rainbow, and Japan**. Each creates ordinary shapes, including asymmetric UK diagonal arms. Choose panel adaptation or preserved flag proportions; display RGB values approximate flag colors and do not specify filament colors.
 
@@ -208,6 +212,7 @@ Multicolor release validation is incomplete. The production build, 390 unit/inte
 - `src/lib/halo-settings.ts` constrains halo dimensions; `halo-geometry.ts` generates a flared annular wall, trims it with the selected cutting plane, and joins it to the panel.
 - `src/lib/race-stripe-settings.ts` validates centered stripe dimensions and shares their intervals with stud placement; `race-stripe-geometry.ts` cuts the recessed bands into the panel.
 - `src/lib/multicolor-settings.ts`, `multicolor-patterns.ts`, and `multicolor-presets.ts` own the versioned artwork document, primitive contours, generators, and editable flag recipes.
+- `src/lib/multicolor-vector.ts` combines imported SVG paths into material outlines; `multicolor-fonts.ts` generates lettering from bundled fonts, with attribution in `src/assets/fonts/README.txt`.
 - `src/components/MulticolorEditor.tsx` and `MulticolorCanvas.tsx` provide the layer/material inspector and 2D placement editor.
 - `src/lib/multicolor-geometry.ts` partitions the final solid and reports region diagnostics; `multicolor-mesh.ts` prepares printable and smoothed preview meshes in the worker. `multicolor-client.ts`, `multicolor.worker.ts`, and `use-multicolor-geometry.ts` handle worker scheduling, disposal, and current-result gating.
 - `src/lib/panel-engine.ts` combines handle generation, the shared face-depth transformation, grille generation, and halo generation in order inside the worker.

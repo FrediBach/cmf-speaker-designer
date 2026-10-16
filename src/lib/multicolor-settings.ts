@@ -1,4 +1,13 @@
-export type PatternKind = 'stripe' | 'cross' | 'circle' | 'polygon'
+import { validatePatternText } from './multicolor-fonts'
+
+export type PatternKind =
+  'stripe' | 'cross' | 'circle' | 'polygon' | 'svg' | 'text'
+export const PATTERN_FONTS = [
+  { id: 'helvetiker', name: 'Helvetiker' },
+  { id: 'optimer', name: 'Optimer' },
+  { id: 'droid-sans-mono', name: 'Droid Sans Mono' },
+] as const
+export type PatternFontId = (typeof PATTERN_FONTS)[number]['id']
 export type PatternFrame = {
   centerX: number
   centerY: number
@@ -31,6 +40,15 @@ export type PatternElement = ElementCommon &
       }
     | { kind: 'circle'; radius: number; innerRadius: number }
     | { kind: 'polygon'; points: PatternPoint[] }
+    | {
+        kind: 'svg'
+        sourceName: string
+        width: number
+        height: number
+        /** Centered unit contours, with counterclockwise exteriors and clockwise holes. */
+        contours: PatternPoint[][]
+      }
+    | { kind: 'text'; text: string; fontId: PatternFontId; fontSize: number }
   )
 export type PatternGroup = {
   id: string
@@ -59,6 +77,10 @@ export type MulticolorSettings = {
 export const MULTICOLOR_LIMITS = {
   elements: 128,
   polygonVertices: 128,
+  svgBytes: 256 * 1024,
+  vectorContours: 512,
+  vectorVertices: 20_000,
+  textLength: 120,
   materials: 128,
   groups: 128,
   coordinate: 10_000,
@@ -389,6 +411,69 @@ export function normalizeMulticolorSettings(
             `Polygon “${common.name}” vertices must form a nonzero simple shape without crossing edges.`,
           )
         return { ...common, kind: 'polygon', points }
+      }
+      case 'svg': {
+        let vertexCount = 0
+        const contours = list(
+          element.contours,
+          'SVG contours',
+          MULTICOLOR_LIMITS.vectorContours,
+        ).map((rawContour): PatternPoint[] => {
+          const points = list(
+            rawContour,
+            'SVG contour points',
+            MULTICOLOR_LIMITS.vectorVertices,
+          ).map((rawPoint): PatternPoint => {
+            if (!Array.isArray(rawPoint) || rawPoint.length !== 2)
+              return fail('Each SVG point must contain X and Y coordinates.')
+            const x = number(rawPoint[0], 'SVG point X')
+            const y = number(rawPoint[1], 'SVG point Y')
+            if (Math.abs(x) > 0.500001 || Math.abs(y) > 0.500001)
+              fail('SVG contours must fit within their normalized bounds.')
+            return [x, y]
+          })
+          vertexCount += points.length
+          if (vertexCount > MULTICOLOR_LIMITS.vectorVertices)
+            fail(
+              `SVG shapes support at most ${MULTICOLOR_LIMITS.vectorVertices} points.`,
+            )
+          if (points.length < 3 || Math.abs(polygonSignedArea(points)) < 1e-12)
+            fail('SVG contours must enclose a nonzero area.')
+          return points
+        })
+        if (!contours.length) fail('The SVG needs at least one filled contour.')
+        return {
+          ...common,
+          kind: 'svg',
+          sourceName: text(
+            element.sourceName,
+            'SVG file name',
+            'Artwork.svg',
+            255,
+          ),
+          width: positive(element.width, 'SVG width'),
+          height: positive(element.height, 'SVG height'),
+          contours,
+        }
+      }
+      case 'text': {
+        const content = text(
+          element.text,
+          'Text',
+          undefined,
+          MULTICOLOR_LIMITS.textLength,
+        )
+        if (!PATTERN_FONTS.some(({ id }) => id === element.fontId))
+          fail('Choose a supported text font.')
+        const fontId = element.fontId as PatternFontId
+        validatePatternText(content, fontId)
+        return {
+          ...common,
+          kind: 'text',
+          text: content,
+          fontId,
+          fontSize: positive(element.fontSize, 'Font size'),
+        }
       }
       default:
         return fail('Unsupported pattern element kind.')

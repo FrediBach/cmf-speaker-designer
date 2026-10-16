@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { BufferGeometry } from 'three'
 import {
   ArrowDown,
@@ -7,20 +7,24 @@ import {
   Copy,
   Eye,
   EyeOff,
+  FileUp,
   Plus,
   RectangleHorizontal,
   Shapes,
   Trash2,
+  Type,
   X,
 } from 'lucide-react'
 import {
   MULTICOLOR_LIMITS,
+  PATTERN_FONTS,
   getDefaultMulticolorSettings,
   normalizeMulticolorSettings,
   type MulticolorSettings,
   type PatternElement,
   type PatternFrame,
   type PatternKind,
+  type PatternFontId,
 } from '@/lib/multicolor-settings'
 import {
   createPatternElement,
@@ -29,6 +33,7 @@ import {
   generateStripes,
   getElementContours,
 } from '@/lib/multicolor-patterns'
+import type { ImportedSvgShape } from '@/lib/multicolor-vector'
 import {
   applyMulticolorPreset,
   MULTICOLOR_PRESETS,
@@ -128,10 +133,12 @@ function TextField({
   label,
   value,
   onChange,
+  maxLength = MULTICOLOR_LIMITS.nameLength,
 }: {
   label: string
   value: string
   onChange: (next: string) => void
+  maxLength?: number
 }) {
   const [previous, setPrevious] = useState(value)
   const [draft, setDraft] = useState(value)
@@ -145,7 +152,7 @@ function TextField({
       <span>{label}</span>
       <input
         value={draft}
-        maxLength={MULTICOLOR_LIMITS.nameLength}
+        maxLength={maxLength}
         onFocus={() => {
           cancelled.current = false
         }}
@@ -284,6 +291,20 @@ export function MulticolorEditor({
   const [stripeWeights, setStripeWeights] = useState('')
   const [stripeColors, setStripeColors] = useState('#f45427, #eeeae1, #303538')
   const [mergeTargets, setMergeTargets] = useState<Record<string, string>>({})
+  const [importingSvg, setImportingSvg] = useState(false)
+  const svgInput = useRef<HTMLInputElement>(null)
+  const svgReplacementId = useRef<string | null>(null)
+  const svgRequest = useRef(0)
+  const latestDocument = useRef({ value, model })
+  useLayoutEffect(() => {
+    latestDocument.current = { value, model }
+  }, [value, model])
+  useEffect(
+    () => () => {
+      svgRequest.current += 1
+    },
+    [],
+  )
   const selected = value.elements.find((element) => element.id === selectedId)
   const selectedGroup = selected?.groupId
     ? value.groups.find((group) => group.id === selected.groupId)
@@ -341,7 +362,7 @@ export function MulticolorEditor({
         element.id === next.id ? next : element,
       ),
     })
-  const addShape = (kind: PatternKind) =>
+  const addShape = (kind: PatternKind, imported?: ImportedSvgShape) =>
     attempt(() => {
       let materialId = selected?.materialId ?? value.materials[0]?.id
       let next = value
@@ -362,12 +383,90 @@ export function MulticolorEditor({
             ],
           }
       }
-      const shape = createPatternElement(kind, value.frame, materialId)
+      const shape: PatternElement = imported
+        ? {
+            ...createPatternElement('svg', value.frame, materialId),
+            ...imported,
+            kind: 'svg',
+            name:
+              imported.sourceName
+                .replace(/\.svg$/i, '')
+                .slice(0, MULTICOLOR_LIMITS.nameLength) || 'SVG',
+          }
+        : createPatternElement(kind, value.frame, materialId)
       if (commit({ ...next, elements: [...value.elements, shape] })) {
         setSelectedId(shape.id)
         setAnnouncement(`${shape.name} added.`)
       }
     })
+  const chooseSvg = (replacementId: string | null = null) => {
+    svgReplacementId.current = replacementId
+    svgInput.current?.click()
+  }
+  const readSvg = async (file: File) => {
+    const request = ++svgRequest.current
+    const replacementId = svgReplacementId.current
+    const baseline = value
+    setImportingSvg(true)
+    try {
+      if (file.size > MULTICOLOR_LIMITS.svgBytes)
+        throw new Error(
+          `SVG files must be ${Math.floor(MULTICOLOR_LIMITS.svgBytes / 1024)} KB or smaller.`,
+        )
+      const source = await file.text()
+      if (request !== svgRequest.current) return
+      // File reads can finish after an undo, preset change, or another edit.
+      // Never replace a newer document with the snapshot from the file picker.
+      if (
+        latestDocument.current.value !== baseline ||
+        latestDocument.current.model !== model
+      )
+        throw new Error(
+          'The artwork changed while the SVG was loading. Please import it again.',
+        )
+      const { importSvgShape } = await import('@/lib/multicolor-vector')
+      const imported = await importSvgShape(source, file.name, value.frame)
+      if (request !== svgRequest.current) return
+      if (
+        latestDocument.current.value !== baseline ||
+        latestDocument.current.model !== model
+      )
+        throw new Error(
+          'The artwork changed while the SVG was loading. Please import it again.',
+        )
+      if (replacementId) {
+        const replacement = value.elements.find(
+          (element) => element.id === replacementId,
+        )
+        if (replacement?.kind !== 'svg')
+          throw new Error('The SVG layer to replace is no longer available.')
+        attempt(() => {
+          if (
+            editElement({
+              ...replacement,
+              ...imported,
+              width: replacement.width,
+              height: (replacement.width * imported.height) / imported.width,
+            })
+          ) {
+            setSelectedId(replacement.id)
+            setAnnouncement(`${replacement.name} SVG replaced.`)
+          }
+        })
+      } else {
+        addShape('svg', imported)
+      }
+    } catch (cause) {
+      if (request === svgRequest.current)
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : 'This SVG could not be imported.',
+        )
+    } finally {
+      if (request === svgRequest.current) setImportingSvg(false)
+    }
+  }
   const duplicate = () => {
     if (!selected) return
     const copy: PatternElement = {
@@ -380,6 +479,10 @@ export function MulticolorEditor({
     delete copy.groupId
     if (copy.kind === 'polygon')
       copy.points = copy.points.map(([x, y]) => [x, y])
+    if (copy.kind === 'svg')
+      copy.contours = copy.contours.map((contour) =>
+        contour.map(([x, y]) => [x, y]),
+      )
     if (commit({ ...value, elements: [...value.elements, copy] })) {
       setSelectedId(copy.id)
       setAnnouncement(`${selected.name} duplicated.`)
@@ -794,7 +897,40 @@ export function MulticolorEditor({
           <Shapes size={15} />
           Polygon
         </button>
+        <button
+          type="button"
+          onClick={() => chooseSvg()}
+          disabled={importingSvg}
+        >
+          <FileUp size={15} />
+          SVG
+        </button>
+        <button type="button" onClick={() => addShape('text')}>
+          <Type size={15} />
+          Text
+        </button>
       </div>
+      <p className="multicolor-hint multicolor-import-hint">
+        SVGs use one material. Convert strokes and text to filled paths before
+        importing.
+      </p>
+      <input
+        ref={svgInput}
+        type="file"
+        accept=".svg,image/svg+xml"
+        aria-label="Import SVG shape"
+        hidden
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0]
+          event.currentTarget.value = ''
+          if (file) void readSvg(file)
+        }}
+      />
+      {importingSvg && (
+        <p className="multicolor-hint" role="status">
+          Importing SVG…
+        </p>
+      )}
       {!value.elements.length ? (
         <p className="multicolor-empty">
           Start with a shape, a preset, or generated stripes.
@@ -995,6 +1131,85 @@ export function MulticolorEditor({
             max={360}
             unit="°"
           />
+          {selected.kind === 'svg' && (
+            <>
+              <div className="multicolor-svg-source">
+                <span title={selected.sourceName}>{selected.sourceName}</span>
+                <button
+                  type="button"
+                  onClick={() => chooseSvg(selected.id)}
+                  disabled={importingSvg}
+                >
+                  Replace SVG
+                </button>
+              </div>
+              <div className="multicolor-field-grid">
+                <NumberField
+                  label="SVG width"
+                  value={selected.width}
+                  min={0.01}
+                  onChange={(width) =>
+                    editElement({
+                      ...selected,
+                      width,
+                      height: (selected.height * width) / selected.width,
+                    })
+                  }
+                />
+                <NumberField
+                  label="SVG height"
+                  value={selected.height}
+                  min={0.01}
+                  onChange={(height) =>
+                    editElement({
+                      ...selected,
+                      height,
+                      width: (selected.width * height) / selected.height,
+                    })
+                  }
+                />
+              </div>
+              <p className="multicolor-hint">
+                Resizing keeps the SVG proportions. All imported shapes use this
+                layer’s material.
+              </p>
+            </>
+          )}
+          {selected.kind === 'text' && (
+            <>
+              <TextField
+                label="Text content"
+                value={selected.text}
+                maxLength={MULTICOLOR_LIMITS.textLength}
+                onChange={(text) => editElement({ ...selected, text })}
+              />
+              <label className="multicolor-select">
+                <span>Text font</span>
+                <select
+                  aria-label="Text font"
+                  value={selected.fontId}
+                  onChange={(event) =>
+                    editElement({
+                      ...selected,
+                      fontId: event.target.value as PatternFontId,
+                    })
+                  }
+                >
+                  {PATTERN_FONTS.map((font) => (
+                    <option key={font.id} value={font.id}>
+                      {font.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <NumberField
+                label="Font size"
+                value={selected.fontSize}
+                min={0.1}
+                onChange={(fontSize) => editElement({ ...selected, fontSize })}
+              />
+            </>
+          )}
           {selected.kind === 'stripe' && (
             <>
               <div className="multicolor-field-grid">

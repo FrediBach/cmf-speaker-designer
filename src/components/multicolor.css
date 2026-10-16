@@ -403,6 +403,27 @@
 .multicolor-selected .multicolor-section-heading {
   margin: 0;
 }
+.multicolor-svg-source {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+.multicolor-import-hint {
+  margin-top: 7px;
+}
+.multicolor-svg-source > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.multicolor-svg-source > button {
+  flex-shrink: 0;
+}
 .multicolor-icon-actions {
   display: flex;
   gap: 5px;

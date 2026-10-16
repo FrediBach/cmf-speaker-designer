@@ -9,6 +9,7 @@ import {
   type PatternKind,
   type PatternPoint,
 } from './multicolor-settings'
+import { getTextContours } from './multicolor-fonts'
 
 export const CIRCLE_CHORD_ERROR_MM = 0.025
 let nextId = 0
@@ -29,6 +30,8 @@ export function createPatternElement(
       cross: 'Cross',
       circle: 'Circle',
       polygon: 'Polygon',
+      svg: 'SVG',
+      text: 'Text',
     }[kind],
     visible: true,
     materialId,
@@ -61,6 +64,30 @@ export function createPatternElement(
           [size * 0.25, -size * 0.2],
           [0, size * 0.25],
         ],
+      }
+    case 'svg':
+      return {
+        ...common,
+        kind,
+        sourceName: 'Artwork.svg',
+        width: size * 0.6,
+        height: size * 0.6,
+        contours: [
+          [
+            [-0.5, -0.5],
+            [0.5, -0.5],
+            [0.5, 0.5],
+            [-0.5, 0.5],
+          ],
+        ],
+      }
+    case 'text':
+      return {
+        ...common,
+        kind,
+        text: 'CMF',
+        fontId: 'helvetiker',
+        fontSize: size * 0.2,
       }
   }
 }
@@ -133,6 +160,17 @@ export function getElementContours(element: PatternElement): PatternPoint[][] {
       contours = [points]
       break
     }
+    case 'svg':
+      contours = element.contours.map((contour) =>
+        contour.map(([x, y]): PatternPoint => [
+          x * element.width,
+          y * element.height,
+        ]),
+      )
+      break
+    case 'text':
+      contours = getTextContours(element.text, element.fontId, element.fontSize)
+      break
   }
   const angle = (element.rotation * Math.PI) / 180,
     cosine = Math.cos(angle),
@@ -309,6 +347,21 @@ export function fitMulticolorArtwork(
           ...common,
           kind: 'polygon',
           points: element.points.map(([x, y]) => [x * scale, y * scale]),
+        }
+      case 'svg':
+        return {
+          ...element,
+          x: common.x,
+          y: common.y,
+          width: element.width * scale,
+          height: element.height * scale,
+        }
+      case 'text':
+        return {
+          ...element,
+          x: common.x,
+          y: common.y,
+          fontSize: element.fontSize * scale,
         }
     }
   })
